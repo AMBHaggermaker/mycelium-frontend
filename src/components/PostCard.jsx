@@ -1,0 +1,129 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../auth';
+import api from '../api';
+
+const TYPE_BADGE = { need: 'badge-need', offer: 'badge-offer', event: 'badge-event' };
+const BASE_URL = 'https://mycelium.unprecedentedtimes.org';
+
+function fmt(date) {
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function MediaGrid({ media }) {
+  const [lightbox, setLightbox] = useState(null);
+  if (!media?.length) return null;
+
+  const visible = media.slice(0, 4);
+  const extra = media.length - 4;
+  const countClass = media.length === 1 ? 'count-1' : media.length === 2 ? 'count-2' : media.length === 3 ? 'count-3' : 'count-4';
+
+  return (
+    <>
+      <div className={`media-grid ${countClass}`}>
+        {visible.map((m, i) => {
+          const isVideo = m.mime_type?.startsWith('video/');
+          const url = `${BASE_URL}${m.url}`;
+          const isLast = i === 3 && extra > 0;
+          return (
+            <div key={m.id} className="media-item" onClick={() => !isVideo && setLightbox(url)}>
+              {isVideo
+                ? <video src={url} controls onClick={e => e.stopPropagation()} />
+                : <img src={url} alt="" loading="lazy" />
+              }
+              {isLast && <div className="media-more-overlay">+{extra + 1}</div>}
+            </div>
+          );
+        })}
+      </div>
+      {lightbox && (
+        <div className="lightbox-overlay" onClick={() => setLightbox(null)}>
+          <button className="lightbox-close" onClick={() => setLightbox(null)}>✕</button>
+          <img src={lightbox} alt="" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+    </>
+  );
+}
+
+export default function PostCard({ post, onRequireAuth, onReserved }) {
+  const { user, token } = useAuth();
+  const [reserving, setReserving] = useState(false);
+  const [reserved,  setReserved]  = useState(false);
+  const [err, setErr]             = useState(null);
+
+  const isOwn  = user?.id === post.user_id;
+  const cap    = post.capacity;
+  const filled = post.reserved_count ?? 0;
+  const isFull = cap !== null && filled >= cap;
+  const pct    = cap ? Math.min(100, (filled / cap) * 100) : 0;
+
+  async function reserve() {
+    if (!user) { onRequireAuth?.(); return; }
+    setReserving(true); setErr(null);
+    try {
+      await api.createReservation({ post_id: post.id }, token);
+      setReserved(true);
+      onReserved?.();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setReserving(false);
+    }
+  }
+
+  return (
+    <div className="card post-card">
+      <div className="post-header">
+        <span className={`badge ${TYPE_BADGE[post.type]}`}>{post.type}</span>
+        <span className="post-meta">
+          <Link to={`/profile/${post.user_id}`} className="username-link">
+            {post.username}
+          </Link>
+          <span className="score">★ {parseFloat(post.reliability_score || 5).toFixed(1)}</span>
+        </span>
+      </div>
+
+      <h3 className="post-title">{post.title}</h3>
+
+      {post.description && <p className="post-description">{post.description}</p>}
+
+      <MediaGrid media={post.media} />
+
+      <div className="post-details">
+        {post.location    && <span>📍 {post.location}</span>}
+        {post.starts_at   && <span>🗓 {fmt(post.starts_at)}</span>}
+        {post.circle_name && <span>⬡ {post.circle_name}</span>}
+      </div>
+
+      {post.tags?.length > 0 && (
+        <div className="tags">
+          {post.tags.map(t => <span key={t} className="tag">{t}</span>)}
+        </div>
+      )}
+
+      {cap !== null && (
+        <div className="capacity-section">
+          <div className="capacity-bar">
+            <div className={`capacity-fill${isFull ? ' full' : ''}`} style={{ width: `${pct}%` }} />
+          </div>
+          <span className="capacity-label">{filled} / {cap} spots</span>
+        </div>
+      )}
+
+      {err && <p className="card-error">{err}</p>}
+
+      {!isOwn && post.status === 'active' && (
+        <div className="post-actions">
+          <button
+            className={`btn btn-sm ${reserved ? 'btn-success' : 'btn-primary'}`}
+            onClick={reserve}
+            disabled={reserving || reserved || isFull}
+          >
+            {reserved ? 'Reserved ✓' : isFull ? 'Full' : reserving ? '…' : 'Reserve'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

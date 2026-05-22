@@ -1,0 +1,96 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../auth';
+import api from '../api';
+import PostCard from '../components/PostCard';
+import NewPostModal from '../components/NewPostModal';
+import UrgentStrip from '../components/UrgentStrip';
+
+const TYPES = [
+  { value: '',      label: 'All'    },
+  { value: 'need',  label: 'Needs'  },
+  { value: 'offer', label: 'Offers' },
+  { value: 'event', label: 'Events' },
+];
+
+export default function Feed({ onRequireAuth }) {
+  const { user, token } = useAuth();
+  const [posts,    setPosts]    = useState([]);
+  const [type,     setType]     = useState('');
+  const [search,   setSearch]   = useState('');
+  const [loading,  setLoading]  = useState(true);
+  const [err,      setErr]      = useState(null);
+  const [showNew,  setShowNew]  = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr(null);
+    try {
+      let result;
+      if (search.trim()) {
+        const res = await api.search({ q: search.trim(), type: 'posts', post_type: type || undefined });
+        result = res.posts ?? [];
+      } else {
+        result = await api.getPosts({ status: 'active', type: type || undefined }, token);
+      }
+      setPosts(result);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [type, search, token]);
+
+  useEffect(() => {
+    const t = setTimeout(load, search ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [load, search]);
+
+  return (
+    <div className="page">
+      <div className="container">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Hotlight</h1>
+            <p className="page-subtitle">Needs, offers, and events from the community</p>
+          </div>
+          {user
+            ? <button className="btn btn-primary" onClick={() => setShowNew(true)}>+ New Post</button>
+            : <button className="btn btn-outline" onClick={onRequireAuth}>Sign in to post</button>
+          }
+        </div>
+
+        <UrgentStrip />
+
+        <div className="filter-row">
+          <div className="filter-tabs">
+            {TYPES.map(t => (
+              <button key={t.value}
+                className={`filter-tab${type === t.value ? ' active' : ''}${t.value ? ` tab-${t.value}` : ''}`}
+                onClick={() => setType(t.value)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <input className="search-input" placeholder="Search…" value={search}
+            onChange={e => setSearch(e.target.value)} />
+        </div>
+
+        {loading
+          ? <div className="spinner" />
+          : err
+            ? <p className="error-msg">{err}</p>
+            : posts.length === 0
+              ? <p className="empty">No posts yet — be the first to share a need or offer.</p>
+              : <div className="post-grid">
+                  {posts.map(p => (
+                    <PostCard key={p.id} post={p} onRequireAuth={onRequireAuth} onReserved={load} />
+                  ))}
+                </div>
+        }
+      </div>
+
+      {showNew && (
+        <NewPostModal onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); load(); }} />
+      )}
+    </div>
+  );
+}
