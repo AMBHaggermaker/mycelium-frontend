@@ -56,6 +56,8 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
   const { user, token } = useAuth();
   const [reserving, setReserving] = useState(false);
   const [reserved,  setReserved]  = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [reported,  setReported]  = useState(false);
   const [err, setErr]             = useState(null);
 
   const isOwn  = user?.id === post.user_id;
@@ -63,6 +65,19 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
   const filled = post.reserved_count ?? 0;
   const isFull = cap !== null && filled >= cap;
   const pct    = cap ? Math.min(100, (filled / cap) * 100) : 0;
+
+  async function report() {
+    if (!user) { onRequireAuth?.(); return; }
+    setReporting(true); setErr(null);
+    try {
+      await api.reportPost(post.id, token);
+      setReported(true);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setReporting(false);
+    }
+  }
 
   async function reserve() {
     if (!user) { onRequireAuth?.(); return; }
@@ -149,6 +164,15 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
             disabled={reserving || reserved || isFull}
           >
             {reserved ? 'Reserved ✓' : isFull ? 'Full' : reserving ? '…' : 'Reserve'}
+          </button>
+          <button
+            className={`btn-report${reported ? ' reported' : ''}`}
+            onClick={report}
+            disabled={reporting || reported}
+            title={reported ? 'Reported' : 'Report this post'}
+            style={{ marginLeft: 'auto' }}
+          >
+            {reported ? 'Reported' : 'Report'}
           </button>
         </div>
       )}

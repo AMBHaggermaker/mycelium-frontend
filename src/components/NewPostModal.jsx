@@ -95,6 +95,11 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
         </div>
         <form className="modal-body" onSubmit={submit}>
 
+          <div className="community-notice">
+            <strong>unprecedentedtimes.org is a family-friendly platform.</strong> No adult content.
+            You own what you say here — say it with your name on it.
+          </div>
+
           {/* Type */}
           <div className="form-group">
             <label className="form-label">Type</label>

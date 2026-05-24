@@ -5,6 +5,8 @@ import Feed from './pages/Feed';
 import Commons from './pages/Commons';
 import CirclePage from './pages/CirclePage';
 import Profile from './pages/Profile';
+import Chat from './pages/Chat';
+import Admin from './pages/Admin';
 import AuthModal from './components/AuthModal';
 import { useAuth } from './auth';
 
@@ -22,6 +24,8 @@ export default function App() {
         <Route path="/commons"     element={<Commons onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/commons/:id" element={<CirclePage onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/profile/:id" element={<Profile />} />
+        <Route path="/chat"        element={<Chat onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/admin"       element={<Admin />} />
       </Routes>
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
     </>

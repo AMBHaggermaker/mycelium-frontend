@@ -95,6 +95,21 @@ export default {
 
   deletePostMedia: (postId, mediaId, token) => del(`/posts/${postId}/media/${mediaId}`, token),
 
+  // Post reporting
+  reportPost: (id, token)             => post(`/posts/${id}/report`, {}, token),
+
   // Search
   search: (params)                    => get(`/search${qs(params)}`),
+
+  // Chat
+  getChatRooms:    ()                 => get('/chat/rooms'),
+  createChatRoom:  (data, token)      => post('/chat/rooms', data, token),
+  getChatMessages: (slug)             => get(`/chat/rooms/${slug}/messages`),
+
+  // Admin
+  getModerationQueue: (token)              => get('/admin/moderation', token),
+  clearPostFlag:      (postId, token)      => patch(`/admin/moderation/${postId}/clear`, {}, token),
+  removePost:         (postId, token)      => del(`/admin/moderation/${postId}`, token),
+  getAdminUsers:      (token)              => get('/admin/users', token),
+  setUserRole:        (userId, role, token) => patch(`/admin/users/${userId}/role`, { role }, token),
 };

@@ -3,6 +3,7 @@ import { useAuth } from '../auth';
 
 export default function Nav({ onAuthOpen }) {
   const { user, logout } = useAuth();
+  const isMod = user?.role === 'moderator' || user?.role === 'admin';
 
   return (
     <nav className="nav">
@@ -15,12 +16,20 @@ export default function Nav({ onAuthOpen }) {
           <NavLink to="/commons" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             Commons
           </NavLink>
+          <NavLink to="/chat" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+            Chat
+          </NavLink>
           <a href="https://lostfound.unprecedentedtimes.org" className="nav-link" target="_blank" rel="noopener noreferrer">
             Lost &amp; Found
           </a>
           <a href="https://unprecedentedtimes.org" className="nav-link" target="_blank" rel="noopener noreferrer">
             Newsletter
           </a>
+          {isMod && (
+            <NavLink to="/admin" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              Admin
+            </NavLink>
+          )}
         </div>
         <div className="nav-auth">
           {user ? (
