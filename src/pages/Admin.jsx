@@ -32,6 +32,10 @@ export default function Admin() {
             onClick={() => setTab('moderation')}>
             Moderation
           </button>
+          <button className={`tab-btn${tab === 'chatrooms' ? ' active' : ''}`}
+            onClick={() => setTab('chatrooms')}>
+            Chat Rooms
+          </button>
           {user.role === 'admin' && (
             <button className={`tab-btn${tab === 'users' ? ' active' : ''}`}
               onClick={() => setTab('users')}>
@@ -41,6 +45,7 @@ export default function Admin() {
         </div>
 
         {tab === 'moderation' && <ModerationQueue token={token} />}
+        {tab === 'chatrooms' && <ChatRoomsTab token={token} userRole={user.role} />}
         {tab === 'users' && user.role === 'admin' && <UsersTab token={token} />}
       </div>
     </div>
@@ -196,6 +201,139 @@ function UsersTab({ token }) {
                       <option value="admin">admin</option>
                     </select>
                   )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ChatRoomsTab({ token, userRole }) {
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    api.getAdminChatRooms(token)
+      .then(setRooms)
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  async function deleteRoom(roomId, name) {
+    if (!confirm(`Delete room "${name}" and all its messages? This cannot be undone.`)) return;
+    try {
+      await api.deleteAdminChatRoom(roomId, token);
+      setRooms(prev => prev.filter(r => r.id !== roomId));
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function toggleFlag(roomId) {
+    try {
+      const updated = await api.flagAdminChatRoom(roomId, token);
+      setRooms(prev => prev.map(r => r.id === roomId ? { ...r, flagged: updated.flagged } : r));
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  if (loading) return <div className="spinner" />;
+  if (err) return <p className="error-msg">{err}</p>;
+
+  const flaggedCount = rooms.filter(r => r.flagged).length;
+
+  return (
+    <div>
+      <p style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
+        {rooms.length} room{rooms.length !== 1 ? 's' : ''}
+        {flaggedCount > 0 && (
+          <span style={{ marginLeft: '.5rem', color: 'var(--red)', fontWeight: 700 }}>
+            · {flaggedCount} flagged
+          </span>
+        )}
+      </p>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Room</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Creator</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Messages</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Reports</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Created</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rooms.map(room => (
+              <tr key={room.id}
+                style={{
+                  borderBottom: '1px solid var(--border)',
+                  background: room.flagged ? 'rgba(181,36,36,.04)' : undefined,
+                }}>
+                <td style={{ padding: '.5rem .75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                    <span style={{ fontWeight: 600 }}>#{room.name}</span>
+                    {room.pinned && (
+                      <span style={{
+                        fontSize: '.65rem', fontWeight: 700, padding: '.1rem .35rem',
+                        borderRadius: 99, background: 'var(--green-bg)', color: 'var(--green)',
+                        textTransform: 'uppercase', letterSpacing: '.04em',
+                      }}>protected</span>
+                    )}
+                    {room.flagged && (
+                      <span style={{
+                        fontSize: '.65rem', fontWeight: 700, padding: '.1rem .35rem',
+                        borderRadius: 99, background: 'var(--red-bg)', color: 'var(--red)',
+                        textTransform: 'uppercase', letterSpacing: '.04em',
+                      }}>flagged</span>
+                    )}
+                  </div>
+                  {room.description && (
+                    <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: '.1rem' }}>
+                      {room.description}
+                    </div>
+                  )}
+                </td>
+                <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
+                  {room.creator ?? <em>system</em>}
+                </td>
+                <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>{room.message_count}</td>
+                <td style={{ padding: '.5rem .75rem', color: room.report_count > 0 ? 'var(--red)' : 'var(--muted)' }}>
+                  {room.report_count}
+                </td>
+                <td style={{ padding: '.5rem .75rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                  {new Date(room.created_at).toLocaleDateString()}
+                </td>
+                <td style={{ padding: '.5rem .75rem' }}>
+                  <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                    {!room.pinned && (
+                      <button
+                        className={`btn btn-sm ${room.flagged && userRole === 'admin' ? 'btn-outline' : 'btn-outline'}`}
+                        style={room.flagged ? { color: 'var(--red)', borderColor: 'var(--red)' } : {}}
+                        onClick={() => toggleFlag(room.id)}
+                        title={room.flagged && userRole === 'admin' ? 'Unflag room' : 'Flag for review'}
+                      >
+                        {room.flagged && userRole === 'admin' ? 'Unflag' : 'Flag'}
+                      </button>
+                    )}
+                    {!room.pinned && userRole === 'admin' && (
+                      <button className="btn btn-sm btn-danger"
+                        onClick={() => deleteRoom(room.id, room.name)}>
+                        Delete
+                      </button>
+                    )}
+                    {room.pinned && (
+                      <span style={{ fontSize: '.78rem', color: 'var(--muted)', fontStyle: 'italic' }}>
+                        protected
+                      </span>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

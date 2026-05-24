@@ -31,6 +31,7 @@ export default function Chat({ onRequireAuth }) {
   const [composer, setComposer] = useState('');
   const [showNewRoom, setShowNewRoom] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [roomReported, setRoomReported] = useState({});
 
   // Keep ref in sync for socket handler closures
   useEffect(() => { activeSlugRef.current = activeSlug; }, [activeSlug]);
@@ -107,6 +108,48 @@ export default function Chat({ onRequireAuth }) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   }
 
+  async function reportRoom() {
+    if (!user) { onRequireAuth?.(); return; }
+    if (!activeSlug) return;
+    try {
+      await api.reportRoom(activeSlug, token);
+      setRoomReported(prev => ({ ...prev, [activeSlug]: true }));
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  function saveChat() {
+    if (!activeRoom || messages.length === 0) return;
+    const exportTime = new Date().toLocaleString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+    });
+    const lines = [
+      `Room: ${activeRoom.name}`,
+      `Exported: ${exportTime}`,
+      `Messages: ${messages.length}`,
+      '',
+      ...messages.map(m => {
+        const ts = new Date(m.created_at).toLocaleString('en-US', {
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit',
+        });
+        return `[${ts}] ${m.username}: ${m.content}`;
+      }),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const date = new Date().toISOString().slice(0, 10);
+    a.download = `${activeRoom.slug}-${date}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   const activeRoom = rooms.find(r => r.slug === activeSlug);
 
   function isRecentlyActive(slug) {
@@ -153,17 +196,34 @@ export default function Chat({ onRequireAuth }) {
                   <span className="chat-room-desc"> — {activeRoom.description}</span>
                 )}
               </div>
-              {onlineUsers.length > 0 && (
-                <div className="chat-online">
-                  <span className="online-dot" />
-                  <span className="online-label">{onlineUsers.length} online:</span>
-                  <div className="online-list">
-                    {onlineUsers.map(u => (
-                      <span key={u.id} className="online-user">{u.username}</span>
-                    ))}
+              <div className="chat-header-actions">
+                {onlineUsers.length > 0 && (
+                  <div className="chat-online">
+                    <span className="online-dot" />
+                    <span className="online-label">{onlineUsers.length} online:</span>
+                    <div className="online-list">
+                      {onlineUsers.map(u => (
+                        <span key={u.id} className="online-user">{u.username}</span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+                {user && messages.length > 0 && (
+                  <button className="btn btn-sm btn-outline" onClick={saveChat}
+                    title="Download message history as .txt">
+                    Save Chat
+                  </button>
+                )}
+                {user && (
+                  <button
+                    className={`btn-report${roomReported[activeSlug] ? ' reported' : ''}`}
+                    onClick={reportRoom}
+                    disabled={roomReported[activeSlug]}
+                    title={roomReported[activeSlug] ? 'Room reported' : 'Report this room'}>
+                    {roomReported[activeSlug] ? 'Reported' : 'Report Room'}
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="chat-messages">

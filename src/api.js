@@ -106,10 +106,18 @@ export default {
   createChatRoom:  (data, token)      => post('/chat/rooms', data, token),
   getChatMessages: (slug)             => get(`/chat/rooms/${slug}/messages`),
 
+  // Chat room reporting
+  reportRoom: (slug, token)               => post(`/chat/rooms/${slug}/report`, {}, token),
+
   // Admin
   getModerationQueue: (token)              => get('/admin/moderation', token),
   clearPostFlag:      (postId, token)      => patch(`/admin/moderation/${postId}/clear`, {}, token),
   removePost:         (postId, token)      => del(`/admin/moderation/${postId}`, token),
   getAdminUsers:      (token)              => get('/admin/users', token),
   setUserRole:        (userId, role, token) => patch(`/admin/users/${userId}/role`, { role }, token),
+
+  // Admin chat-room management
+  getAdminChatRooms:    (token)              => get('/admin/chat-rooms', token),
+  deleteAdminChatRoom:  (roomId, token)      => del(`/admin/chat-rooms/${roomId}`, token),
+  flagAdminChatRoom:    (roomId, token)      => patch(`/admin/chat-rooms/${roomId}/flag`, {}, token),
 };
