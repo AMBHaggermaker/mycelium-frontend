@@ -6,6 +6,12 @@ import api from '../api';
 const TYPE_BADGE = { need: 'badge-need', offer: 'badge-offer', event: 'badge-event' };
 const BASE_URL = 'https://mycelium.unprecedentedtimes.org';
 
+const CATEGORY_LABELS = {
+  jobs_services:  'Jobs & Services',
+  goods_supplies: 'Goods & Supplies',
+  community:      'Community',
+};
+
 function fmt(date) {
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
@@ -76,7 +82,29 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
     <div className="card post-card">
       <div className="post-header">
         <span className={`badge ${TYPE_BADGE[post.type]}`}>{post.type}</span>
-        <span className="post-meta">
+        {(post.category || post.subcategory) && (
+          <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {post.category && (
+              <span style={{
+                fontSize: '.72rem', padding: '.15rem .45rem', borderRadius: 99,
+                background: 'var(--surface-2, #f0f0f0)', color: 'var(--muted)',
+                border: '1px solid var(--border)', fontWeight: 500, lineHeight: 1.4,
+              }}>
+                {CATEGORY_LABELS[post.category]}
+              </span>
+            )}
+            {post.subcategory && (
+              <span style={{
+                fontSize: '.72rem', padding: '.15rem .45rem', borderRadius: 99,
+                background: 'transparent', color: 'var(--muted)',
+                border: '1px solid var(--border)', lineHeight: 1.4,
+              }}>
+                {post.subcategory}
+              </span>
+            )}
+          </div>
+        )}
+        <span className="post-meta" style={{ marginLeft: 'auto' }}>
           <Link to={`/profile/${post.user_id}`} className="username-link">
             {post.username}
           </Link>
