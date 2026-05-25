@@ -93,10 +93,17 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
     }
   }
 
+  const urgencyDot = post.auto_urgent
+    ? <span className="urgency-dot dot-auto" title="Automatically flagged as urgent" />
+    : post.is_urgent
+      ? <span className="urgency-dot dot-self" title="Poster marked as urgent" />
+      : null;
+
   return (
     <div className="card post-card">
       <div className="post-header">
         <span className={`badge ${TYPE_BADGE[post.type]}`}>{post.type}</span>
+        {urgencyDot}
         {(post.category || post.subcategory) && (
           <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
             {post.category && (

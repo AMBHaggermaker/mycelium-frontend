@@ -22,7 +22,7 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
   const [form, setForm] = useState({
     type: 'offer', title: '', description: '', circle_id: defaultCircleId || '',
     capacity: '', location: '', starts_at: '', ends_at: '', tags: '',
-    category: '', subcategory: '',
+    category: '', subcategory: '', is_urgent: false, expires_at: '',
   });
   const [circles,  setCircles]  = useState([]);
   const [files,    setFiles]    = useState([]);
@@ -73,6 +73,8 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
         tags:        form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
         category:    form.category || undefined,
         subcategory: form.subcategory.trim() || undefined,
+        is_urgent:   form.is_urgent || undefined,
+        expires_at:  form.expires_at || undefined,
       };
       const post = await api.createPost(payload, token);
       if (files.length) await api.uploadPostMedia(post.id, files, token);
@@ -214,6 +216,28 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
                 onChange={e => set('tags', e.target.value)} />
             </div>
           </div>
+
+          {/* Urgency / Expiry — needs and offers only */}
+          {(form.type === 'need' || form.type === 'offer') && (
+            <div className="form-row" style={{ alignItems: 'flex-start' }}>
+              {form.type === 'need' && (
+                <div className="form-group" style={{ flex: 'none' }}>
+                  <label className="form-label" style={{ marginBottom: '.5rem' }}>Urgency</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '.45rem', cursor: 'pointer', fontSize: '.88rem' }}>
+                    <input type="checkbox" checked={form.is_urgent}
+                      onChange={e => set('is_urgent', e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: 'var(--amber, #f59e0b)' }} />
+                    This is an urgent need
+                  </label>
+                </div>
+              )}
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Need by / Expires</label>
+                <input className="form-input" type="date" value={form.expires_at.slice(0, 10) || ''}
+                  onChange={e => set('expires_at', e.target.value ? `${e.target.value}T00:00:00Z` : '')} />
+              </div>
+            </div>
+          )}
 
           {/* Media */}
           <div className="form-group">

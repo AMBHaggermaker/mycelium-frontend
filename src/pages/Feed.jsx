@@ -19,6 +19,13 @@ const CATEGORIES = [
   { value: 'community',      label: 'Community' },
 ];
 
+const SORTS = [
+  { value: 'recent',          label: 'Recent' },
+  { value: 'urgent',          label: 'Most Urgent' },
+  { value: 'least_responded', label: 'Least Responded' },
+  { value: 'expiring',        label: 'Expiring Soon' },
+];
+
 export default function Feed({ onRequireAuth }) {
   const { user, token } = useAuth();
   const [posts,       setPosts]       = useState([]);
@@ -26,6 +33,7 @@ export default function Feed({ onRequireAuth }) {
   const [category,    setCategory]    = useState('');
   const [subcategory, setSubcategory] = useState('');
   const [search,      setSearch]      = useState('');
+  const [sort,        setSort]        = useState('recent');
   const [loading,     setLoading]     = useState(true);
   const [err,         setErr]         = useState(null);
   const [showNew,     setShowNew]     = useState(false);
@@ -48,6 +56,7 @@ export default function Feed({ onRequireAuth }) {
           type:       type        || undefined,
           category:   category    || undefined,
           subcategory: subcategory || undefined,
+          sort:        sort !== 'recent' ? sort : undefined,
         }, token);
       }
       setPosts(result);
@@ -56,7 +65,7 @@ export default function Feed({ onRequireAuth }) {
     } finally {
       setLoading(false);
     }
-  }, [type, category, subcategory, search, token]);
+  }, [type, category, subcategory, search, sort, token]);
 
   useEffect(() => {
     const t = setTimeout(load, search ? 350 : 0);
@@ -99,7 +108,7 @@ export default function Feed({ onRequireAuth }) {
             onChange={e => setSearch(e.target.value)} />
         </div>
 
-        {/* Row 2: category tabs + subcategory filter */}
+        {/* Row 2: category tabs + subcategory + sort */}
         <div className="filter-row" style={{ marginTop: '.5rem' }}>
           <div className="filter-tabs">
             {CATEGORIES.map(c => (
@@ -112,7 +121,10 @@ export default function Feed({ onRequireAuth }) {
           </div>
           <input className="search-input" placeholder="Subcategory…" value={subcategory}
             onChange={e => setSubcategory(e.target.value)}
-            style={{ width: 160 }} />
+            style={{ width: 140 }} />
+          <select className="sort-select" value={sort} onChange={e => setSort(e.target.value)}>
+            {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
         </div>
 
         {loading
