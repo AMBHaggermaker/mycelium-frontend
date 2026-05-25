@@ -39,7 +39,11 @@ export default function Chat({ onRequireAuth }) {
   // Connect socket
   useEffect(() => {
     if (!token) return;
-    const socket = io(SOCKET_URL, { auth: { token } });
+    const socket = io(SOCKET_URL, {
+      path: '/api/socket.io',
+      transports: ['polling', 'websocket'],
+      auth: { token },
+    });
     socketRef.current = socket;
 
     socket.on('chat_message', (msg) => {
