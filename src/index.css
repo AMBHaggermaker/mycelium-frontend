@@ -2278,3 +2278,67 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 768px) {
   .settings-page { padding: calc(var(--nav-h) + 1rem) 1rem 7rem; }
 }
+
+/* ── Critical anomaly banner ─────────────────────────────────── */
+.critical-anomaly-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1000;
+  height: 44px;
+  background: #dc2626;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: 0 1rem;
+  font-size: .82rem;
+  font-weight: 600;
+}
+.critical-anomaly-banner-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.critical-anomaly-banner-link {
+  color: #fff;
+  text-decoration: underline;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.critical-anomaly-banner-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.8);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  padding: 0 .25rem;
+}
+.critical-anomaly-banner-close:hover { color: #fff; }
+
+/* When banner is active, shift nav and page content down */
+:root { --banner-h: 0px; }
+.nav { top: var(--banner-h, 0px); }
+.page { padding-top: calc(var(--nav-h) + var(--banner-h, 0px) + 2rem); }
+
+/* ── Watch anomaly cards ──────────────────────────────────────── */
+.watch-anomaly-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: .75rem;
+}
+.watch-anomaly-card:last-child { margin-bottom: 0; }
+
+/* ── Watch report card: severity + type row ──────────────────── */
+.watch-report-card .watch-report-card-header { align-items: flex-start; }
+
+@media (max-width: 600px) {
+  .critical-anomaly-banner-text {
+    font-size: .75rem;
+  }
+}

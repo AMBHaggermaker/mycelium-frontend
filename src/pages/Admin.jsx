@@ -42,11 +42,18 @@ export default function Admin() {
               Users
             </button>
           )}
+          {user.role === 'admin' && (
+            <button className={`tab-btn${tab === 'anomalies' ? ' active' : ''}`}
+              onClick={() => setTab('anomalies')}>
+              Anomalies
+            </button>
+          )}
         </div>
 
         {tab === 'moderation' && <ModerationQueue token={token} />}
         {tab === 'chatrooms' && <ChatRoomsTab token={token} userRole={user.role} />}
         {tab === 'users' && user.role === 'admin' && <UsersTab token={token} />}
+        {tab === 'anomalies' && user.role === 'admin' && <AnomaliesTab token={token} />}
       </div>
     </div>
   );
@@ -461,6 +468,138 @@ function ChatRoomsTab({ token, userRole }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ── Anomalies Tab ─────────────────────────────────────────────────────────────
+
+const SEVERITY_COLORS = {
+  critical: '#dc2626', serious: '#ea580c',
+  moderate: '#ca8a04', minor: '#2563eb', monitoring: '#6b7280',
+};
+const ANOMALY_TYPE_LABELS = {
+  location_cluster:    'Location Cluster',
+  severity_escalation: 'Severity Escalation',
+  cross_dashboard:     'Cross-Dashboard',
+  temporal_pattern:    'Temporal Pattern',
+  sensitive_location:  'Near Sensitive Location',
+};
+
+function AnomaliesTab({ token }) {
+  const [anomalies, setAnomalies] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [err,       setErr]       = useState(null);
+  const [actionId,  setActionId]  = useState(null);
+
+  useEffect(() => {
+    api.getAdminWatchAnomalies(token)
+      .then(setAnomalies)
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  async function markReviewed(id) {
+    setActionId(id);
+    try {
+      const updated = await api.reviewAnomaly(id, token);
+      setAnomalies(prev => prev.map(a => a.id === id ? updated : a));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  async function deleteAnomaly(id) {
+    if (!confirm('Delete this anomaly record?')) return;
+    setActionId(id);
+    try {
+      await api.deleteAnomaly(id, token);
+      setAnomalies(prev => prev.filter(a => a.id !== id));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  if (loading) return <div className="spinner" />;
+  if (err) return <p className="error-msg">{err}</p>;
+
+  const pending  = anomalies.filter(a => !a.reviewed);
+  const reviewed = anomalies.filter(a => a.reviewed);
+
+  const renderAnomaly = (a) => {
+    const color = SEVERITY_COLORS[a.severity] || '#6b7280';
+    const typeLabel = ANOMALY_TYPE_LABELS[a.anomaly_type] || a.anomaly_type;
+    const confColors = { high: '#16a34a', medium: '#ca8a04', low: '#6b7280' };
+    return (
+      <div key={a.id} className="watch-anomaly-card" style={{ borderLeftColor: color, opacity: a.reviewed ? .7 : 1 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', justifyContent: 'space-between' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.35rem', alignItems: 'center' }}>
+              <span style={{ fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', background: color + '22', color, border: `1px solid ${color}44`, padding: '.15rem .55rem', borderRadius: 99 }}>
+                {a.severity}
+              </span>
+              <span style={{ fontSize: '.72rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>{typeLabel}</span>
+              <span style={{ fontSize: '.72rem', color: confColors[a.ai_confidence], fontWeight: 600 }}>
+                {a.ai_confidence} confidence
+              </span>
+              {a.reviewed && (
+                <span style={{ fontSize: '.68rem', color: 'var(--green)', fontWeight: 700 }}>✓ Reviewed</span>
+              )}
+            </div>
+            <p style={{ margin: '0 0 .4rem', fontSize: '.875rem', color: 'var(--text)', lineHeight: 1.5 }}>{a.description}</p>
+            <div style={{ fontSize: '.78rem', color: 'var(--muted)', display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
+              {a.location_label && <span>📍 {a.location_label}</span>}
+              {a.dashboard_types?.length > 0 && <span>{a.dashboard_types.join(', ')}</span>}
+              <span>{a.affected_reports?.length || 0} reports</span>
+              <span>{new Date(a.created_at).toLocaleDateString()}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '.4rem', flexShrink: 0 }}>
+            {!a.reviewed && (
+              <button className="btn btn-sm btn-outline" disabled={actionId === a.id}
+                onClick={() => markReviewed(a.id)}>
+                {actionId === a.id ? '…' : 'Mark Reviewed'}
+              </button>
+            )}
+            <button className="btn btn-sm btn-danger" disabled={actionId === a.id}
+              onClick={() => deleteAnomaly(a.id)}>
+              {actionId === a.id ? '…' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <p style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
+        {pending.length} pending · {reviewed.length} reviewed
+        <span style={{ marginLeft: '.5rem', fontSize: '.8rem', color: 'var(--muted)' }}>
+          (AI analysis runs every 30 min — add ANTHROPIC_API_KEY to .env to enable)
+        </span>
+      </p>
+
+      {pending.length === 0 && reviewed.length === 0 && (
+        <p className="empty">No anomalies detected yet.</p>
+      )}
+
+      {pending.length > 0 && (
+        <div className="watch-report-list">{pending.map(renderAnomaly)}</div>
+      )}
+
+      {reviewed.length > 0 && (
+        <>
+          <h3 style={{ fontSize: '.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', margin: '1.75rem 0 .75rem' }}>
+            Reviewed
+          </h3>
+          <div className="watch-report-list">{reviewed.map(renderAnomaly)}</div>
+        </>
+      )}
     </div>
   );
 }

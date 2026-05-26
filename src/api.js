@@ -142,7 +142,11 @@ export default {
   resetPassword:        (data)          => post('/auth/reset-password', data),
 
   // Watch
-  getWatchReports: (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),
+  getWatchReports:   (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),
+  getWatchAnomalies: (params)            => get(`/watch/anomalies${qs(params)}`),
+  getAdminWatchAnomalies: (token)        => get('/admin/watch-anomalies', token),
+  reviewAnomaly:     (id, token)         => patch(`/admin/watch-anomalies/${id}/review`, {}, token),
+  deleteAnomaly:     (id, token)         => del(`/admin/watch-anomalies/${id}`, token),
   submitWatchReport: (dashboard, formData, token) =>
     fetch(`${BASE}/watch/${dashboard}/reports`, {
       method: 'POST',

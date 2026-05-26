@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Routes, Route, Link } from 'react-router-dom';
 import Nav from './components/Nav';
 import Feed from './pages/Feed';
 import Commons from './pages/Commons';
@@ -17,6 +17,49 @@ import AuthModal from './components/AuthModal';
 import InviteModal from './components/InviteModal';
 import { useAuth } from './auth';
 
+function CriticalAnomalyBanner() {
+  const { user } = useAuth();
+  const [anomaly,   setAnomaly]   = useState(null);
+  const [dismissed, setDismissed] = useState(
+    () => sessionStorage.getItem('critical_anomaly_dismissed') === '1'
+  );
+
+  useEffect(() => {
+    if (!user || dismissed) return;
+    api.getWatchAnomalies({ severity: 'critical', reviewed: false, limit: 1 })
+      .then(list => { if (list.length > 0) setAnomaly(list[0]); })
+      .catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      '--banner-h', (anomaly && !dismissed) ? '44px' : '0px'
+    );
+    return () => document.documentElement.style.setProperty('--banner-h', '0px');
+  }, [anomaly, dismissed]);
+
+  if (!anomaly || dismissed) return null;
+
+  function dismiss() {
+    setDismissed(true);
+    sessionStorage.setItem('critical_anomaly_dismissed', '1');
+  }
+
+  return (
+    <div className="critical-anomaly-banner">
+      <span className="critical-anomaly-banner-text">
+        ⚠ Critical Alert: {anomaly.description.length > 120
+          ? anomaly.description.slice(0, 120) + '…'
+          : anomaly.description}
+      </span>
+      <Link to="/watch" className="critical-anomaly-banner-link" onClick={() => sessionStorage.setItem('watch_tab', 'anomalies')}>
+        View in Watch →
+      </Link>
+      <button className="critical-anomaly-banner-close" onClick={dismiss} aria-label="Dismiss">✕</button>
+    </div>
+  );
+}
+
 export default function App() {
   const { ready } = useAuth();
   const [authOpen,   setAuthOpen]   = useState(false);
@@ -26,6 +69,7 @@ export default function App() {
 
   return (
     <>
+      <CriticalAnomalyBanner />
       <Nav onAuthOpen={() => setAuthOpen(true)} onInviteOpen={() => setInviteOpen(true)} />
       <Routes>
         <Route path="/"            element={<Feed onRequireAuth={() => setAuthOpen(true)} />} />
