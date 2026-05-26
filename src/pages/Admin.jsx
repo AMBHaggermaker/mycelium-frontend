@@ -130,6 +130,7 @@ function UsersTab({ token }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     api.getAdminUsers(token)
@@ -147,13 +148,30 @@ function UsersTab({ token }) {
     }
   }
 
+  async function deleteUser(u) {
+    if (!confirm(
+      `Soft-delete @${u.username}?\n\nThis will anonymize their account and prevent login. Their posts and content will remain, attributed to "Deleted User". This cannot be undone.`
+    )) return;
+    setDeletingId(u.id);
+    try {
+      const updated = await api.deleteUser(u.id, token);
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ...updated } : x));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   if (loading) return <div className="spinner" />;
   if (err) return <p className="error-msg">{err}</p>;
+
+  const activeCount = users.filter(u => u.is_active !== false).length;
 
   return (
     <div>
       <p style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-        {users.length} total members
+        {activeCount} active · {users.length} total
       </p>
       <div className="table-scroll-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
@@ -164,46 +182,82 @@ function UsersTab({ token }) {
               <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Posts</th>
               <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Flags</th>
               <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Role</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {users.map(u => (
-              <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>
-                  {u.username}
-                  {u.username === 'AMBHaggermaker' && (
-                    <span style={{ marginLeft: '.4rem', fontSize: '.68rem', color: 'var(--green)', fontWeight: 700 }}>
-                      FOUNDER
-                    </span>
-                  )}
-                </td>
-                <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
-                  {new Date(u.created_at).toLocaleDateString()}
-                </td>
-                <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>{u.post_count}</td>
-                <td style={{ padding: '.5rem .75rem', color: u.flag_count > 0 ? 'var(--red)' : 'var(--muted)' }}>
-                  {u.flag_count}
-                </td>
-                <td style={{ padding: '.5rem .75rem' }}>
-                  {u.username === 'AMBHaggermaker' ? (
-                    <span className={`role-badge role-${u.role}`}>{u.role}</span>
-                  ) : u.id === me?.id ? (
-                    <span className={`role-badge role-${u.role}`}>{u.role}</span>
-                  ) : (
-                    <select
-                      className="form-select"
-                      style={{ padding: '.2rem .5rem', fontSize: '.8rem' }}
-                      value={u.role}
-                      onChange={e => changeRole(u.id, e.target.value)}
-                    >
-                      <option value="member">member</option>
-                      <option value="moderator">moderator</option>
-                      <option value="admin">admin</option>
-                    </select>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {users.map(u => {
+              const isDeleted  = u.is_active === false;
+              const isFounder  = u.username === 'AMBHaggermaker' || u.username?.startsWith('deleted_') === false && !u.is_active;
+              const isMe       = u.id === me?.id;
+              const canDelete  = !isDeleted && u.username !== 'AMBHaggermaker' && !isMe;
+
+              return (
+                <tr key={u.id} style={{
+                  borderBottom: '1px solid var(--border)',
+                  opacity: isDeleted ? .5 : 1,
+                  background: isDeleted ? 'var(--surface)' : undefined,
+                }}>
+                  <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>
+                    {isDeleted ? (
+                      <span style={{ color: 'var(--muted)', fontStyle: 'italic' }}>
+                        [deleted]
+                      </span>
+                    ) : (
+                      <>
+                        {u.username}
+                        {u.username === 'AMBHaggermaker' && (
+                          <span style={{ marginLeft: '.4rem', fontSize: '.68rem', color: 'var(--green)', fontWeight: 700 }}>
+                            FOUNDER
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </td>
+                  <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
+                    {new Date(u.created_at).toLocaleDateString()}
+                  </td>
+                  <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>{u.post_count}</td>
+                  <td style={{ padding: '.5rem .75rem', color: u.flag_count > 0 ? 'var(--red)' : 'var(--muted)' }}>
+                    {u.flag_count}
+                  </td>
+                  <td style={{ padding: '.5rem .75rem' }}>
+                    {isDeleted ? (
+                      <span style={{ color: 'var(--muted)', fontSize: '.8rem', fontStyle: 'italic' }}>n/a</span>
+                    ) : u.username === 'AMBHaggermaker' || isMe ? (
+                      <span className={`role-badge role-${u.role}`}>{u.role}</span>
+                    ) : (
+                      <select
+                        className="form-select"
+                        style={{ padding: '.2rem .5rem', fontSize: '.8rem' }}
+                        value={u.role}
+                        onChange={e => changeRole(u.id, e.target.value)}
+                      >
+                        <option value="member">member</option>
+                        <option value="moderator">moderator</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    )}
+                  </td>
+                  <td style={{ padding: '.5rem .75rem' }}>
+                    {isDeleted ? (
+                      <span style={{ fontSize: '.75rem', color: 'var(--muted)', fontStyle: 'italic' }}>deleted</span>
+                    ) : canDelete ? (
+                      <button
+                        className="btn btn-sm btn-danger"
+                        disabled={deletingId === u.id}
+                        onClick={() => deleteUser(u)}
+                        title="Soft-delete this account"
+                      >
+                        {deletingId === u.id ? '…' : 'Delete'}
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

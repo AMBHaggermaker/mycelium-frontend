@@ -115,6 +115,7 @@ export default {
   removePost:         (postId, token)      => del(`/admin/moderation/${postId}`, token),
   getAdminUsers:      (token)              => get('/admin/users', token),
   setUserRole:        (userId, role, token) => patch(`/admin/users/${userId}/role`, { role }, token),
+  deleteUser:         (userId, token)       => patch(`/admin/users/${userId}/delete`, {}, token),
 
   // Admin chat-room management
   getAdminChatRooms:    (token)              => get('/admin/chat-rooms', token),
