@@ -1,17 +1,29 @@
-import { NavLink, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 
 const BOTTOM_TABS = [
-  { to: '/',        end: true, icon: '⚡', label: 'Hotlight',     internal: true },
-  { to: '/commons',            icon: '⬡',  label: 'Commons',      internal: true },
-  { to: '/chat',               icon: '💬', label: 'Chat',         internal: true },
-  { to: '/watch',              icon: '◉',  label: 'Watch',        internal: true },
-  { href: 'https://lostfound.unprecedentedtimes.org', icon: '🔍', label: 'Lost & Found' },
+  { to: '/',        end: true, icon: '⚡', label: 'Hotlight' },
+  { to: '/commons',            icon: '⬡',  label: 'Commons'  },
+  { to: '/chat',               icon: '💬', label: 'Chat'     },
+  { to: '/watch',              icon: '◉',  label: 'Watch'    },
 ];
 
 export default function Nav({ onAuthOpen, onInviteOpen }) {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const isMod = user?.role === 'moderator' || user?.role === 'admin';
+  const [meOpen, setMeOpen] = useState(false);
+
+  function handleLogout() {
+    setMeOpen(false);
+    logout();
+  }
+
+  function handleNavigate(to) {
+    setMeOpen(false);
+    navigate(to);
+  }
 
   return (
     <>
@@ -54,6 +66,7 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
                   + Invite
                 </button>
                 <Link to={`/profile/${user.id}`} className="nav-username">{user.username}</Link>
+                <Link to="/settings" className="btn btn-ghost btn-sm">Settings</Link>
                 <button className="btn btn-ghost btn-sm" onClick={logout}>Sign Out</button>
               </>
             ) : (
@@ -76,32 +89,76 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
       {/* Mobile bottom tab bar */}
       <nav className="bottom-nav" aria-label="Main navigation">
         <div className="bottom-nav-inner">
-          {BOTTOM_TABS.map(tab =>
-            tab.internal ? (
-              <NavLink
-                key={tab.to}
-                to={tab.to}
-                end={tab.end}
-                className={({ isActive }) => 'bottom-tab' + (isActive ? ' active' : '')}
-              >
-                <span className="bottom-tab-icon">{tab.icon}</span>
-                <span className="bottom-tab-label">{tab.label}</span>
-              </NavLink>
-            ) : (
-              <a
-                key={tab.href}
-                href={tab.href}
-                className="bottom-tab"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <span className="bottom-tab-icon">{tab.icon}</span>
-                <span className="bottom-tab-label">{tab.label}</span>
-              </a>
-            )
+          {BOTTOM_TABS.map(tab => (
+            <NavLink
+              key={tab.to}
+              to={tab.to}
+              end={tab.end}
+              className={({ isActive }) => 'bottom-tab' + (isActive ? ' active' : '')}
+            >
+              <span className="bottom-tab-icon">{tab.icon}</span>
+              <span className="bottom-tab-label">{tab.label}</span>
+            </NavLink>
+          ))}
+
+          {/* Me tab */}
+          {user ? (
+            <button
+              className={'bottom-tab' + (meOpen ? ' active' : '')}
+              onClick={() => setMeOpen(o => !o)}
+              aria-label="Account menu"
+            >
+              <span className="bottom-tab-icon">👤</span>
+              <span className="bottom-tab-label">Me</span>
+            </button>
+          ) : (
+            <button className="bottom-tab" onClick={onAuthOpen}>
+              <span className="bottom-tab-icon">👤</span>
+              <span className="bottom-tab-label">Sign In</span>
+            </button>
           )}
         </div>
       </nav>
+
+      {/* Mobile Me sheet */}
+      {meOpen && (
+        <div className="me-sheet-overlay" onClick={() => setMeOpen(false)}>
+          <div className="me-sheet" onClick={e => e.stopPropagation()}>
+            <div className="me-sheet-handle" />
+            <div className="me-sheet-header">
+              <span className="me-sheet-username">{user?.username}</span>
+            </div>
+            <nav className="me-sheet-nav">
+              <button className="me-sheet-item" onClick={() => handleNavigate(`/profile/${user?.id}`)}>
+                <span className="me-sheet-item-icon">⬡</span> My Profile
+              </button>
+              <button className="me-sheet-item" onClick={() => handleNavigate('/settings')}>
+                <span className="me-sheet-item-icon">⚙</span> Settings
+              </button>
+              <button className="me-sheet-item" onClick={() => { setMeOpen(false); onInviteOpen(); }}>
+                <span className="me-sheet-item-icon">+</span> Invite Someone
+              </button>
+              <a
+                className="me-sheet-item"
+                href="https://lostfound.unprecedentedtimes.org"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMeOpen(false)}
+              >
+                <span className="me-sheet-item-icon">🔍</span> Lost &amp; Found
+              </a>
+              {isMod && (
+                <button className="me-sheet-item" onClick={() => handleNavigate('/admin')}>
+                  <span className="me-sheet-item-icon">🛡</span> Admin
+                </button>
+              )}
+              <button className="me-sheet-item me-sheet-item--danger" onClick={handleLogout}>
+                <span className="me-sheet-item-icon">↩</span> Sign Out
+              </button>
+            </nav>
+          </div>
+        </div>
+      )}
     </>
   );
 }

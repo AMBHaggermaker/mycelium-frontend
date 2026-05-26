@@ -39,13 +39,13 @@ export default function AuthModal({ onClose }) {
             <div className="form-group">
               <label className="form-label">Username</label>
               <input className="form-input" required value={form.username}
-                onChange={e => set('username', e.target.value)} autoFocus />
+                onChange={e => set('username', e.target.value)} />
             </div>
           )}
           <div className="form-group">
             <label className="form-label">Email</label>
             <input className="form-input" type="email" required value={form.email}
-              onChange={e => set('email', e.target.value)} autoFocus={mode === 'login'} />
+              onChange={e => set('email', e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label">Password</label>

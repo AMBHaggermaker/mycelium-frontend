@@ -125,6 +125,11 @@ export default {
   sendInvitation:    (data, token)  => post('/invitations', data, token),
   getMyInvitations:  (token)        => get('/invitations', token),
   getInviteByToken:  (token)        => get(`/invitations/token/${token}`),
+  deleteInvitation:  (id, token)    => del(`/invitations/${id}`, token),
+  resendInvitation:  (id, token)    => post(`/invitations/${id}/resend`, {}, token),
+
+  // Account
+  changePassword: (data, token)     => patch('/auth/change-password', data, token),
 
   // Watch
   getWatchReports: (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),

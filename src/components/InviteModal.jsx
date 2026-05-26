@@ -8,23 +8,26 @@ const STATUS_CLASS = { pending: 'badge-gray', accepted: 'badge-green', expired: 
 
 export default function InviteModal({ onClose }) {
   const { token } = useAuth();
-  const [tab,          setTab]          = useState('send');
-  const [email,        setEmail]        = useState('');
-  const [note,         setNote]         = useState('');
-  const [err,          setErr]          = useState(null);
-  const [busy,         setBusy]         = useState(false);
-  const [sent,         setSent]         = useState(null);
-  const [invitations,  setInvitations]  = useState([]);
-  const [loadingList,  setLoadingList]  = useState(false);
+  const [tab,         setTab]         = useState('send');
+  const [email,       setEmail]       = useState('');
+  const [note,        setNote]        = useState('');
+  const [err,         setErr]         = useState(null);
+  const [busy,        setBusy]        = useState(false);
+  const [sent,        setSent]        = useState(null);
+  const [invitations, setInvitations] = useState([]);
+  const [loadingList, setLoadingList] = useState(false);
+  const [actionBusy,  setActionBusy]  = useState(null); // invite id being acted on
+
+  function loadList() {
+    setLoadingList(true);
+    api.getMyInvitations(token)
+      .then(setInvitations)
+      .catch(() => {})
+      .finally(() => setLoadingList(false));
+  }
 
   useEffect(() => {
-    if (tab === 'sent') {
-      setLoadingList(true);
-      api.getMyInvitations(token)
-        .then(setInvitations)
-        .catch(() => {})
-        .finally(() => setLoadingList(false));
-    }
+    if (tab === 'sent') loadList();
   }, [tab, token]);
 
   async function submit(e) {
@@ -37,6 +40,31 @@ export default function InviteModal({ onClose }) {
       setErr(e.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleDelete(inv) {
+    if (!window.confirm(`Delete invitation to ${inv.email}? This will allow re-inviting them.`)) return;
+    setActionBusy(inv.id);
+    try {
+      await api.deleteInvitation(inv.id, token);
+      setInvitations(list => list.filter(i => i.id !== inv.id));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleResend(inv) {
+    setActionBusy(inv.id);
+    try {
+      const updated = await api.resendInvitation(inv.id, token);
+      setInvitations(list => list.map(i => i.id === inv.id ? { ...i, ...updated } : i));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionBusy(null);
     }
   }
 
@@ -91,12 +119,12 @@ export default function InviteModal({ onClose }) {
             ) : (
               <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
                 <p style={{ fontSize: '.875rem', color: 'var(--muted)', marginBottom: '.25rem' }}>
-                  Invite someone you know and trust to join the Mycelium community. They will receive a verified account and be vouched for by you.
+                  Invite someone you know and trust. They will receive a verified account and be vouched for by you.
                 </p>
                 <div className="form-group">
                   <label className="form-label">Email address *</label>
                   <input className="form-input" type="email" required value={email}
-                    onChange={e => setEmail(e.target.value)} placeholder="friend@example.com" autoFocus />
+                    onChange={e => setEmail(e.target.value)} placeholder="friend@example.com" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Personal note <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
@@ -140,9 +168,33 @@ export default function InviteModal({ onClose }) {
                         )}
                       </p>
                     </div>
-                    <span className={`badge ${STATUS_CLASS[inv.status]}`}>
-                      {STATUS_LABEL[inv.status]}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.35rem' }}>
+                      <span className={`badge ${STATUS_CLASS[inv.status]}`}>
+                        {STATUS_LABEL[inv.status]}
+                      </span>
+                      {(inv.status === 'pending' || inv.status === 'expired') && (
+                        <div style={{ display: 'flex', gap: '.3rem' }}>
+                          <button
+                            className="btn btn-xs btn-outline"
+                            disabled={actionBusy === inv.id}
+                            onClick={() => handleResend(inv)}
+                            title="Resend — generates a new link and resets the 14-day expiry"
+                          >
+                            {actionBusy === inv.id ? '…' : 'Resend'}
+                          </button>
+                          {inv.status === 'pending' && (
+                            <button
+                              className="btn btn-xs btn-ghost btn-danger"
+                              disabled={actionBusy === inv.id}
+                              onClick={() => handleDelete(inv)}
+                              title="Delete this invitation"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
