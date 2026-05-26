@@ -9,7 +9,7 @@ const BOTTOM_TABS = [
   { href: 'https://lostfound.unprecedentedtimes.org', icon: '🔍', label: 'Lost & Found' },
 ];
 
-export default function Nav({ onAuthOpen }) {
+export default function Nav({ onAuthOpen, onInviteOpen }) {
   const { user, logout } = useAuth();
   const isMod = user?.role === 'moderator' || user?.role === 'admin';
 
@@ -50,6 +50,9 @@ export default function Nav({ onAuthOpen }) {
           <div className="nav-auth">
             {user ? (
               <>
+                <button className="btn btn-outline btn-sm nav-invite-btn" onClick={onInviteOpen}>
+                  + Invite
+                </button>
                 <Link to={`/profile/${user.id}`} className="nav-username">{user.username}</Link>
                 <button className="btn btn-ghost btn-sm" onClick={logout}>Sign Out</button>
               </>

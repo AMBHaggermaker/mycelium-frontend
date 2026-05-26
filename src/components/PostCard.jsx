@@ -130,6 +130,9 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
           <Link to={`/profile/${post.user_id}`} className="username-link">
             {post.username}
           </Link>
+          {post.founding_member && (
+            <span className="post-founding-dot" title="Founding member">⬡</span>
+          )}
           <span className="score">★ {parseFloat(post.reliability_score || 5).toFixed(1)}</span>
         </span>
       </div>

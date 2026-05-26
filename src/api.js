@@ -121,6 +121,11 @@ export default {
   deleteAdminChatRoom:  (roomId, token)      => del(`/admin/chat-rooms/${roomId}`, token),
   flagAdminChatRoom:    (roomId, token)      => patch(`/admin/chat-rooms/${roomId}/flag`, {}, token),
 
+  // Invitations
+  sendInvitation:    (data, token)  => post('/invitations', data, token),
+  getMyInvitations:  (token)        => get('/invitations', token),
+  getInviteByToken:  (token)        => get(`/invitations/token/${token}`),
+
   // Watch
   getWatchReports: (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),
   submitWatchReport: (dashboard, formData, token) =>

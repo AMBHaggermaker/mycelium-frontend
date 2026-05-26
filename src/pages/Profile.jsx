@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 import PostCard from '../components/PostCard';
+import InviteModal from '../components/InviteModal';
 
 const TYPE_BADGE = { need: 'badge-need', offer: 'badge-offer', event: 'badge-event' };
 
@@ -11,6 +12,8 @@ function scoreColor(s) {
   if (s >= 5)   return 'var(--amber)';
   return 'var(--red)';
 }
+
+const BASE_URL = 'https://mycelium.unprecedentedtimes.org';
 
 export default function Profile() {
   const { id } = useParams();
@@ -28,6 +31,7 @@ export default function Profile() {
   const [saving,    setSaving]   = useState(false);
   const [saveErr,   setSaveErr]  = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => { load(); }, [id]);
@@ -119,7 +123,7 @@ export default function Profile() {
               {isOwn ? (
                 <div className="avatar avatar-upload" onClick={() => fileInputRef.current?.click()} title="Change photo">
                   {profile.avatar_url
-                    ? <img src={`https://mycelium.unprecedentedtimes.org${profile.avatar_url}`} alt={profile.username} />
+                    ? <img src={`${BASE_URL}${profile.avatar_url}`} alt={profile.username} />
                     : profile.username[0].toUpperCase()
                   }
                   <div className={`avatar-upload-overlay${uploading ? ' uploading' : ''}`}>
@@ -131,7 +135,7 @@ export default function Profile() {
               ) : (
                 <div className="avatar">
                   {profile.avatar_url
-                    ? <img src={`https://mycelium.unprecedentedtimes.org${profile.avatar_url}`} alt={profile.username} />
+                    ? <img src={`${BASE_URL}${profile.avatar_url}`} alt={profile.username} />
                     : profile.username[0].toUpperCase()
                   }
                 </div>
@@ -139,6 +143,16 @@ export default function Profile() {
               <div className="profile-info">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
                   <h1 className="profile-name">{profile.username}</h1>
+                  {profile.founding_member && (
+                    <span className="founding-badge" title="Founding member — vouched by AMBHaggermaker">
+                      ⬡ Founding Member
+                    </span>
+                  )}
+                  {profile.verified && !profile.founding_member && (
+                    <span className="verified-badge" title="Verified — joined via invitation">
+                      ✓ Verified
+                    </span>
+                  )}
                   <span className="reliability" style={{ color: scoreColor(score) }}>
                     ★ {score.toFixed(1)}
                   </span>
@@ -150,8 +164,12 @@ export default function Profile() {
                 {profile.bio && <p className="profile-bio">{profile.bio}</p>}
               </div>
               {isOwn && (
-                <button className="btn btn-outline btn-sm" style={{ flexShrink: 0 }}
-                  onClick={() => setEditing(true)}>Edit Profile</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem', flexShrink: 0 }}>
+                  <button className="btn btn-outline btn-sm"
+                    onClick={() => setEditing(true)}>Edit Profile</button>
+                  <button className="btn btn-primary btn-sm"
+                    onClick={() => setShowInvite(true)}>+ Invite Someone</button>
+                </div>
               )}
             </div>
           )}
@@ -164,6 +182,11 @@ export default function Profile() {
           <button className={`tab-btn${tab === 'circles' ? ' active' : ''}`} onClick={() => setTab('circles')}>
             Circles ({circles.length})
           </button>
+          {isOwn && (
+            <button className={`tab-btn${tab === 'invitations' ? ' active' : ''}`} onClick={() => setTab('invitations')}>
+              Invitations
+            </button>
+          )}
         </div>
 
         {tab === 'posts' && (
@@ -194,7 +217,77 @@ export default function Profile() {
                 ))}
               </div>
         )}
+
+        {tab === 'invitations' && isOwn && (
+          <InvitationsTab token={token} />
+        )}
       </div>
+
+      {showInvite && <InviteModal onClose={() => setShowInvite(false)} />}
+    </div>
+  );
+}
+
+function InvitationsTab({ token }) {
+  const [invitations, setInvitations] = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [showForm,    setShowForm]    = useState(false);
+
+  useEffect(() => {
+    api.getMyInvitations(token)
+      .then(setInvitations)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const STATUS_LABEL = { pending: 'Pending', accepted: 'Accepted', expired: 'Expired' };
+  const STATUS_CLASS = { pending: 'badge-gray', accepted: 'badge-green', expired: 'badge-red' };
+
+  if (loading) return <div className="spinner" />;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <p style={{ fontSize: '.85rem', color: 'var(--muted)' }}>
+          {invitations.length} invitation{invitations.length !== 1 ? 's' : ''} sent
+        </p>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Send Invite</button>
+      </div>
+
+      {invitations.length === 0 ? (
+        <p className="empty">You haven't sent any invitations yet. Invite someone you trust to join the community.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          {invitations.map(inv => (
+            <div key={inv.id} className="invite-list-row">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p className="invite-list-email">{inv.email}</p>
+                {inv.personal_note && (
+                  <p className="invite-list-note">"{inv.personal_note}"</p>
+                )}
+                <p className="invite-list-date">
+                  Sent {new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {inv.status === 'accepted' && inv.accepted_by_username && (
+                    <> · Joined as{' '}
+                      <Link to={`/profile/${inv.accepted_by_id}`} style={{ color: 'var(--green)' }}>
+                        {inv.accepted_by_username}
+                      </Link>
+                    </>
+                  )}
+                  {inv.status === 'pending' && (
+                    <> · Expires {new Date(inv.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</>
+                  )}
+                </p>
+              </div>
+              <span className={`badge ${STATUS_CLASS[inv.status]}`}>
+                {STATUS_LABEL[inv.status]}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && <InviteModal onClose={() => setShowForm(false)} />}
     </div>
   );
 }
