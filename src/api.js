@@ -133,7 +133,10 @@ export default {
   resendInvitation:  (id, token)    => post(`/invitations/${id}/resend`, {}, token),
 
   // Account
-  changePassword: (data, token)     => patch('/auth/change-password', data, token),
+  changePassword:       (data, token)   => patch('/auth/change-password', data, token),
+  requestEmailChange:   (data, token)   => post('/auth/request-email-change', data, token),
+  cancelEmailChange:    (token)         => del('/auth/request-email-change', token),
+  verifyEmailChange:    (changeToken)   => get(`/auth/verify-email-change?token=${encodeURIComponent(changeToken)}`),
 
   // Watch
   getWatchReports: (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),

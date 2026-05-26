@@ -13,9 +13,9 @@ const HOW_FOUND_OPTIONS = [
 ];
 
 export default function InvitePage() {
-  const { token }  = useParams();
-  const { user }   = useAuth();
-  const navigate   = useNavigate();
+  const { token }           = useParams();
+  const { user, logout }    = useAuth();
+  const navigate            = useNavigate();
 
   const [invite,  setInvite]  = useState(null);
   const [loading, setLoading] = useState(true);
@@ -77,11 +77,21 @@ export default function InvitePage() {
       <div className="invite-page">
         <div className="invite-card invite-error-card">
           <div className="invite-error-icon">⬡</div>
-          <h1 className="invite-error-title">You're already a member</h1>
+          <h1 className="invite-error-title">You're signed in</h1>
           <p className="invite-error-body">
-            You're signed in as <strong>{user.username}</strong>. This invitation is for someone who doesn't have an account yet.
+            You're currently signed in as <strong>{user.username}</strong>.
+            This invitation is for a new account
+            {invite?.email ? <> for <strong>{invite.email}</strong></> : null}.
+            Sign out to register the invited account.
           </p>
-          <button className="btn btn-primary" onClick={() => navigate('/')}>Go to Mycelium</button>
+          <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button className="btn btn-primary" onClick={logout}>
+              Sign Out &amp; Register
+            </button>
+            <button className="btn btn-outline" onClick={() => navigate('/')}>
+              Stay Signed In
+            </button>
+          </div>
         </div>
       </div>
     );

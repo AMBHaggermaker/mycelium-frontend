@@ -288,15 +288,14 @@ function UsersTab({ token }) {
                       {u.deleted_at ? new Date(u.deleted_at).toLocaleDateString() : '—'}
                     </td>
                     <td style={{ padding: '.5rem .75rem' }}>
-                      {u.original_username ? (
-                        <button className="btn btn-sm btn-outline" disabled={actionId === u.id}
-                          onClick={() => restoreUser(u)}
-                          title="Restore this account and send welcome-back email">
-                          {actionId === u.id ? '…' : 'Restore'}
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: '.75rem', color: 'var(--muted)', fontStyle: 'italic' }}>cannot restore</span>
-                      )}
+                      <button className="btn btn-sm btn-outline" disabled={actionId === u.id}
+                        onClick={() => restoreUser(u)}
+                        title={u.original_username
+                          ? `Restore @${u.original_username} and send welcome-back email`
+                          : 'Restore account (original name was not preserved — account will be active with anonymized name)'
+                        }>
+                        {actionId === u.id ? '…' : 'Restore'}
+                      </button>
                     </td>
                   </tr>
                 ))}
