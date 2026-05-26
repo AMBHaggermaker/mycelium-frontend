@@ -29,9 +29,11 @@ const del  = (path, token)        => request('DELETE', path, undefined, token);
 
 export default {
   // Auth
-  register:   (data)                  => post('/auth/register', data),
-  login:      (data)                  => post('/auth/login', data),
-  me:         (token)                 => get('/auth/me', token),
+  register:        (data)             => post('/auth/register', data),
+  login:           (data)             => post('/auth/login', data),
+  me:              (token)            => get('/auth/me', token),
+  checkEmail:      (email)            => get(`/auth/check-email?email=${encodeURIComponent(email)}`),
+  restoreAccount:  (userId, data)     => post(`/auth/restore/${userId}`, data),
 
   // Posts
   getPosts:   (params, token)         => get(`/posts${qs(params)}`, token),
@@ -116,6 +118,7 @@ export default {
   getAdminUsers:      (token)              => get('/admin/users', token),
   setUserRole:        (userId, role, token) => patch(`/admin/users/${userId}/role`, { role }, token),
   deleteUser:         (userId, token)       => patch(`/admin/users/${userId}/delete`, {}, token),
+  restoreUser:        (userId, token)       => patch(`/admin/users/${userId}/restore`, {}, token),
 
   // Admin chat-room management
   getAdminChatRooms:    (token)              => get('/admin/chat-rooms', token),

@@ -127,10 +127,10 @@ function ModerationQueue({ token }) {
 
 function UsersTab({ token }) {
   const { user: me } = useAuth();
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
+  const [users,      setUsers]      = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [err,        setErr]        = useState(null);
+  const [actionId,   setActionId]   = useState(null);
 
   useEffect(() => {
     api.getAdminUsers(token)
@@ -150,117 +150,161 @@ function UsersTab({ token }) {
 
   async function deleteUser(u) {
     if (!confirm(
-      `Soft-delete @${u.username}?\n\nThis will anonymize their account and prevent login. Their posts and content will remain, attributed to "Deleted User". This cannot be undone.`
+      `Soft-delete @${u.username}?\n\nThis anonymizes their account and prevents login. Posts remain intact. This can be reversed with Restore.`
     )) return;
-    setDeletingId(u.id);
+    setActionId(u.id);
     try {
       const updated = await api.deleteUser(u.id, token);
       setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ...updated } : x));
     } catch (e) {
       alert(e.message);
     } finally {
-      setDeletingId(null);
+      setActionId(null);
+    }
+  }
+
+  async function restoreUser(u) {
+    if (!confirm(`Restore @${u.original_username || '[unknown]'}?\n\nThis will reactivate the account and send them a welcome-back email.`)) return;
+    setActionId(u.id);
+    try {
+      const updated = await api.restoreUser(u.id, token);
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ...updated, original_username: null } : x));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionId(null);
     }
   }
 
   if (loading) return <div className="spinner" />;
   if (err) return <p className="error-msg">{err}</p>;
 
-  const activeCount = users.filter(u => u.is_active !== false).length;
+  const activeUsers  = users.filter(u => u.is_active !== false);
+  const deletedUsers = users.filter(u => u.is_active === false);
+
+  const UserRow = ({ u }) => {
+    const isMe      = u.id === me?.id;
+    const isFounder = u.username === 'AMBHaggermaker';
+    const canDelete = !isFounder && !isMe;
+
+    return (
+      <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+        <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>
+          {u.username}
+          {isFounder && (
+            <span style={{ marginLeft: '.4rem', fontSize: '.68rem', color: 'var(--green)', fontWeight: 700 }}>
+              FOUNDER
+            </span>
+          )}
+        </td>
+        <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
+          {new Date(u.created_at).toLocaleDateString()}
+        </td>
+        <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>{u.post_count}</td>
+        <td style={{ padding: '.5rem .75rem', color: u.flag_count > 0 ? 'var(--red)' : 'var(--muted)' }}>
+          {u.flag_count}
+        </td>
+        <td style={{ padding: '.5rem .75rem' }}>
+          {isFounder || isMe ? (
+            <span className={`role-badge role-${u.role}`}>{u.role}</span>
+          ) : (
+            <select className="form-select" style={{ padding: '.2rem .5rem', fontSize: '.8rem' }}
+              value={u.role} onChange={e => changeRole(u.id, e.target.value)}>
+              <option value="member">member</option>
+              <option value="moderator">moderator</option>
+              <option value="admin">admin</option>
+            </select>
+          )}
+        </td>
+        <td style={{ padding: '.5rem .75rem' }}>
+          {canDelete ? (
+            <button className="btn btn-sm btn-danger" disabled={actionId === u.id}
+              onClick={() => deleteUser(u)}>
+              {actionId === u.id ? '…' : 'Delete'}
+            </button>
+          ) : (
+            <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>—</span>
+          )}
+        </td>
+      </tr>
+    );
+  };
+
+  const tableHead = (
+    <thead>
+      <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
+        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Username</th>
+        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Joined</th>
+        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Posts</th>
+        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Flags</th>
+        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Role</th>
+        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Actions</th>
+      </tr>
+    </thead>
+  );
 
   return (
     <div>
       <p style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-        {activeCount} active · {users.length} total
+        {activeUsers.length} active · {deletedUsers.length} deleted
       </p>
+
       <div className="table-scroll-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
-              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Username</th>
-              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Joined</th>
-              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Posts</th>
-              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Flags</th>
-              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Role</th>
-              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Actions</th>
-            </tr>
-          </thead>
+          {tableHead}
           <tbody>
-            {users.map(u => {
-              const isDeleted  = u.is_active === false;
-              const isFounder  = u.username === 'AMBHaggermaker' || u.username?.startsWith('deleted_') === false && !u.is_active;
-              const isMe       = u.id === me?.id;
-              const canDelete  = !isDeleted && u.username !== 'AMBHaggermaker' && !isMe;
-
-              return (
-                <tr key={u.id} style={{
-                  borderBottom: '1px solid var(--border)',
-                  opacity: isDeleted ? .5 : 1,
-                  background: isDeleted ? 'var(--surface)' : undefined,
-                }}>
-                  <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>
-                    {isDeleted ? (
-                      <span style={{ color: 'var(--muted)', fontStyle: 'italic' }}>
-                        [deleted]
-                      </span>
-                    ) : (
-                      <>
-                        {u.username}
-                        {u.username === 'AMBHaggermaker' && (
-                          <span style={{ marginLeft: '.4rem', fontSize: '.68rem', color: 'var(--green)', fontWeight: 700 }}>
-                            FOUNDER
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </td>
-                  <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
-                    {new Date(u.created_at).toLocaleDateString()}
-                  </td>
-                  <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>{u.post_count}</td>
-                  <td style={{ padding: '.5rem .75rem', color: u.flag_count > 0 ? 'var(--red)' : 'var(--muted)' }}>
-                    {u.flag_count}
-                  </td>
-                  <td style={{ padding: '.5rem .75rem' }}>
-                    {isDeleted ? (
-                      <span style={{ color: 'var(--muted)', fontSize: '.8rem', fontStyle: 'italic' }}>n/a</span>
-                    ) : u.username === 'AMBHaggermaker' || isMe ? (
-                      <span className={`role-badge role-${u.role}`}>{u.role}</span>
-                    ) : (
-                      <select
-                        className="form-select"
-                        style={{ padding: '.2rem .5rem', fontSize: '.8rem' }}
-                        value={u.role}
-                        onChange={e => changeRole(u.id, e.target.value)}
-                      >
-                        <option value="member">member</option>
-                        <option value="moderator">moderator</option>
-                        <option value="admin">admin</option>
-                      </select>
-                    )}
-                  </td>
-                  <td style={{ padding: '.5rem .75rem' }}>
-                    {isDeleted ? (
-                      <span style={{ fontSize: '.75rem', color: 'var(--muted)', fontStyle: 'italic' }}>deleted</span>
-                    ) : canDelete ? (
-                      <button
-                        className="btn btn-sm btn-danger"
-                        disabled={deletingId === u.id}
-                        onClick={() => deleteUser(u)}
-                        title="Soft-delete this account"
-                      >
-                        {deletingId === u.id ? '…' : 'Delete'}
-                      </button>
-                    ) : (
-                      <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {activeUsers.map(u => <UserRow key={u.id} u={u} />)}
           </tbody>
         </table>
       </div>
+
+      {deletedUsers.length > 0 && (
+        <>
+          <h3 style={{ fontSize: '.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', margin: '1.75rem 0 .75rem' }}>
+            Deleted Accounts
+          </h3>
+          <div className="table-scroll-wrap">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem', opacity: .8 }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
+                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Original name</th>
+                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Joined</th>
+                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Posts</th>
+                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Deleted</th>
+                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deletedUsers.map(u => (
+                  <tr key={u.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+                    <td style={{ padding: '.5rem .75rem', fontWeight: 600, color: 'var(--muted)', fontStyle: 'italic' }}>
+                      {u.original_username ? `@${u.original_username}` : '[no data]'}
+                    </td>
+                    <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
+                      {new Date(u.created_at).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>{u.post_count}</td>
+                    <td style={{ padding: '.5rem .75rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                      {u.deleted_at ? new Date(u.deleted_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td style={{ padding: '.5rem .75rem' }}>
+                      {u.original_username ? (
+                        <button className="btn btn-sm btn-outline" disabled={actionId === u.id}
+                          onClick={() => restoreUser(u)}
+                          title="Restore this account and send welcome-back email">
+                          {actionId === u.id ? '…' : 'Restore'}
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '.75rem', color: 'var(--muted)', fontStyle: 'italic' }}>cannot restore</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }

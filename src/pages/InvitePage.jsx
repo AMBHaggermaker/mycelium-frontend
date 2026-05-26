@@ -3,21 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 
-const COVENANT = [
-  { icon: '🤝', text: 'Show up with integrity — your word is your bond here, and your reliability score reflects it.' },
-  { icon: '🌱', text: 'Give more than you take — this community grows stronger when everyone contributes.' },
-  { icon: '🏡', text: 'Keep it family-friendly — no adult content, no harassment, no exploitation of any kind.' },
-  { icon: '💛', text: 'Respect the humans — behind every post is a real person. Treat them accordingly.' },
-  { icon: '🛡️', text: 'Protect the network — do not use this platform for spam, manipulation, or surveillance. Report what feels wrong.' },
-  { icon: '🌿', text: 'Hold this place as sacred — Huntsville is our home. Mycelium is our infrastructure. Take care of both.' },
-];
-
 const BASE_URL = 'https://mycelium.unprecedentedtimes.org';
 
-export default function InvitePage({ onRequireAuth }) {
-  const { token } = useParams();
-  const { user } = useAuth();
-  const navigate  = useNavigate();
+const HOW_FOUND_OPTIONS = [
+  { value: 'invited',     label: 'Invited by someone' },
+  { value: 'newsletter',  label: 'unprecedentedtimes.org' },
+  { value: 'lostfound',   label: 'Lost & Found' },
+  { value: 'other',       label: 'Other' },
+];
+
+export default function InvitePage() {
+  const { token }  = useParams();
+  const { user }   = useAuth();
+  const navigate   = useNavigate();
 
   const [invite,  setInvite]  = useState(null);
   const [loading, setLoading] = useState(true);
@@ -64,7 +62,10 @@ export default function InvitePage({ onRequireAuth }) {
         <div className="invite-card invite-error-card">
           <div className="invite-error-icon">⏳</div>
           <h1 className="invite-error-title">Invitation expired</h1>
-          <p className="invite-error-body">This invitation was valid for 14 days and has now expired. Ask {invite.inviter_username} to send a new one.</p>
+          <p className="invite-error-body">
+            This invitation was valid for 14 days and has now expired.
+            Ask {invite.inviter_username} to send a new one.
+          </p>
           <button className="btn btn-outline" onClick={() => navigate('/')}>Go to Mycelium</button>
         </div>
       </div>
@@ -77,7 +78,9 @@ export default function InvitePage({ onRequireAuth }) {
         <div className="invite-card invite-error-card">
           <div className="invite-error-icon">⬡</div>
           <h1 className="invite-error-title">You're already a member</h1>
-          <p className="invite-error-body">You're signed in as <strong>{user.username}</strong>. This invitation is for someone who doesn't have an account yet.</p>
+          <p className="invite-error-body">
+            You're signed in as <strong>{user.username}</strong>. This invitation is for someone who doesn't have an account yet.
+          </p>
           <button className="btn btn-primary" onClick={() => navigate('/')}>Go to Mycelium</button>
         </div>
       </div>
@@ -116,67 +119,110 @@ export default function InvitePage({ onRequireAuth }) {
           </div>
         )}
 
-        {/* What is Mycelium */}
+        {/* About blurb */}
         <div className="invite-about">
           <p>
-            <strong>Mycelium</strong> is a community platform for mutual aid, needs, offers, and events in Huntsville, Alabama.
-            It is built by and for the people who live here — a place to share resources, skills, and care across the network.
+            <strong>Mycelium</strong> is a community platform for mutual aid, needs, offers, and events
+            in Huntsville, Alabama — built by and for the people who live here.
           </p>
-        </div>
-
-        {/* Covenant */}
-        <div className="invite-covenant">
-          <p className="invite-covenant-heading">The Mycelium Covenant</p>
-          <p className="invite-covenant-subhead">By joining, you agree to:</p>
-          <ul className="invite-covenant-list">
-            {COVENANT.map((item, i) => (
-              <li key={i} className="invite-covenant-item">
-                <span className="invite-covenant-icon">{item.icon}</span>
-                <span>{item.text}</span>
-              </li>
-            ))}
-          </ul>
         </div>
 
         {/* Expiry notice */}
         <p className="invite-expires">
-          This invitation expires on{' '}
+          Invitation expires{' '}
           {new Date(invite.expires_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
         </p>
 
-        {/* CTA */}
-        <InviteRegisterForm inviteToken={token} inviterName={invite.inviter_username} />
+        {/* Registration form section */}
+        <InviteRegisterForm
+          inviteToken={token}
+          inviterName={invite.inviter_username}
+          lockedEmail={invite.email}
+        />
 
       </div>
     </div>
   );
 }
 
-function InviteRegisterForm({ inviteToken, inviterName }) {
+// ─── Registration form ────────────────────────────────────────────────────────
+
+function InviteRegisterForm({ inviteToken, inviterName, lockedEmail }) {
   const { login } = useAuth();
   const navigate  = useNavigate();
-  const [form,  setForm]  = useState({ username: '', email: '', password: '' });
-  const [err,   setErr]   = useState(null);
-  const [busy,  setBusy]  = useState(false);
-  const [mode,  setMode]  = useState('register');
+
+  // email status check
+  const [emailStatus, setEmailStatus] = useState(null); // null | 'checking' | 'none' | 'deleted' | 'active'
+  const [deletedInfo, setDeletedInfo] = useState(null); // { deleted_user_id, original_username }
+
+  // sub-modes: 'register' | 'login' | 'restore' | 'create_fresh'
+  const [mode, setMode] = useState('register');
+
+  // success
+  const [done, setDone] = useState(false);
+  const [restored, setRestored] = useState(false);
+
+  // form state
+  const [form, setForm] = useState({
+    username:  '',
+    password:  '',
+    location:  '',
+    how_found: 'invited',
+    covenant:  false,
+    // login mode
+    loginEmail: lockedEmail || '',
+    loginPw:    '',
+    // restore mode
+    newPw: '',
+  });
+  const [err,  setErr]  = useState(null);
+  const [busy, setBusy] = useState(false);
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
-  async function submit(e) {
+  // Check email status on mount if email is locked from invite
+  useEffect(() => {
+    if (!lockedEmail) return;
+    setEmailStatus('checking');
+    api.checkEmail(lockedEmail)
+      .then(r => {
+        setEmailStatus(r.status);
+        if (r.status === 'deleted') {
+          setDeletedInfo({ deleted_user_id: r.deleted_user_id, original_username: r.original_username });
+        }
+      })
+      .catch(() => setEmailStatus('none'));
+  }, [lockedEmail]);
+
+  // ── submit handlers ──────────────────────────────────────────────────────
+
+  async function submitRegister(e) {
+    e.preventDefault();
+    if (!form.covenant) { setErr('You must agree to The Mycelium Covenant to join.'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const res = await api.register({
+        username:     form.username.trim(),
+        email:        lockedEmail,
+        password:     form.password,
+        location:     form.location.trim(),
+        how_found:    form.how_found,
+        invite_token: inviteToken,
+      });
+      login(res.token, res.user);
+      setDone(true);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitLogin(e) {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
-      let res;
-      if (mode === 'login') {
-        res = await api.login({ email: form.email, password: form.password });
-      } else {
-        res = await api.register({
-          username: form.username,
-          email: form.email,
-          password: form.password,
-          invite_token: inviteToken,
-        });
-      }
+      const res = await api.login({ email: form.loginEmail, password: form.loginPw });
       login(res.token, res.user);
       navigate('/');
     } catch (e) {
@@ -186,69 +232,244 @@ function InviteRegisterForm({ inviteToken, inviterName }) {
     }
   }
 
+  async function submitRestore(e) {
+    e.preventDefault();
+    if (!form.covenant) { setErr('You must agree to The Mycelium Covenant to restore your account.'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const res = await api.restoreAccount(deletedInfo.deleted_user_id, {
+        new_password: form.newPw,
+        invite_token: inviteToken,
+      });
+      login(res.token, res.user);
+      setDone(true);
+      setRestored(true);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ── success screen ───────────────────────────────────────────────────────
+
+  if (done) {
+    return (
+      <div className="invite-register-section">
+        <div className="invite-welcome-screen">
+          <div className="invite-welcome-logo">⬡</div>
+          <h2 className="invite-welcome-title">Welcome to Mycelium.</h2>
+          <p className="invite-welcome-tagline">The chain grows.</p>
+          {restored && (
+            <p className="invite-welcome-sub">Your account and history have been restored.</p>
+          )}
+          <button className="btn btn-primary" style={{ marginTop: '1.5rem' }} onClick={() => navigate('/')}>
+            Enter Mycelium
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── deleted account detection ────────────────────────────────────────────
+
+  if (emailStatus === 'deleted' && mode === 'register') {
+    return (
+      <div className="invite-register-section">
+        <div className="invite-deleted-notice">
+          <p className="invite-deleted-title">We found a previous account</p>
+          <p className="invite-deleted-body">
+            The email <strong>{lockedEmail}</strong> is linked to a deleted account
+            {deletedInfo?.original_username ? <> (@{deletedInfo.original_username})</> : null}.
+            What would you like to do?
+          </p>
+          <div className="invite-deleted-choices">
+            <button className="invite-deleted-choice" onClick={() => setMode('restore')}>
+              <span className="invite-deleted-choice-icon">↩</span>
+              <div>
+                <strong>Restore your account</strong>
+                <p>Reactivate @{deletedInfo?.original_username}. Your posts and community history will be restored.</p>
+              </div>
+            </button>
+            <button className="invite-deleted-choice" onClick={() => setMode('create_fresh')}>
+              <span className="invite-deleted-choice-icon">✦</span>
+              <div>
+                <strong>Create a fresh account</strong>
+                <p>Start over with a brand new account. Your previous history stays archived.</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── restore form ─────────────────────────────────────────────────────────
+
+  if (mode === 'restore') {
+    return (
+      <div className="invite-register-section">
+        <div className="invite-register-banner">
+          <span className="invite-register-banner-icon">↩</span>
+          <span>Restoring <strong>@{deletedInfo?.original_username}</strong></span>
+        </div>
+        <form onSubmit={submitRestore} style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+          <div className="form-group">
+            <label className="form-label">Email</label>
+            <input className="form-input" type="email" value={lockedEmail} readOnly
+              style={{ background: 'var(--surface)', color: 'var(--muted)' }} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Set a new password</label>
+            <input className="form-input" type="password" required minLength={8}
+              value={form.newPw} onChange={e => set('newPw', e.target.value)}
+              autoComplete="new-password" placeholder="At least 8 characters" />
+          </div>
+          <label className="invite-covenant-check">
+            <input type="checkbox" checked={form.covenant} onChange={e => set('covenant', e.target.checked)} />
+            {' '}I have read and agree to{' '}
+            <a href="https://unprecedentedtimes.org/the-mycelium-covenant" target="_blank" rel="noopener noreferrer">
+              The Mycelium Covenant
+            </a>
+          </label>
+          {err && <p className="form-error">{err}</p>}
+          <button className="btn btn-primary btn-full" disabled={busy}>
+            {busy ? '…' : 'Restore Account'}
+          </button>
+        </form>
+        <p className="invite-toggle-mode">
+          <button type="button" className="link-btn" onClick={() => { setMode('register'); setErr(null); }}>
+            ← Back
+          </button>
+        </p>
+      </div>
+    );
+  }
+
+  // ── login form ───────────────────────────────────────────────────────────
+
+  if (mode === 'login') {
+    return (
+      <div className="invite-register-section">
+        <div className="invite-register-banner">
+          <span className="invite-register-banner-icon">⬡</span>
+          <span>Sign in to your existing account</span>
+        </div>
+        <form onSubmit={submitLogin} style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+          <div className="form-group">
+            <label className="form-label">Email</label>
+            <input className="form-input" type="email" required value={form.loginEmail}
+              onChange={e => set('loginEmail', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Password</label>
+            <input className="form-input" type="password" required value={form.loginPw}
+              onChange={e => set('loginPw', e.target.value)} />
+          </div>
+          {err && <p className="form-error">{err}</p>}
+          <button className="btn btn-primary btn-full" disabled={busy}>
+            {busy ? '…' : 'Sign In'}
+          </button>
+        </form>
+        <p className="invite-toggle-mode">
+          <button type="button" className="link-btn"
+            onClick={() => { setMode('register'); setErr(null); }}>
+            ← Back to registration
+          </button>
+        </p>
+      </div>
+    );
+  }
+
+  // ── main registration form (register or create_fresh) ───────────────────
+
+  const isCheckingEmail = emailStatus === 'checking';
+
   return (
     <div className="invite-register-section">
-      {mode === 'register' ? (
+      {emailStatus !== 'active' && (
         <>
           <div className="invite-register-banner">
             <span className="invite-register-banner-icon">✉️</span>
-            <span>You've been invited by <strong>{inviterName}</strong> — create your account to join</span>
+            <span>
+              Invited by <strong>{inviterName}</strong>
+              {mode === 'create_fresh' && ' · Creating fresh account'}
+            </span>
           </div>
 
-          <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+          <form onSubmit={submitRegister} style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             <div className="form-group">
-              <label className="form-label">Username</label>
+              <label className="form-label">Display Name <span className="form-required">*</span></label>
               <input className="form-input" required value={form.username}
-                onChange={e => set('username', e.target.value)} autoFocus />
+                onChange={e => set('username', e.target.value)}
+                placeholder="Your name or nickname" />
             </div>
+
             <div className="form-group">
               <label className="form-label">Email</label>
-              <input className="form-input" type="email" required value={form.email}
-                onChange={e => set('email', e.target.value)} />
+              <input className="form-input" type="email" value={lockedEmail} readOnly
+                style={{ background: 'var(--surface)', color: 'var(--muted)' }} />
             </div>
+
             <div className="form-group">
-              <label className="form-label">Password</label>
-              <input className="form-input" type="password" required minLength={8} value={form.password}
-                onChange={e => set('password', e.target.value)} />
+              <label className="form-label">Location <span className="form-required">*</span></label>
+              <input className="form-input" required value={form.location}
+                onChange={e => set('location', e.target.value)}
+                placeholder="e.g. North Huntsville, Madison, Downtown" />
             </div>
+
+            <div className="form-group">
+              <label className="form-label">How did you find Mycelium? <span className="form-required">*</span></label>
+              <select className="form-select" required value={form.how_found}
+                onChange={e => set('how_found', e.target.value)}>
+                {HOW_FOUND_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Password <span className="form-required">*</span></label>
+              <input className="form-input" type="password" required minLength={8}
+                value={form.password} onChange={e => set('password', e.target.value)}
+                autoComplete="new-password" placeholder="At least 8 characters" />
+            </div>
+
+            <label className="invite-covenant-check">
+              <input type="checkbox" checked={form.covenant} onChange={e => set('covenant', e.target.checked)} />
+              {' '}I have read and agree to{' '}
+              <a href="https://unprecedentedtimes.org/the-mycelium-covenant" target="_blank" rel="noopener noreferrer">
+                The Mycelium Covenant
+              </a>
+            </label>
+
             {err && <p className="form-error">{err}</p>}
-            <button className="btn btn-primary btn-full" disabled={busy}>
-              {busy ? '…' : 'Join Mycelium'}
+
+            <button className="btn btn-primary btn-full" disabled={busy || isCheckingEmail}>
+              {busy ? '…' : isCheckingEmail ? 'Checking…' : 'Join Mycelium'}
             </button>
           </form>
 
           <p className="invite-toggle-mode">
             Already have an account?{' '}
-            <button type="button" className="link-btn" onClick={() => { setMode('login'); setErr(null); }}>
+            <button type="button" className="link-btn"
+              onClick={() => { setMode('login'); setErr(null); }}>
               Sign in instead
             </button>
           </p>
         </>
-      ) : (
-        <>
-          <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
-            <div className="form-group">
-              <label className="form-label">Email</label>
-              <input className="form-input" type="email" required value={form.email}
-                onChange={e => set('email', e.target.value)} autoFocus />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <input className="form-input" type="password" required value={form.password}
-                onChange={e => set('password', e.target.value)} />
-            </div>
-            {err && <p className="form-error">{err}</p>}
-            <button className="btn btn-primary btn-full" disabled={busy}>
-              {busy ? '…' : 'Sign In'}
-            </button>
-          </form>
+      )}
 
-          <p className="invite-toggle-mode">
-            <button type="button" className="link-btn" onClick={() => { setMode('register'); setErr(null); }}>
-              ← Back to registration
-            </button>
+      {emailStatus === 'active' && (
+        <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
+          <p style={{ fontSize: '.95rem', color: 'var(--muted)' }}>
+            An active account already exists for <strong>{lockedEmail}</strong>.
           </p>
-        </>
+          <button className="btn btn-primary" style={{ marginTop: '1rem' }}
+            onClick={() => setMode('login')}>
+            Sign In
+          </button>
+        </div>
       )}
     </div>
   );
