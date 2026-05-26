@@ -27,7 +27,7 @@ export default function Admin() {
           </div>
         </div>
 
-        <div className="tabs" style={{ marginBottom: '1.5rem' }}>
+        <div className="tabs admin-tabs" style={{ marginBottom: '1.5rem' }}>
           <button className={`tab-btn${tab === 'moderation' ? ' active' : ''}`}
             onClick={() => setTab('moderation')}>
             Moderation
@@ -155,7 +155,7 @@ function UsersTab({ token }) {
       <p style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
         {users.length} total members
       </p>
-      <div style={{ overflowX: 'auto' }}>
+      <div className="table-scroll-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
@@ -257,7 +257,7 @@ function ChatRoomsTab({ token, userRole }) {
           </span>
         )}
       </p>
-      <div style={{ overflowX: 'auto' }}>
+      <div className="table-scroll-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>

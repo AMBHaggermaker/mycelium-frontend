@@ -32,6 +32,7 @@ export default function Chat({ onRequireAuth }) {
   const [showNewRoom, setShowNewRoom] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [roomReported, setRoomReported] = useState({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Keep ref in sync for socket handler closures
   useEffect(() => { activeSlugRef.current = activeSlug; }, [activeSlug]);
@@ -161,10 +162,19 @@ export default function Chat({ onRequireAuth }) {
     return t ? Date.now() - new Date(t).getTime() < FIVE_MIN : false;
   }
 
+  function selectRoom(slug) {
+    setActiveSlug(slug);
+    setSidebarOpen(false);
+  }
+
   return (
     <div className="chat-page">
+      {/* Mobile sidebar backdrop */}
+      <div className={`chat-sidebar-backdrop${sidebarOpen ? ' open' : ''}`}
+        onClick={() => setSidebarOpen(false)} />
+
       {/* Sidebar */}
-      <aside className="chat-sidebar">
+      <aside className={`chat-sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="chat-sidebar-header">
           <span className="chat-sidebar-title">Rooms</span>
           {user && (
@@ -176,7 +186,7 @@ export default function Chat({ onRequireAuth }) {
           {rooms.map(room => (
             <button key={room.slug}
               className={`chat-room-item${activeSlug === room.slug ? ' active' : ''}`}
-              onClick={() => setActiveSlug(room.slug)}>
+              onClick={() => selectRoom(room.slug)}>
               <div className="chat-room-row">
                 {isRecentlyActive(room.slug) && <span className="activity-dot" />}
                 <span className="chat-room-name">{room.name}</span>
@@ -194,6 +204,10 @@ export default function Chat({ onRequireAuth }) {
         {activeRoom ? (
           <>
             <div className="chat-header">
+              <button className="chat-rooms-toggle" onClick={() => setSidebarOpen(true)}
+                aria-label="Open rooms">
+                ≡ Rooms
+              </button>
               <div>
                 <span className="chat-room-title">{activeRoom.name}</span>
                 {activeRoom.description && (

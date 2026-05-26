@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#2a5f0a"/>
+  <polygon points="256,72 420,164 420,348 256,440 92,348 92,164"
+    fill="none" stroke="#f2ede4" stroke-width="26" stroke-linejoin="round"/>
+  <text x="256" y="326" text-anchor="middle" font-size="196"
+    font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"
+    fill="#f2ede4" font-weight="700">M</text>
+</svg>

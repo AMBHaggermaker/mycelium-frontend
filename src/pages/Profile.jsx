@@ -157,7 +157,7 @@ export default function Profile() {
           )}
         </div>
 
-        <div className="tabs">
+        <div className="tabs profile-page-tabs">
           <button className={`tab-btn${tab === 'posts' ? ' active' : ''}`} onClick={() => setTab('posts')}>
             Posts ({posts.length})
           </button>

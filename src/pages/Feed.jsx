@@ -28,15 +28,16 @@ const SORTS = [
 
 export default function Feed({ onRequireAuth }) {
   const { user, token } = useAuth();
-  const [posts,       setPosts]       = useState([]);
-  const [type,        setType]        = useState('');
-  const [category,    setCategory]    = useState('');
-  const [subcategory, setSubcategory] = useState('');
-  const [search,      setSearch]      = useState('');
-  const [sort,        setSort]        = useState('recent');
-  const [loading,     setLoading]     = useState(true);
-  const [err,         setErr]         = useState(null);
-  const [showNew,     setShowNew]     = useState(false);
+  const [posts,           setPosts]           = useState([]);
+  const [type,            setType]            = useState('');
+  const [category,        setCategory]        = useState('');
+  const [subcategory,     setSubcategory]     = useState('');
+  const [search,          setSearch]          = useState('');
+  const [sort,            setSort]            = useState('recent');
+  const [loading,         setLoading]         = useState(true);
+  const [err,             setErr]             = useState(null);
+  const [showNew,         setShowNew]         = useState(false);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
@@ -45,16 +46,16 @@ export default function Feed({ onRequireAuth }) {
       if (search.trim()) {
         const res = await api.search({
           q: search.trim(), type: 'posts',
-          post_type:  type        || undefined,
-          category:   category    || undefined,
+          post_type:   type        || undefined,
+          category:    category    || undefined,
           subcategory: subcategory || undefined,
         });
         result = res.posts ?? [];
       } else {
         result = await api.getPosts({
-          status:     'active',
-          type:       type        || undefined,
-          category:   category    || undefined,
+          status:      'active',
+          type:        type        || undefined,
+          category:    category    || undefined,
           subcategory: subcategory || undefined,
           sort:        sort !== 'recent' ? sort : undefined,
         }, token);
@@ -77,6 +78,17 @@ export default function Feed({ onRequireAuth }) {
     setSubcategory('');
   }
 
+  function clearFilters() {
+    setType(''); setCategory(''); setSubcategory(''); setSort('recent');
+  }
+
+  const activeFilterCount = [
+    type !== '',
+    category !== '',
+    subcategory !== '',
+    sort !== 'recent',
+  ].filter(Boolean).length;
+
   return (
     <div className="page">
       <div className="container">
@@ -93,7 +105,7 @@ export default function Feed({ onRequireAuth }) {
 
         <UrgentStrip />
 
-        {/* Row 1: type tabs + search */}
+        {/* Desktop filter rows */}
         <div className="filter-row">
           <div className="filter-tabs">
             {TYPES.map(t => (
@@ -107,8 +119,6 @@ export default function Feed({ onRequireAuth }) {
           <input className="search-input" placeholder="Search…" value={search}
             onChange={e => setSearch(e.target.value)} />
         </div>
-
-        {/* Row 2: category tabs + subcategory + sort */}
         <div className="filter-row" style={{ marginTop: '.5rem' }}>
           <div className="filter-tabs">
             {CATEGORIES.map(c => (
@@ -127,6 +137,20 @@ export default function Feed({ onRequireAuth }) {
           </select>
         </div>
 
+        {/* Mobile filter bar */}
+        <div className="filter-fab">
+          <div className="filter-fab-search">
+            <input className="search-input" placeholder="Search…" value={search}
+              onChange={e => setSearch(e.target.value)} />
+          </div>
+          <button
+            className={`filter-fab-btn${activeFilterCount > 0 ? ' has-filters' : ''}`}
+            onClick={() => setShowFilterSheet(true)}
+          >
+            ⚙ Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+          </button>
+        </div>
+
         {loading
           ? <div className="spinner" />
           : err
@@ -140,6 +164,70 @@ export default function Feed({ onRequireAuth }) {
                 </div>
         }
       </div>
+
+      {/* Mobile filter bottom sheet */}
+      {showFilterSheet && (
+        <>
+          <div className="filter-sheet-backdrop" onClick={() => setShowFilterSheet(false)} />
+          <div className="filter-sheet">
+            <div className="filter-sheet-handle" />
+            <div className="filter-sheet-header">
+              <span className="filter-sheet-title">Filters</span>
+              <button className="modal-close" onClick={() => setShowFilterSheet(false)}>✕</button>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Type</label>
+              <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                {TYPES.map(t => (
+                  <button key={t.value} type="button"
+                    className={`filter-tab${type === t.value ? ' active' : ''}${t.value ? ` tab-${t.value}` : ''}`}
+                    onClick={() => setType(t.value)}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                {CATEGORIES.map(c => (
+                  <button key={c.value} type="button"
+                    className={`filter-tab${category === c.value ? ' active' : ''}`}
+                    onClick={() => handleCategoryChange(c.value)}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Subcategory</label>
+              <input className="form-input" placeholder="e.g. childcare, tools…" value={subcategory}
+                onChange={e => setSubcategory(e.target.value)} />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Sort by</label>
+              <select className="form-select" value={sort} onChange={e => setSort(e.target.value)}>
+                {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '.5rem', paddingTop: '.25rem' }}>
+              <button className="btn btn-primary btn-full" onClick={() => setShowFilterSheet(false)}>
+                Show Results
+              </button>
+              {activeFilterCount > 0 && (
+                <button className="btn btn-outline" onClick={() => { clearFilters(); setShowFilterSheet(false); }}>
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {showNew && (
         <NewPostModal onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); load(); }} />
