@@ -7,6 +7,8 @@ import CirclePage from './pages/CirclePage';
 import Profile from './pages/Profile';
 import Chat from './pages/Chat';
 import Admin from './pages/Admin';
+import Watch from './pages/Watch';
+import Merch from './pages/Merch';
 import AuthModal from './components/AuthModal';
 import { useAuth } from './auth';
 
@@ -26,6 +28,8 @@ export default function App() {
         <Route path="/profile/:id" element={<Profile />} />
         <Route path="/chat"        element={<Chat onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/admin"       element={<Admin />} />
+        <Route path="/watch"       element={<Watch onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/merch"       element={<Merch />} />
       </Routes>
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
     </>

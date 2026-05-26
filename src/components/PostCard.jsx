@@ -134,7 +134,15 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
         </span>
       </div>
 
-      <h3 className="post-title">{post.title}</h3>
+      <div className="post-title-row">
+        <h3 className="post-title">{post.title}</h3>
+        {post.commerce_type === 'commerce' && post.price != null && (
+          <span className="post-price">${parseFloat(post.price).toFixed(2)}</span>
+        )}
+        {post.commerce_type === 'exchange' && (
+          <span className="post-exchange-badge">Exchange</span>
+        )}
+      </div>
 
       {post.description && <p className="post-description">{post.description}</p>}
 

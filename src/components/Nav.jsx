@@ -5,7 +5,7 @@ const BOTTOM_TABS = [
   { to: '/',        end: true, icon: '⚡', label: 'Hotlight',     internal: true },
   { to: '/commons',            icon: '⬡',  label: 'Commons',      internal: true },
   { to: '/chat',               icon: '💬', label: 'Chat',         internal: true },
-  { href: 'https://unprecedentedtimes.org',           icon: '◉', label: 'Watch'       },
+  { to: '/watch',              icon: '◉',  label: 'Watch',        internal: true },
   { href: 'https://lostfound.unprecedentedtimes.org', icon: '🔍', label: 'Lost & Found' },
 ];
 
@@ -32,6 +32,12 @@ export default function Nav({ onAuthOpen }) {
             <a href="https://lostfound.unprecedentedtimes.org" className="nav-link" target="_blank" rel="noopener noreferrer">
               Lost &amp; Found
             </a>
+            <NavLink to="/watch" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              Watch
+            </NavLink>
+            <NavLink to="/merch" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              Merch
+            </NavLink>
             <a href="https://unprecedentedtimes.org" className="nav-link" target="_blank" rel="noopener noreferrer">
               Newsletter
             </a>

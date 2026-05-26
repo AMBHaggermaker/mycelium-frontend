@@ -23,6 +23,7 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
     type: 'offer', title: '', description: '', circle_id: defaultCircleId || '',
     capacity: '', location: '', starts_at: '', ends_at: '', tags: '',
     category: '', subcategory: '', is_urgent: false, expires_at: '',
+    commerce_type: '', price: '',
   });
   const [circles,  setCircles]  = useState([]);
   const [files,    setFiles]    = useState([]);
@@ -62,19 +63,21 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
     setBusy(true); setErr(null);
     try {
       const payload = {
-        type:        form.type,
-        title:       form.title.trim(),
-        description: form.description.trim() || undefined,
-        circle_id:   form.circle_id || undefined,
-        capacity:    form.capacity ? parseInt(form.capacity) : undefined,
-        location:    form.location.trim() || undefined,
-        starts_at:   form.starts_at || undefined,
-        ends_at:     form.ends_at || undefined,
-        tags:        form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-        category:    form.category || undefined,
-        subcategory: form.subcategory.trim() || undefined,
-        is_urgent:   form.is_urgent || undefined,
-        expires_at:  form.expires_at || undefined,
+        type:          form.type,
+        title:         form.title.trim(),
+        description:   form.description.trim() || undefined,
+        circle_id:     form.circle_id || undefined,
+        capacity:      form.capacity ? parseInt(form.capacity) : undefined,
+        location:      form.location.trim() || undefined,
+        starts_at:     form.starts_at || undefined,
+        ends_at:       form.ends_at || undefined,
+        tags:          form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        category:      form.category || undefined,
+        subcategory:   form.subcategory.trim() || undefined,
+        is_urgent:     form.is_urgent || undefined,
+        expires_at:    form.expires_at || undefined,
+        commerce_type: form.commerce_type || undefined,
+        price:         form.commerce_type === 'commerce' && form.price ? parseFloat(form.price) : undefined,
       };
       const post = await api.createPost(payload, token);
       if (files.length) await api.uploadPostMedia(post.id, files, token);
@@ -216,6 +219,42 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
                 onChange={e => set('tags', e.target.value)} />
             </div>
           </div>
+
+          {/* Commerce type — needs and offers */}
+          {(form.type === 'need' || form.type === 'offer') && (
+            <div className="form-group">
+              <label className="form-label">Exchange Type</label>
+              <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                {[
+                  { value: '',         label: 'Default' },
+                  { value: 'exchange', label: 'Community Exchange' },
+                  { value: 'commerce', label: 'Local Commerce' },
+                ].map(opt => (
+                  <button key={opt.value} type="button"
+                    className={`btn btn-sm ${form.commerce_type === opt.value ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => set('commerce_type', opt.value)}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {form.commerce_type === 'exchange' && (
+                <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: '.3rem' }}>Free, barter, or mutual aid — no money expected</p>
+              )}
+              {form.commerce_type === 'commerce' && (
+                <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: '.3rem' }}>Priced goods or paid services</p>
+              )}
+            </div>
+          )}
+
+          {/* Price — commerce only */}
+          {form.commerce_type === 'commerce' && (
+            <div className="form-group">
+              <label className="form-label">Price ($)</label>
+              <input className="form-input" type="number" min="0" step="0.01"
+                value={form.price} onChange={e => set('price', e.target.value)}
+                placeholder="e.g. 25.00" style={{ maxWidth: 160 }} />
+            </div>
+          )}
 
           {/* Urgency / Expiry — needs and offers only */}
           {(form.type === 'need' || form.type === 'offer') && (

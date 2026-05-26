@@ -5,6 +5,13 @@ import PostCard from '../components/PostCard';
 import NewPostModal from '../components/NewPostModal';
 import UrgentStrip from '../components/UrgentStrip';
 
+const FEED_TABS = [
+  { value: '',          label: 'All',               desc: 'Everything from the community' },
+  { value: 'community', label: 'Community Exchange', desc: 'Free exchanges and mutual aid' },
+  { value: 'commerce',  label: 'Local Commerce',     desc: 'Goods and services for sale' },
+  { value: 'urgent',    label: 'Urgent Needs',       desc: 'Time-sensitive community needs' },
+];
+
 const TYPES = [
   { value: '',      label: 'All'    },
   { value: 'need',  label: 'Needs'  },
@@ -29,6 +36,7 @@ const SORTS = [
 export default function Feed({ onRequireAuth }) {
   const { user, token } = useAuth();
   const [posts,           setPosts]           = useState([]);
+  const [feedTab,         setFeedTab]         = useState('');
   const [type,            setType]            = useState('');
   const [category,        setCategory]        = useState('');
   const [subcategory,     setSubcategory]     = useState('');
@@ -52,12 +60,14 @@ export default function Feed({ onRequireAuth }) {
         });
         result = res.posts ?? [];
       } else {
+        const sortParam = feedTab === 'urgent' ? 'urgent' : (sort !== 'recent' ? sort : undefined);
         result = await api.getPosts({
           status:      'active',
           type:        type        || undefined,
           category:    category    || undefined,
           subcategory: subcategory || undefined,
-          sort:        sort !== 'recent' ? sort : undefined,
+          feed_tab:    feedTab     || undefined,
+          sort:        sortParam,
         }, token);
       }
       setPosts(result);
@@ -66,7 +76,7 @@ export default function Feed({ onRequireAuth }) {
     } finally {
       setLoading(false);
     }
-  }, [type, category, subcategory, search, sort, token]);
+  }, [feedTab, type, category, subcategory, search, sort, token]);
 
   useEffect(() => {
     const t = setTimeout(load, search ? 350 : 0);
@@ -89,13 +99,17 @@ export default function Feed({ onRequireAuth }) {
     sort !== 'recent',
   ].filter(Boolean).length;
 
+  const activeFeedTab = FEED_TABS.find(t => t.value === feedTab);
+
   return (
     <div className="page">
       <div className="container">
         <div className="page-header">
           <div>
             <h1 className="page-title">Hotlight</h1>
-            <p className="page-subtitle">Needs, offers, and events from the community</p>
+            <p className="page-subtitle">
+              {activeFeedTab?.value ? activeFeedTab.desc : 'Needs, offers, and events from the community'}
+            </p>
           </div>
           {user
             ? <button className="btn btn-primary" onClick={() => setShowNew(true)}>+ New Post</button>
@@ -104,6 +118,19 @@ export default function Feed({ onRequireAuth }) {
         </div>
 
         <UrgentStrip />
+
+        {/* Feed sub-tabs */}
+        <div className="feed-subtabs">
+          {FEED_TABS.map(t => (
+            <button
+              key={t.value}
+              className={`feed-subtab${feedTab === t.value ? ' active' : ''}${t.value === 'urgent' ? ' subtab-urgent' : ''}`}
+              onClick={() => setFeedTab(t.value)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
         {/* Desktop filter rows */}
         <div className="filter-row">

@@ -120,4 +120,17 @@ export default {
   getAdminChatRooms:    (token)              => get('/admin/chat-rooms', token),
   deleteAdminChatRoom:  (roomId, token)      => del(`/admin/chat-rooms/${roomId}`, token),
   flagAdminChatRoom:    (roomId, token)      => patch(`/admin/chat-rooms/${roomId}/flag`, {}, token),
+
+  // Watch
+  getWatchReports: (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),
+  submitWatchReport: (dashboard, formData, token) =>
+    fetch(`${BASE}/watch/${dashboard}/reports`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    }).then(async res => {
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      if (!res.ok) throw new Error(data.error || 'Submit failed');
+      return data;
+    }),
 };
