@@ -12,6 +12,7 @@ import Merch from './pages/Merch';
 import InvitePage from './pages/InvitePage';
 import Settings from './pages/Settings';
 import EmailVerifyPage from './pages/EmailVerifyPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import AuthModal from './components/AuthModal';
 import InviteModal from './components/InviteModal';
 import { useAuth } from './auth';
@@ -36,8 +37,9 @@ export default function App() {
         <Route path="/watch"       element={<Watch onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/merch"       element={<Merch />} />
         <Route path="/invite/:token" element={<InvitePage />} />
-        <Route path="/settings"     element={<Settings />} />
-        <Route path="/verify-email" element={<EmailVerifyPage />} />
+        <Route path="/settings"        element={<Settings />} />
+        <Route path="/verify-email"    element={<EmailVerifyPage />} />
+        <Route path="/reset-password"  element={<ResetPasswordPage />} />
       </Routes>
       {authOpen   && <AuthModal onClose={() => setAuthOpen(false)} />}
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}

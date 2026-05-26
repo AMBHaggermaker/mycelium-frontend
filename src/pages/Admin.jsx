@@ -164,11 +164,25 @@ function UsersTab({ token }) {
   }
 
   async function restoreUser(u) {
-    if (!confirm(`Restore @${u.original_username || '[unknown]'}?\n\nThis will reactivate the account and send them a welcome-back email.`)) return;
+    const displayName = u.preserved_display_name || u.original_username || '[unknown]';
+    if (!confirm(`Restore ${displayName}?\n\nThis will reactivate the account and send them a welcome-back email.`)) return;
     setActionId(u.id);
     try {
       const updated = await api.restoreUser(u.id, token);
       setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ...updated, original_username: null } : x));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  async function sendPasswordReset(u) {
+    if (!confirm(`Send a password reset email to @${u.username}?`)) return;
+    setActionId(u.id);
+    try {
+      await api.adminSendPasswordReset(u.id, token);
+      alert(`Password reset email sent to ${u.username}.`);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -217,14 +231,21 @@ function UsersTab({ token }) {
           )}
         </td>
         <td style={{ padding: '.5rem .75rem' }}>
-          {canDelete ? (
-            <button className="btn btn-sm btn-danger" disabled={actionId === u.id}
-              onClick={() => deleteUser(u)}>
-              {actionId === u.id ? '…' : 'Delete'}
+          <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-sm btn-outline" disabled={actionId === u.id}
+              onClick={() => sendPasswordReset(u)}
+              title="Send password reset email">
+              {actionId === u.id ? '…' : 'Reset PW'}
             </button>
-          ) : (
-            <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>—</span>
-          )}
+            {canDelete ? (
+              <button className="btn btn-sm btn-danger" disabled={actionId === u.id}
+                onClick={() => deleteUser(u)}>
+                {actionId === u.id ? '…' : 'Delete'}
+              </button>
+            ) : (
+              <span style={{ fontSize: '.75rem', color: 'var(--muted)', alignSelf: 'center' }}>—</span>
+            )}
+          </div>
         </td>
       </tr>
     );
@@ -277,8 +298,11 @@ function UsersTab({ token }) {
               <tbody>
                 {deletedUsers.map(u => (
                   <tr key={u.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
-                    <td style={{ padding: '.5rem .75rem', fontWeight: 600, color: 'var(--muted)', fontStyle: 'italic' }}>
-                      {u.original_username ? `@${u.original_username}` : '[no data]'}
+                    <td style={{ padding: '.5rem .75rem', fontWeight: 600, color: 'var(--muted)' }}>
+                      {u.preserved_display_name || u.original_username
+                        ? <>{u.preserved_display_name || u.original_username}<br /><span style={{ fontStyle: 'italic', fontSize: '.8rem' }}>@{u.original_username || '—'}</span></>
+                        : <span style={{ fontStyle: 'italic' }}>[no data]</span>
+                      }
                     </td>
                     <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
                       {new Date(u.created_at).toLocaleDateString()}
@@ -291,8 +315,8 @@ function UsersTab({ token }) {
                       <button className="btn btn-sm btn-outline" disabled={actionId === u.id}
                         onClick={() => restoreUser(u)}
                         title={u.original_username
-                          ? `Restore @${u.original_username} and send welcome-back email`
-                          : 'Restore account (original name was not preserved — account will be active with anonymized name)'
+                          ? `Restore and send welcome-back email`
+                          : 'Restore account (original name was not preserved)'
                         }>
                         {actionId === u.id ? '…' : 'Restore'}
                       </button>

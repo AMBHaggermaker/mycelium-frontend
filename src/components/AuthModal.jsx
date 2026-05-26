@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../auth';
 import api from '../api';
+import PasswordInput from './PasswordInput';
 
 const HOW_FOUND_OPTIONS = [
   { value: '',            label: 'How did you find Mycelium? *' },
@@ -23,9 +24,15 @@ export default function AuthModal({ onClose }) {
   const [restorePw,   setRestorePw]   = useState('');
   const [covenantRestore, setCovenantRestore] = useState(false);
 
+  // forgot password state
+  const [forgotEmail,  setForgotEmail]  = useState('');
+  const [forgotBusy,   setForgotBusy]   = useState(false);
+  const [forgotSent,   setForgotSent]   = useState(false);
+  const [forgotErr,    setForgotErr]    = useState(null);
+
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
-  function switchMode(m) { setMode(m); setErr(null); setDeletedInfo(null); setDeletedMode(null); }
+  function switchMode(m) { setMode(m); setErr(null); setDeletedInfo(null); setDeletedMode(null); setForgotSent(false); setForgotErr(null); }
 
   async function submit(e) {
     e.preventDefault();
@@ -71,6 +78,65 @@ export default function AuthModal({ onClose }) {
     }
   }
 
+  async function submitForgot(e) {
+    e.preventDefault();
+    setForgotBusy(true); setForgotErr(null);
+    try {
+      await api.forgotPassword({ email: forgotEmail });
+      setForgotSent(true);
+    } catch (e) {
+      setForgotErr(e.message);
+    } finally {
+      setForgotBusy(false);
+    }
+  }
+
+  // ── forgot password modal ────────────────────────────────────────────────
+
+  if (mode === 'forgot') {
+    return (
+      <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className="modal">
+          <div className="modal-header">
+            <span className="modal-title">Forgot Password</span>
+            <button className="modal-close" onClick={onClose}>✕</button>
+          </div>
+          <div className="modal-body">
+            {forgotSent ? (
+              <>
+                <p style={{ fontSize: '.9rem', color: 'var(--muted)', marginBottom: '1.25rem' }}>
+                  If an account exists for <strong>{forgotEmail}</strong>, a reset link has been sent.
+                  Check your email and follow the link to set a new password.
+                </p>
+                <button className="btn btn-outline btn-full" onClick={() => switchMode('login')}>
+                  Back to Sign In
+                </button>
+              </>
+            ) : (
+              <form onSubmit={submitForgot}>
+                <p style={{ fontSize: '.875rem', color: 'var(--muted)', marginBottom: '1rem' }}>
+                  Enter your email address and we'll send you a link to reset your password.
+                </p>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input className="form-input" type="email" required value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)} />
+                </div>
+                {forgotErr && <p className="form-error">{forgotErr}</p>}
+                <button className="btn btn-primary btn-full" disabled={forgotBusy}>
+                  {forgotBusy ? '…' : 'Send Reset Link'}
+                </button>
+                <p className="auth-toggle">
+                  <button type="button" onClick={() => switchMode('login')}>← Back to Sign In</button>
+                </p>
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── deleted account restore sub-form ────────────────────────────────────
 
   if (deletedMode === 'restore') {
@@ -92,7 +158,7 @@ export default function AuthModal({ onClose }) {
             </div>
             <div className="form-group">
               <label className="form-label">Set a new password</label>
-              <input className="form-input" type="password" required minLength={8}
+              <PasswordInput required minLength={8}
                 value={restorePw} onChange={e => setRestorePw(e.target.value)}
                 autoComplete="new-password" placeholder="At least 8 characters" />
             </div>
@@ -198,9 +264,18 @@ export default function AuthModal({ onClose }) {
           )}
           <div className="form-group">
             <label className="form-label">Password</label>
-            <input className="form-input" type="password" required minLength={8} value={form.password}
-              onChange={e => set('password', e.target.value)} />
+            <PasswordInput required minLength={8} value={form.password}
+              onChange={e => set('password', e.target.value)}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
           </div>
+          {mode === 'login' && (
+            <p style={{ marginTop: '-.25rem', marginBottom: '.5rem', fontSize: '.8rem', textAlign: 'right' }}>
+              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', textDecoration: 'underline', padding: 0 }}
+                onClick={() => { setForgotEmail(form.email); switchMode('forgot'); }}>
+                Forgot password?
+              </button>
+            </p>
+          )}
           {mode === 'register' && (
             <label className="invite-covenant-check" style={{ fontSize: '.85rem' }}>
               <input type="checkbox" checked={form.covenant} onChange={e => set('covenant', e.target.checked)} />

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
+import PasswordInput from '../components/PasswordInput';
 
 function Section({ title, children }) {
   return (
@@ -259,7 +260,7 @@ export default function Settings() {
             </p>
             <div className="form-group">
               <label className="form-label">Current password</label>
-              <input className="form-input" type="password" required value={emailCurPw}
+              <PasswordInput required value={emailCurPw}
                 onChange={e => setEmailCurPw(e.target.value)} autoComplete="current-password" />
             </div>
             <div className="form-group">
@@ -286,17 +287,17 @@ export default function Settings() {
         <div className="settings-fields">
           <div className="form-group">
             <label className="form-label">Current password</label>
-            <input className="form-input" type="password" value={currentPw}
+            <PasswordInput value={currentPw}
               onChange={e => setCurrentPw(e.target.value)} autoComplete="current-password" />
           </div>
           <div className="form-group">
             <label className="form-label">New password</label>
-            <input className="form-input" type="password" value={newPw}
+            <PasswordInput value={newPw}
               onChange={e => setNewPw(e.target.value)} autoComplete="new-password" minLength={8} />
           </div>
           <div className="form-group">
             <label className="form-label">Confirm new password</label>
-            <input className="form-input" type="password" value={confirmPw}
+            <PasswordInput value={confirmPw}
               onChange={e => setConfirmPw(e.target.value)} autoComplete="new-password" />
           </div>
           {pwErr && <p className="form-error">{pwErr}</p>}

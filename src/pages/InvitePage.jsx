@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
+import PasswordInput from '../components/PasswordInput';
 
 const BASE_URL = 'https://mycelium.unprecedentedtimes.org';
 
@@ -331,7 +332,7 @@ function InviteRegisterForm({ inviteToken, inviterName, lockedEmail }) {
           </div>
           <div className="form-group">
             <label className="form-label">Set a new password</label>
-            <input className="form-input" type="password" required minLength={8}
+            <PasswordInput required minLength={8}
               value={form.newPw} onChange={e => set('newPw', e.target.value)}
               autoComplete="new-password" placeholder="At least 8 characters" />
           </div>
@@ -373,8 +374,9 @@ function InviteRegisterForm({ inviteToken, inviterName, lockedEmail }) {
           </div>
           <div className="form-group">
             <label className="form-label">Password</label>
-            <input className="form-input" type="password" required value={form.loginPw}
-              onChange={e => set('loginPw', e.target.value)} />
+            <PasswordInput required value={form.loginPw}
+              onChange={e => set('loginPw', e.target.value)}
+              autoComplete="current-password" />
           </div>
           {err && <p className="form-error">{err}</p>}
           <button className="btn btn-primary btn-full" disabled={busy}>
@@ -440,7 +442,7 @@ function InviteRegisterForm({ inviteToken, inviterName, lockedEmail }) {
 
             <div className="form-group">
               <label className="form-label">Password <span className="form-required">*</span></label>
-              <input className="form-input" type="password" required minLength={8}
+              <PasswordInput required minLength={8}
                 value={form.password} onChange={e => set('password', e.target.value)}
                 autoComplete="new-password" placeholder="At least 8 characters" />
             </div>

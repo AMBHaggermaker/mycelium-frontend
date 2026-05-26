@@ -20,6 +20,8 @@ export function AuthProvider({ children }) {
     localStorage.setItem('mycelium_token', newToken);
     setToken(newToken);
     setUser(newUser);
+    // Refresh from server to ensure all fields (verified, founding_member, email_pending) are current
+    api.me(newToken).then(setUser).catch(() => {});
   }
 
   function logout() {

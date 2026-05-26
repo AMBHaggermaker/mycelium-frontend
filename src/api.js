@@ -117,8 +117,9 @@ export default {
   removePost:         (postId, token)      => del(`/admin/moderation/${postId}`, token),
   getAdminUsers:      (token)              => get('/admin/users', token),
   setUserRole:        (userId, role, token) => patch(`/admin/users/${userId}/role`, { role }, token),
-  deleteUser:         (userId, token)       => patch(`/admin/users/${userId}/delete`, {}, token),
-  restoreUser:        (userId, token)       => patch(`/admin/users/${userId}/restore`, {}, token),
+  deleteUser:             (userId, token)   => patch(`/admin/users/${userId}/delete`, {}, token),
+  restoreUser:            (userId, token)   => patch(`/admin/users/${userId}/restore`, {}, token),
+  adminSendPasswordReset: (userId, token)   => post(`/admin/users/${userId}/send-password-reset`, {}, token),
 
   // Admin chat-room management
   getAdminChatRooms:    (token)              => get('/admin/chat-rooms', token),
@@ -137,6 +138,8 @@ export default {
   requestEmailChange:   (data, token)   => post('/auth/request-email-change', data, token),
   cancelEmailChange:    (token)         => del('/auth/request-email-change', token),
   verifyEmailChange:    (changeToken)   => get(`/auth/verify-email-change?token=${encodeURIComponent(changeToken)}`),
+  forgotPassword:       (data)          => post('/auth/forgot-password', data),
+  resetPassword:        (data)          => post('/auth/reset-password', data),
 
   // Watch
   getWatchReports: (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),
