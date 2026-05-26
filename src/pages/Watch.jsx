@@ -266,36 +266,41 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
         <form className="modal-body" onSubmit={submit}>
           <div className="form-group">
             <label className="form-label">Severity <span className="form-required">*</span></label>
-            <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
-              {SEVERITY_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setSeverity(opt.value)}
-                  title={opt.desc}
-                  style={{
-                    padding: '.3rem .75rem',
-                    borderRadius: 99,
-                    fontSize: '.8rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    border: `2px solid ${severity === opt.value ? opt.color : 'transparent'}`,
-                    background: severity === opt.value ? opt.bg : 'var(--surface)',
-                    color: severity === opt.value ? opt.color : 'var(--muted)',
-                    transition: 'all .15s',
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+              <select
+                className="form-select"
+                required
+                value={severity}
+                onChange={e => setSeverity(e.target.value)}
+                style={selectedSev ? {
+                  borderLeft: `4px solid ${selectedSev.color}`,
+                  fontWeight: 600,
+                  color: selectedSev.color,
+                } : {}}
+              >
+                <option value="" disabled>— Choose severity —</option>
+                {SEVERITY_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value} style={{ color: opt.color, fontWeight: 600 }}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              {selectedSev && (
+                <span style={{
+                  width: 12, height: 12, borderRadius: '50%',
+                  background: selectedSev.color, flexShrink: 0,
+                }} />
+              )}
             </div>
             {selectedSev && (
-              <p style={{ fontSize: '.78rem', color: selectedSev.color, marginTop: '.35rem' }}>{selectedSev.desc}</p>
+              <p style={{ fontSize: '.78rem', color: selectedSev.color, margin: '.25rem 0 0' }}>
+                {selectedSev.desc}
+              </p>
             )}
           </div>
 
           <div className="form-group">
-            <label className="form-label">Issue Type</label>
+            <label className="form-label">Issue Type <span style={{ fontSize: '.75rem', color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
             <select className="form-select" value={reportType} onChange={e => setReportType(e.target.value)}>
               <option value="">— Select type —</option>
               {reportTypes.map(t => <option key={t} value={t}>{t}</option>)}
