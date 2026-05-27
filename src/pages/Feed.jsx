@@ -4,6 +4,7 @@ import api from '../api';
 import PostCard from '../components/PostCard';
 import NewPostModal from '../components/NewPostModal';
 import UrgentStrip from '../components/UrgentStrip';
+import DonateButton from '../components/DonateButton';
 import { getSocket } from '../socket';
 
 const FEED_TABS = [
@@ -50,6 +51,9 @@ export default function Feed({ onRequireAuth }) {
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [covenantDismissed, setCovenantDismissed] = useState(
     () => typeof localStorage !== 'undefined' && localStorage.getItem('covenant_banner_dismissed') === '1'
+  );
+  const [donateDismissed, setDonateDismissed] = useState(
+    () => typeof localStorage !== 'undefined' && localStorage.getItem('donate_banner_dismissed') === '1'
   );
 
   const load = useCallback(async () => {
@@ -153,6 +157,28 @@ export default function Feed({ onRequireAuth }) {
               >
                 ✕
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Support Mycelium banner */}
+        {!donateDismissed && (
+          <div className="donate-banner">
+            <div className="donate-banner-body">
+              <span className="donate-banner-icon">💛</span>
+              <div className="donate-banner-text">
+                <strong>Support Mycelium</strong>
+                <span className="donate-banner-sub"> — Keep this platform free for the community</span>
+              </div>
+              <DonateButton className="btn btn-sm btn-primary donate-banner-btn" label="Donate" />
+              <button
+                className="donate-banner-dismiss"
+                onClick={() => {
+                  setDonateDismissed(true);
+                  localStorage.setItem('donate_banner_dismissed', '1');
+                }}
+                aria-label="Dismiss"
+              >✕</button>
             </div>
           </div>
         )}

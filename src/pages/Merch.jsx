@@ -1,3 +1,5 @@
+import DonateButton from '../components/DonateButton';
+
 const MERCH_EMAIL = 'aliciambh82@protonmail.com';
 
 const PRODUCTS = [
@@ -81,6 +83,19 @@ export default function Merch() {
               </a>
             </div>
           ))}
+        </div>
+
+        <div className="merch-donate-section">
+          <div className="merch-donate-inner">
+            <div>
+              <h2 className="merch-donate-title">Prefer to donate directly?</h2>
+              <p className="merch-donate-desc">
+                A direct donation — any amount — goes straight toward server costs, maintenance,
+                and keeping Mycelium free for everyone in the community.
+              </p>
+            </div>
+            <DonateButton className="btn btn-primary merch-donate-btn" label="Donate via Stripe" />
+          </div>
         </div>
 
         <div className="merch-footer">

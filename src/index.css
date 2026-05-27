@@ -5020,3 +5020,60 @@ a { color: inherit; text-decoration: none; }
 .hs-divider { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: .5rem .75rem; }
 .hs-chat-item { display: flex; align-items: center; gap: .35rem; }
 .hs-chat-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green, #2a5f0a); flex-shrink: 0; }
+
+/* ── Donate Banner (Feed) ──────────────────────────────────── */
+.donate-banner {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef9e7 100%);
+  border: 1px solid #fbbf24;
+  border-radius: var(--radius);
+  padding: .6rem 1rem;
+  margin-bottom: .75rem;
+}
+.donate-banner-body {
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+}
+.donate-banner-icon { font-size: 1.15rem; flex-shrink: 0; }
+.donate-banner-text { flex: 1; font-size: .875rem; color: var(--text); min-width: 180px; }
+.donate-banner-sub { color: var(--muted); }
+.donate-banner-btn { flex-shrink: 0; }
+.donate-banner-dismiss {
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font-size: 1rem; padding: .2rem .3rem; line-height: 1; border-radius: 4px; margin-left: auto;
+}
+.donate-banner-dismiss:hover { color: var(--text); }
+
+/* ── Donate Coming-Soon Tooltip ────────────────────────────── */
+.donate-coming-soon-tip {
+  position: absolute; z-index: 200; bottom: calc(100% + 8px); left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: .75rem 1rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12); width: 240px;
+  font-size: .82rem; color: var(--text); line-height: 1.5;
+}
+.donate-coming-soon-tip strong { display: block; margin-bottom: .25rem; }
+.donate-coming-soon-tip p { margin: 0; color: var(--muted); }
+.donate-tip-close {
+  position: absolute; top: .4rem; right: .4rem;
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font-size: .85rem; padding: .1rem .25rem; line-height: 1;
+}
+.donate-tip-close:hover { color: var(--text); }
+
+/* ── Merch Donate Section ──────────────────────────────────── */
+.merch-donate-section {
+  margin: 2.5rem 0 1.5rem;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  border: 1px solid #6ee7b7;
+  border-radius: var(--radius);
+  padding: 1.75rem 2rem;
+}
+.merch-donate-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1.5rem; flex-wrap: wrap;
+}
+.merch-donate-title { font-size: 1.15rem; font-weight: 700; margin: 0 0 .35rem; }
+.merch-donate-desc {
+  font-size: .875rem; color: var(--muted); max-width: 480px; margin: 0; line-height: 1.6;
+}
+.merch-donate-btn { flex-shrink: 0; }
