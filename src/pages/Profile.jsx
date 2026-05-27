@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
+import ImageCropUploader from '../components/ImageCropUploader';
 
 const AVAIL_LABELS = {
   available: '🟢 Available for Work', not_taking_clients: '🔴 Not Taking New Clients',
@@ -1034,26 +1035,35 @@ function MyBusinessesBoard({ user: u, isOwn, token }) {
 // ── Avatar Block ──────────────────────────────────────────────────────────────
 
 function AvatarBlock({ user: u, isOwn, token, onUpdated }) {
-  const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
-  async function handleChange(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+  async function handleFile(blob, filename) {
     setUploading(true);
     try {
+      const file = new File([blob], filename, { type: 'image/jpeg' });
       const res = await api.uploadProfilePhoto(file, { is_profile_photo: true }, token);
       onUpdated(res.url);
     } catch (e) { alert(e.message); }
-    finally { setUploading(false); e.target.value = ''; }
+    finally { setUploading(false); }
   }
 
   return (
-    <div className={'profile-avatar-lg' + (isOwn ? ' clickable' : '')}
-      onClick={isOwn ? () => fileRef.current?.click() : undefined}>
+    <div className="profile-avatar-lg" style={{ position: 'relative' }}>
       {u.avatar_url ? <img src={resolveUrl(u.avatar_url)} alt={u.username} /> : <span>{u.username[0].toUpperCase()}</span>}
-      {isOwn && <div className={'profile-avatar-overlay' + (uploading ? ' uploading' : '')}>{uploading ? '…' : '📷'}</div>}
-      {isOwn && <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleChange} />}
+      {isOwn && (
+        <div className="profile-avatar-crop-wrap">
+          <ImageCropUploader
+            aspect={1}
+            targetWidth={400}
+            targetHeight={400}
+            label={uploading ? '…' : '📷'}
+            hint="400×400px · square"
+            onFile={handleFile}
+            disabled={uploading}
+            btnClassName="profile-avatar-edit-btn"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1061,27 +1071,29 @@ function AvatarBlock({ user: u, isOwn, token, onUpdated }) {
 // ── Banner Upload ─────────────────────────────────────────────────────────────
 
 function BannerUpload({ token, onUploaded }) {
-  const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
-  async function handleChange(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+  async function handleFile(blob, filename) {
     setUploading(true);
     try {
+      const file = new File([blob], filename, { type: 'image/jpeg' });
       const res = await api.uploadProfileBanner(file, token);
       onUploaded(res.url);
     } catch (e) { alert(e.message); }
-    finally { setUploading(false); e.target.value = ''; }
+    finally { setUploading(false); }
   }
 
   return (
-    <>
-      <button className="profile-banner-edit-btn" onClick={() => fileRef.current?.click()} disabled={uploading}>
-        {uploading ? '…' : '📷 Change Banner'}
-      </button>
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={handleChange} />
-    </>
+    <ImageCropUploader
+      aspect={3}
+      targetWidth={1200}
+      targetHeight={400}
+      label={uploading ? '…' : '📷 Change Banner'}
+      hint="1200×400px · 3:1"
+      onFile={handleFile}
+      disabled={uploading}
+      btnClassName="profile-banner-edit-btn"
+    />
   );
 }
 

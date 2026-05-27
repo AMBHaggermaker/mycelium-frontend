@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../auth';
 import api from '../api';
+import ImageCropUploader from './ImageCropUploader';
 
 const TYPES = ['need', 'offer', 'event'];
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime';
@@ -297,11 +298,30 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
           {/* Media */}
           <div className="form-group">
             <label className="form-label">Photos / Videos {files.length > 0 && `(${files.length}/5)`}</label>
-            <div className="media-upload-area" onClick={() => fileInputRef.current?.click()}>
-              Click to add images or videos (up to 5)
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {files.length < 5 && (
+                <ImageCropUploader
+                  aspect={1200 / 630}
+                  targetWidth={1200}
+                  targetHeight={630}
+                  label="+ Add Photo"
+                  hint="1200×630px · 1.91:1"
+                  onFile={(blob, name) => setFiles(prev => [...prev, new File([blob], name, { type: 'image/jpeg' })].slice(0, 5))}
+                  btnClassName="btn btn-outline btn-sm"
+                />
+              )}
+              {files.length < 5 && (
+                <>
+                  <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>or</span>
+                  <div className="media-upload-area" style={{ display: 'inline-block', padding: '.3rem .75rem', cursor: 'pointer', fontSize: '.8rem' }}
+                    onClick={() => fileInputRef.current?.click()}>
+                    Add Video
+                  </div>
+                  <input ref={fileInputRef} type="file" accept="video/mp4,video/webm,video/quicktime"
+                    style={{ display: 'none' }} onChange={handleFiles} />
+                </>
+              )}
             </div>
-            <input ref={fileInputRef} type="file" multiple accept={ACCEPT}
-              style={{ display: 'none' }} onChange={handleFiles} />
             {previews.length > 0 && (
               <div className="media-preview-strip">
                 {previews.map((url, i) => (

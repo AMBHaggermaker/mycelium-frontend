@@ -310,6 +310,10 @@ export default {
   getWatchReports:    (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),
   getAllWatchReports:  (params)           => get(`/watch/all-reports${qs(params)}`),
   getWatchAnomalies: (params)            => get(`/watch/anomalies${qs(params)}`),
+  // Homeschool
+  getHomeschoolGroups: ()               => get('/circles?circle_type=homeschool_circle&limit=60'),
+  getHomeschoolChats:  ()               => get('/chat/rooms'),
+
   // Businesses
   getBusinesses:                (params)            => get(`/businesses${qs(params)}`),
   getRecentlyRecommendedBusinesses: ()              => get('/businesses/recently-recommended'),
@@ -339,7 +343,8 @@ export default {
   replyToRecommendation:        (id, msgId, content, token) => post(`/businesses/${id}/recommendations/${msgId}/reply`, { content }, token),
   adminDeleteRecommendation:    (id, msgId, token)  => del(`/businesses/${id}/recommendations/${msgId}`, token),
   adminVerifyBusiness:          (id, verified, token) => patch(`/admin/businesses/${id}/verify`, { verified }, token),
-  getAdminBusinesses:           (token)             => get('/admin/businesses', token),
+  adminDeactivateBusiness:      (id, token)          => patch(`/admin/businesses/${id}/deactivate`, {}, token),
+  getAdminBusinesses:           (token, showDeleted) => get(`/admin/businesses${showDeleted ? '?show_deleted=true' : ''}`, token),
 
   // Professional profiles
   getProfessionalProfile:       (username)          => get(`/profiles/${username}/professional`),

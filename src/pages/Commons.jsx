@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../auth';
 import api from '../api';
 import CircleCard from '../components/CircleCard';
@@ -742,17 +742,37 @@ function SchoolPostCard({ post: p, schoolId, isRep, token, onDeleted }) {
 
 // ── Homeschool Hub Tab ────────────────────────────────────────────────────────
 
-function HomeschoolTab({ onRequireAuth }) {
-  const { user } = useAuth();
-  const [circles, setCircles] = useState([]);
-  const [joining, setJoining] = useState(null);
-  const { token } = useAuth();
+const GRADE_LEVELS   = ['PreK', 'K-5', 'Middle School', 'High School', 'Mixed'];
+const LEARNING_STYLES = ['Classical', 'Charlotte Mason', 'Unschooling', 'Eclectic', 'Online', 'Co-op', 'Other'];
+const LOCATION_TYPE_LABELS = {
+  local:    'Local — Huntsville area',
+  regional: 'Regional — North Alabama',
+  open:     'Open to all',
+};
 
-  useEffect(() => {
-    api.getCircles({ circle_type: 'homeschool_co_op', limit: 20 })
-      .then(setCircles)
-      .catch(() => {});
+function HomeschoolTab({ onRequireAuth }) {
+  const { user, token } = useAuth();
+  const [circles,    setCircles]    = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [joining,    setJoining]    = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating,   setCreating]   = useState(false);
+  const [createErr,  setCreateErr]  = useState(null);
+  const [form, setForm] = useState({
+    name: '', description: '', location_type: 'local',
+    grade_levels: [], learning_styles: [], is_private: false,
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.getCircles({ circle_type: 'homeschool_circle', limit: 60 });
+      setCircles(res);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   async function joinCircle(id) {
     if (!user) { onRequireAuth?.(); return; }
@@ -764,74 +784,185 @@ function HomeschoolTab({ onRequireAuth }) {
     finally { setJoining(null); }
   }
 
+  function toggleArr(key, val) {
+    setForm(f => ({
+      ...f,
+      [key]: f[key].includes(val) ? f[key].filter(v => v !== val) : [...f[key], val],
+    }));
+  }
+
+  async function createGroup(e) {
+    e.preventDefault();
+    if (!user) { onRequireAuth?.(); return; }
+    if (!form.name.trim()) { setCreateErr('Group name is required'); return; }
+    setCreating(true); setCreateErr(null);
+    try {
+      await api.createCircle({
+        name:            form.name.trim(),
+        description:     form.description.trim() || undefined,
+        is_private:      form.is_private,
+        circle_type:     'homeschool_circle',
+        location_type:   form.location_type,
+        grade_levels:    form.grade_levels,
+        learning_styles: form.learning_styles,
+      }, token);
+      setShowCreate(false);
+      setForm({ name: '', description: '', location_type: 'local', grade_levels: [], learning_styles: [], is_private: false });
+      load();
+    } catch (e) { setCreateErr(e.message); }
+    finally { setCreating(false); }
+  }
+
   return (
     <div className="commons-section">
-      <h2 className="commons-section-title">Homeschool Hub</h2>
-      <p style={{ marginBottom: '1.25rem', fontSize: '.9rem', color: 'var(--text-muted)' }}>
-        Resources, co-ops, curriculum sharing, and community for homeschool families in North Alabama.
-      </p>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.75rem', marginBottom: '1.25rem' }}>
+        <div>
+          <h2 className="commons-section-title" style={{ margin: 0 }}>Homeschool Hub</h2>
+          <p style={{ margin: '.3rem 0 0', fontSize: '.9rem', color: 'var(--text-muted)' }}>
+            Groups, curriculum sharing, and community for homeschool families — open to everyone, everywhere.
+          </p>
+        </div>
+        <button className="btn btn-primary btn-sm"
+          onClick={() => user ? setShowCreate(v => !v) : onRequireAuth?.()}>
+          {showCreate ? 'Cancel' : '+ Create Group'}
+        </button>
+      </div>
 
-      {/* Alabama legal requirements */}
-      <div className="homeschool-legal-card">
-        <h3 style={{ margin: '0 0 .75rem', fontSize: '1rem' }}>Alabama Homeschool Requirements</h3>
-        <p style={{ fontSize: '.88rem', margin: '0 0 .6rem' }}>
-          Alabama law allows homeschooling under three options: (1) church school, (2) private tutor, or (3) home-based program equivalent.
-          Most Alabama homeschool families operate under a church school umbrella program.
+      {/* Create form */}
+      {showCreate && (
+        <form className="hs-create-form" onSubmit={createGroup} style={{ marginBottom: '1.5rem' }}>
+          <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 700 }}>New Homeschool Group</h3>
+          <div className="form-group">
+            <label className="form-label">Group Name *</label>
+            <input className="form-input" required value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Description</label>
+            <textarea className="form-textarea" rows={2} value={form.description}
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="What does your group focus on? Who is it for?" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Location Type</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
+              {Object.entries(LOCATION_TYPE_LABELS).map(([val, lbl]) => (
+                <button key={val} type="button"
+                  className={`btn btn-sm ${form.location_type === val ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setForm(f => ({ ...f, location_type: val }))}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Grade Levels Served</label>
+            <div className="hs-tag-cloud">
+              {GRADE_LEVELS.map(g => (
+                <button key={g} type="button"
+                  className={`hs-tag-btn${form.grade_levels.includes(g) ? ' selected' : ''}`}
+                  onClick={() => toggleArr('grade_levels', g)}>{g}</button>
+              ))}
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Learning Style</label>
+            <div className="hs-tag-cloud">
+              {LEARNING_STYLES.map(s => (
+                <button key={s} type="button"
+                  className={`hs-tag-btn${form.learning_styles.includes(s) ? ' selected' : ''}`}
+                  onClick={() => toggleArr('learning_styles', s)}>{s}</button>
+              ))}
+            </div>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', fontSize: '.85rem', cursor: 'pointer', marginBottom: '.75rem' }}>
+            <input type="checkbox" checked={form.is_private}
+              onChange={e => setForm(f => ({ ...f, is_private: e.target.checked }))} />
+            Invite-only (private group — join requires approval)
+          </label>
+          {createErr && <p className="form-error">{createErr}</p>}
+          <div style={{ display: 'flex', gap: '.5rem' }}>
+            <button className="btn btn-primary btn-sm" disabled={creating}>{creating ? '…' : 'Create Group'}</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowCreate(false)}>Cancel</button>
+          </div>
+        </form>
+      )}
+
+      {/* Group directory */}
+      {loading ? <div className="spinner" /> : circles.length === 0 ? (
+        <p className="empty">No homeschool groups yet. Create the first one!</p>
+      ) : (
+        <div className="hs-grid">
+          {circles.map(c => (
+            <HomeschoolCard key={c.id} circle={c}
+              onJoin={user ? joinCircle : () => onRequireAuth?.()}
+              joining={joining === c.id} />
+          ))}
+        </div>
+      )}
+
+      {/* Resources */}
+      <h3 className="section-title" style={{ marginTop: '2rem', marginBottom: '1rem' }}>Resources</h3>
+
+      <div className="homeschool-legal-card" style={{ marginBottom: '1.25rem' }}>
+        <h4 style={{ margin: '0 0 .6rem', fontSize: '.95rem' }}>Alabama Homeschool Law</h4>
+        <p style={{ fontSize: '.86rem', margin: '0 0 .5rem' }}>
+          Alabama allows homeschooling under a church school umbrella — no state registration or testing required.
+          Attendance records must be kept. Compulsory age: 6–17.
         </p>
-        <ul style={{ fontSize: '.88rem', margin: '0 0 .75rem', paddingLeft: '1.25rem' }}>
-          <li>No state registration required under church school umbrella</li>
-          <li>No state testing requirements for homeschool students</li>
-          <li>Attendance records must be kept (church school programs handle this)</li>
-          <li>Compulsory age: 6–17</li>
-        </ul>
-        <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
-          <a href="https://hslda.org/legal/alabama" target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">
-            HSLDA Alabama Law Overview
-          </a>
-          <a href="https://www.alabamahomeschooling.com" target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">
-            Alabama Homeschool Resources
-          </a>
+        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
+          <a href="https://hslda.org/legal/alabama" target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">HSLDA Alabama</a>
+          <a href="https://chefofalabama.org" target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">CHEF of Alabama</a>
         </div>
       </div>
 
-      {/* Resources */}
-      <div className="veteran-resources-grid" style={{ marginTop: '1.5rem' }}>
-        <FRResourceSection title="Curriculum & Teaching" items={[
-          { name: 'Khan Academy', url: 'https://khanacademy.org', detail: 'Free K-12 curriculum, all subjects' },
-          { name: 'Easy Peasy All-in-One Homeschool', url: 'https://allinonehomeschool.com', detail: 'Free complete homeschool program' },
-          { name: 'Ambleside Online', url: 'https://amblesideonline.org', detail: 'Free Charlotte Mason curriculum' },
-          { name: 'Cathy Duffy Reviews', url: 'https://cathyduffyreviews.com', detail: 'Curriculum reviews and comparisons' },
+      <div className="veteran-resources-grid">
+        <FRResourceSection title="Free Curriculum" items={[
+          { name: 'Khan Academy', url: 'https://khanacademy.org', detail: 'Free K-12, all subjects' },
+          { name: 'Easy Peasy All-in-One', url: 'https://allinonehomeschool.com', detail: 'Free complete program' },
+          { name: 'Ambleside Online', url: 'https://amblesideonline.org', detail: 'Charlotte Mason, free' },
+          { name: 'Cathy Duffy Reviews', url: 'https://cathyduffyreviews.com', detail: 'Curriculum comparison guide' },
         ]} />
-        <FRResourceSection title="Alabama Co-op Resources" items={[
-          { name: 'CHEF of Alabama', url: 'https://chefofalabama.org', detail: 'Christian Home Educators Fellowship of Alabama' },
-          { name: 'North Alabama Homeschool Network', detail: 'Connect through Homeschool Hub circles below' },
-          { name: 'HSLDA', url: 'https://hslda.org', detail: 'Legal support and resources' },
-        ]} />
-        <FRResourceSection title="Field Trip & Activities" items={[
-          { name: 'U.S. Space & Rocket Center', url: 'https://rocketcenter.com', detail: 'Homeschool days and programs — Huntsville' },
-          { name: 'EarlyWorks Family of Museums', url: 'https://earlyworks.com', detail: 'History museums in Huntsville' },
-          { name: 'Burritt on the Mountain', url: 'https://burrittonthemountain.com', detail: 'Living history site — Huntsville' },
-          { name: 'Alabama Department of Conservation', url: 'https://outdooralabama.com', detail: 'State parks and nature education' },
+        <FRResourceSection title="Huntsville Field Trips" items={[
+          { name: 'U.S. Space & Rocket Center', url: 'https://rocketcenter.com', detail: 'Homeschool days available' },
+          { name: 'EarlyWorks Family of Museums', url: 'https://earlyworks.com', detail: 'History museums downtown' },
+          { name: 'Burritt on the Mountain', url: 'https://burrittonthemountain.com', detail: 'Living history site' },
+          { name: 'Alabama State Parks', url: 'https://outdooralabama.com', detail: 'Nature education programs' },
         ]} />
       </div>
+    </div>
+  );
+}
 
-      {/* Homeschool co-op circles */}
-      <div style={{ marginTop: '1.5rem' }}>
-        <h3 className="section-title" style={{ marginBottom: '.5rem' }}>Homeschool Co-op Circles</h3>
-        <p style={{ fontSize: '.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-          Join or create a homeschool co-op circle. Co-op circles support curriculum sharing, field trip coordination, and resource exchange.
-          Create a co-op circle from the <button className="btn btn-ghost btn-sm" style={{ display: 'inline', padding: '0 .25rem' }} onClick={() => onRequireAuth?.()}>Circles tab</button> using the type "Homeschool Co-op".
-        </p>
-        {circles.length === 0 ? (
-          <p className="empty">No homeschool co-op circles yet. Create one from the Circles tab!</p>
+function HomeschoolCard({ circle, onJoin, joining }) {
+  const locLabel = LOCATION_TYPE_LABELS[circle.location_type] || '';
+  const grades    = Array.isArray(circle.grade_levels)    ? circle.grade_levels    : [];
+  const styles    = Array.isArray(circle.learning_styles)  ? circle.learning_styles : [];
+
+  return (
+    <div className="hs-card">
+      <div className="hs-card-name">{circle.name}</div>
+      {circle.description && <div className="hs-card-desc">{circle.description}</div>}
+      <div className="hs-card-meta">
+        {circle.location_type && (
+          <span className={`hs-badge${circle.location_type === 'local' ? ' hs-badge-local' : circle.location_type === 'open' ? ' hs-badge-open' : ''}`}>
+            {locLabel}
+          </span>
+        )}
+        {circle.is_private && <span className="hs-badge hs-badge-private">Invite Only</span>}
+        {grades.map(g => <span key={g} className="hs-badge">{g}</span>)}
+        {styles.map(s => <span key={s} className="hs-badge" style={{ background: '#fef3c7', color: '#92400e', borderColor: '#f59e0b44' }}>{s}</span>)}
+      </div>
+      <div className="hs-card-footer">
+        <span className="hs-member-count">{circle.member_count ?? 0} member{circle.member_count !== 1 ? 's' : ''}</span>
+        {!circle.is_member ? (
+          <button className="btn btn-primary btn-sm" disabled={joining}
+            onClick={() => onJoin(circle.id)}>
+            {joining ? '…' : 'Join'}
+          </button>
         ) : (
-          <div className="circle-grid">
-            {circles.map(c => (
-              <CircleCard key={c.id} circle={c}
-                onJoin={user ? joinCircle : () => onRequireAuth?.()}
-                joining={joining === c.id} />
-            ))}
-          </div>
+          <span style={{ fontSize: '.8rem', color: 'var(--green)', fontWeight: 600 }}>✓ Member</span>
         )}
       </div>
     </div>

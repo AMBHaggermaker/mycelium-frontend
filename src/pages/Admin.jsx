@@ -693,17 +693,19 @@ function AnomaliesTab({ token }) {
 // ── Businesses Tab ─────────────────────────────────────────────────────────────
 
 function BusinessesTab({ token }) {
-  const [businesses, setBusinesses] = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [err,        setErr]        = useState(null);
-  const [actionId,   setActionId]   = useState(null);
+  const [businesses,   setBusinesses]   = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [err,          setErr]          = useState(null);
+  const [actionId,     setActionId]     = useState(null);
+  const [showDeleted,  setShowDeleted]  = useState(false);
 
   useEffect(() => {
-    api.getAdminBusinesses(token)
+    setLoading(true);
+    api.getAdminBusinesses(token, showDeleted)
       .then(setBusinesses)
       .catch(e => setErr(e.message))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, showDeleted]);
 
   async function toggleVerify(biz) {
     const next = !biz.is_verified_local;
@@ -722,17 +724,44 @@ function BusinessesTab({ token }) {
     }
   }
 
+  async function deactivateBusiness(biz) {
+    if (!confirm(`Deactivate "${biz.business_name}"? It will be hidden from the directory and marked inactive.`)) return;
+    setActionId(biz.id);
+    try {
+      await api.adminDeactivateBusiness(biz.id, token);
+      setBusinesses(prev => prev.map(b => b.id === biz.id ? { ...b, is_active: false } : b));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionId(null);
+    }
+  }
+
   if (loading) return <div className="spinner" />;
   if (err) return <p className="error-msg">{err}</p>;
 
-  const verified   = businesses.filter(b => b.is_verified_local);
-  const unverified = businesses.filter(b => !b.is_verified_local);
+  const active   = businesses.filter(b => b.is_active);
+  const verified = active.filter(b => b.is_verified_local);
 
   return (
     <div>
-      <p style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-        {businesses.length} total · {verified.length} verified local
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <p style={{ fontSize: '.85rem', color: 'var(--muted)', margin: 0 }}>
+          {active.length} active · {verified.length} verified local
+          {showDeleted && businesses.filter(b => !b.is_active).length > 0 && (
+            <span style={{ marginLeft: '.5rem', color: 'var(--red)' }}>
+              · {businesses.filter(b => !b.is_active).length} deactivated
+            </span>
+          )}
+        </p>
+        <button
+          className={`btn btn-sm ${showDeleted ? 'btn-primary' : 'btn-outline'}`}
+          style={{ fontSize: '.78rem' }}
+          onClick={() => setShowDeleted(s => !s)}
+        >
+          {showDeleted ? 'Hide Deleted' : 'Show Deleted'}
+        </button>
+      </div>
       <div className="table-scroll-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
           <thead>
@@ -748,14 +777,20 @@ function BusinessesTab({ token }) {
           </thead>
           <tbody>
             {businesses.map(biz => {
-              const busy = actionId === biz.id;
+              const busy     = actionId === biz.id;
+              const inactive = !biz.is_active;
               return (
-                <tr key={biz.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                <tr key={biz.id} style={{ borderBottom: '1px solid var(--border)', opacity: inactive ? .55 : 1 }}>
                   <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>
                     {biz.business_name}
                     {biz.is_verified_local && (
                       <span style={{ marginLeft: '.4rem', fontSize: '.65rem', background: '#e3f2fd', color: '#1565c0', border: '1px solid #90caf9', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700 }}>
                         ✓ Verified Local
+                      </span>
+                    )}
+                    {inactive && (
+                      <span style={{ marginLeft: '.4rem', fontSize: '.65rem', background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red)', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700 }}>
+                        Deactivated
                       </span>
                     )}
                   </td>
@@ -778,17 +813,31 @@ function BusinessesTab({ token }) {
                     }
                   </td>
                   <td style={{ padding: '.5rem .75rem' }}>
-                    <button
-                      className="btn btn-sm btn-outline"
-                      disabled={busy}
-                      style={biz.is_verified_local
-                        ? { fontSize: '.72rem', color: 'var(--muted)', borderColor: 'var(--border)' }
-                        : { fontSize: '.72rem', color: '#1565c0', borderColor: '#90caf9' }
-                      }
-                      onClick={() => toggleVerify(biz)}
-                    >
-                      {busy ? '…' : biz.is_verified_local ? 'Revoke Verified' : '✓ Verify Local'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
+                      {!inactive && (
+                        <button
+                          className="btn btn-sm btn-outline"
+                          disabled={busy}
+                          style={biz.is_verified_local
+                            ? { fontSize: '.72rem', color: 'var(--muted)', borderColor: 'var(--border)' }
+                            : { fontSize: '.72rem', color: '#1565c0', borderColor: '#90caf9' }
+                          }
+                          onClick={() => toggleVerify(biz)}
+                        >
+                          {busy ? '…' : biz.is_verified_local ? 'Revoke Verified' : '✓ Verify Local'}
+                        </button>
+                      )}
+                      {!inactive && (
+                        <button
+                          className="btn btn-sm btn-danger"
+                          disabled={busy}
+                          style={{ fontSize: '.72rem' }}
+                          onClick={() => deactivateBusiness(biz)}
+                        >
+                          {busy ? '…' : 'Delete'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

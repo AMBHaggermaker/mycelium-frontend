@@ -183,19 +183,34 @@ export default function Chat({ onRequireAuth }) {
           )}
         </div>
         <div className="chat-room-list">
-          {rooms.map(room => (
-            <button key={room.slug}
-              className={`chat-room-item${activeSlug === room.slug ? ' active' : ''}`}
-              onClick={() => selectRoom(room.slug)}>
-              <div className="chat-room-row">
-                {isRecentlyActive(room.slug) && <span className="activity-dot" />}
-                <span className="chat-room-name">{room.name}</span>
-                {(roomCounts[room.slug] ?? 0) > 0 && (
-                  <span className="chat-room-count">{roomCounts[room.slug]}</span>
+          {(() => {
+            const general    = rooms.filter(r => r.room_type !== 'homeschool');
+            const homeschool = rooms.filter(r => r.room_type === 'homeschool');
+            const renderRoom = (room) => (
+              <button key={room.slug}
+                className={`chat-room-item${activeSlug === room.slug ? ' active' : ''}`}
+                onClick={() => selectRoom(room.slug)}>
+                <div className="chat-room-row">
+                  {isRecentlyActive(room.slug) && <span className="activity-dot" />}
+                  <span className="chat-room-name">{room.name}</span>
+                  {(roomCounts[room.slug] ?? 0) > 0 && (
+                    <span className="chat-room-count">{roomCounts[room.slug]}</span>
+                  )}
+                </div>
+              </button>
+            );
+            return (
+              <>
+                {general.map(renderRoom)}
+                {homeschool.length > 0 && (
+                  <>
+                    <div className="hs-divider">Homeschool Hub</div>
+                    {homeschool.map(renderRoom)}
+                  </>
                 )}
-              </div>
-            </button>
-          ))}
+              </>
+            );
+          })()}
         </div>
       </aside>
 

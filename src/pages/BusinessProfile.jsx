@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
+import ImageCropUploader from '../components/ImageCropUploader';
 
 const BIZ_TYPE_LABELS = {
   independently_owned:    'Independently Owned',
@@ -32,17 +33,19 @@ export default function BusinessProfile() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [biz,      setBiz]      = useState(null);
-  const [recs,     setRecs]     = useState({ messages: [], thread_id: null });
-  const [tab,      setTab]      = useState('about');
-  const [loading,  setLoading]  = useState(true);
-  const [editing,  setEditing]  = useState(false);
-  const [lightbox, setLightbox] = useState(null);
-  const [recInput, setRecInput] = useState('');
-  const [recBusy,  setRecBusy]  = useState(false);
-  const [recErr,   setRecErr]   = useState(null);
-  const [replyId,  setReplyId]  = useState(null);
-  const [replyText,setReplyText]= useState('');
-  const [reported, setReported] = useState(false);
+  const [recs,        setRecs]        = useState({ messages: [], thread_id: null });
+  const [tab,         setTab]         = useState('about');
+  const [loading,     setLoading]     = useState(true);
+  const [editing,     setEditing]     = useState(false);
+  const [lightbox,    setLightbox]    = useState(null);
+  const [recInput,    setRecInput]    = useState('');
+  const [recBusy,     setRecBusy]     = useState(false);
+  const [recErr,      setRecErr]      = useState(null);
+  const [replyId,     setReplyId]     = useState(null);
+  const [replyText,   setReplyText]   = useState('');
+  const [reported,    setReported]    = useState(false);
+  const [deactivating,setDeactivating]= useState(false);
+  const [deactivateConfirm, setDeactivateConfirm] = useState('');
 
   useEffect(() => {
     Promise.all([api.getBusiness(id), api.getBusinessRecommendations(id)])
@@ -53,6 +56,18 @@ export default function BusinessProfile() {
 
   if (loading) return <div className="page"><div className="container"><div className="spinner" style={{ marginTop: '4rem' }} /></div></div>;
   if (!biz)    return <div className="page"><div className="container"><p className="error-msg">Business not found.</p></div></div>;
+
+  async function handleDeactivate() {
+    if (deactivateConfirm !== biz.business_name) return;
+    setRecBusy(true);
+    try {
+      await api.deleteBusiness(id, token);
+      setBiz(b => ({ ...b, is_active: false }));
+      setDeactivating(false);
+      setDeactivateConfirm('');
+    } catch (e) { alert(e.message); }
+    finally { setRecBusy(false); }
+  }
 
   const isOwner = user?.id === biz.owner_id;
   const isAdmin = user?.role === 'admin' || user?.role === 'moderator';
@@ -106,6 +121,11 @@ export default function BusinessProfile() {
 
   return (
     <div className="page biz-profile-page">
+      {!biz.is_active && (
+        <div style={{ background: 'var(--red-bg,#fef2f2)', borderBottom: '2px solid var(--red,#dc2626)', padding: '.75rem 1rem', textAlign: 'center', fontSize: '.9rem', fontWeight: 600, color: 'var(--red,#dc2626)' }}>
+          This business is no longer active.
+        </div>
+      )}
       {/* Cover banner */}
       <div className="biz-cover-banner" style={cover ? { backgroundImage: `url(${resolveUrl(cover.url)})` } : {}}>
         {!cover && <div className="biz-cover-placeholder">{biz.business_name[0].toUpperCase()}</div>}
@@ -141,13 +161,19 @@ export default function BusinessProfile() {
             </p>
           </div>
           <div className="biz-profile-actions">
-            {isOwner && <button className="btn btn-outline btn-sm" onClick={() => setEditing(true)}>Edit</button>}
-            {isAdmin && (
+            {isOwner && biz.is_active && <button className="btn btn-outline btn-sm" onClick={() => setEditing(true)}>Edit</button>}
+            {isAdmin && biz.is_active && (
               <button className={`btn btn-sm ${biz.is_verified_local ? 'btn-outline' : 'btn-primary'}`} onClick={toggleVerify}>
                 {biz.is_verified_local ? 'Revoke Verification' : '✓ Verify Local'}
               </button>
             )}
-            {!reported && user && !isOwner && (
+            {isOwner && biz.is_active && (
+              <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)', fontSize: '.78rem', borderColor: 'var(--red)' }}
+                onClick={() => setDeactivating(true)}>
+                Deactivate
+              </button>
+            )}
+            {!reported && user && !isOwner && biz.is_active && (
               <button className="btn btn-ghost btn-sm" style={{ color: 'var(--muted)', fontSize: '.78rem' }}
                 onClick={() => { if (confirm('Report this business page?')) setReported(true); }}>
                 Report
@@ -385,6 +411,38 @@ export default function BusinessProfile() {
         )}
       </div>
 
+      {deactivating && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setDeactivating(false)}>
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <span className="modal-title">Deactivate Business</span>
+              <button className="modal-close" onClick={() => setDeactivating(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: '1rem', lineHeight: 1.6 }}>
+                This will hide <strong>{biz.business_name}</strong> from the directory. All recommendations and data are preserved. To confirm, type the business name exactly:
+              </p>
+              <input
+                className="form-input"
+                value={deactivateConfirm}
+                onChange={e => setDeactivateConfirm(e.target.value)}
+                placeholder={biz.business_name}
+                style={{ marginBottom: '.75rem' }}
+              />
+              <div style={{ display: 'flex', gap: '.5rem' }}>
+                <button
+                  className="btn btn-danger"
+                  disabled={deactivateConfirm !== biz.business_name || recBusy}
+                  onClick={handleDeactivate}
+                >
+                  {recBusy ? '…' : 'Deactivate Business'}
+                </button>
+                <button className="btn btn-ghost" onClick={() => { setDeactivating(false); setDeactivateConfirm(''); }}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {editing && (
         <EditBusinessModal biz={biz} token={token}
           onClose={() => setEditing(false)}
@@ -398,27 +456,30 @@ export default function BusinessProfile() {
 // ── Helper sub-components ─────────────────────────────────────────────────────
 
 function PhotoUploader({ bizId, token, isCover = false, onUploaded }) {
-  const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
-  async function handleFile(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+  async function handleFile(blob, filename) {
     setUploading(true);
     try {
+      const file = new File([blob], filename, { type: 'image/jpeg' });
       const photo = await api.uploadBusinessPhoto(bizId, file, { is_cover: isCover }, token);
       onUploaded(photo);
     } catch (e) { alert(e.message); }
-    finally { setUploading(false); e.target.value = ''; }
+    finally { setUploading(false); }
   }
 
   return (
     <div style={{ marginBottom: isCover ? 0 : '.75rem' }}>
-      <button className={`btn btn-sm ${isCover ? 'biz-cover-upload-btn' : 'btn-outline'}`}
-        onClick={() => fileRef.current?.click()} disabled={uploading}>
-        {uploading ? '…' : isCover ? '📷 Change Cover' : '+ Add Photo'}
-      </button>
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={handleFile} />
+      <ImageCropUploader
+        aspect={isCover ? 3 : 4 / 3}
+        targetWidth={isCover ? 1200 : 800}
+        targetHeight={isCover ? 400 : 600}
+        label={isCover ? '📷 Change Cover' : '+ Add Photo'}
+        hint={isCover ? '1200×400px · 3:1' : '800×600px · 4:3'}
+        onFile={handleFile}
+        disabled={uploading}
+        btnClassName={`btn btn-sm ${isCover ? 'biz-cover-upload-btn' : 'btn-outline'}`}
+      />
     </div>
   );
 }

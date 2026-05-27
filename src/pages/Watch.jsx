@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 import WatchMap, { AnomalyMap } from '../components/WatchMap';
+import ImageCropUploader from '../components/ImageCropUploader';
 
 const VALID_TABS = ['overview','infrastructure','environment','housing','health','watershed','food','surveillance','civic','land_development','atmospheric_observations','anomalies'];
 
@@ -434,10 +435,11 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
   const selectedSev   = SEVERITY_OPTIONS.find(s => s.value === severity);
   const supportsLab   = LAB_DASHBOARDS.has(dashboard.id);
 
-  function handlePhotos(e) {
-    const files = Array.from(e.target.files);
-    e.target.value = '';
-    setPhotos(prev => [...prev, ...files].slice(0, 5));
+  function addPhoto(blob, filename) {
+    setPhotos(prev => {
+      if (prev.length >= 5) return prev;
+      return [...prev, new File([blob], filename, { type: 'image/jpeg' })];
+    });
   }
 
   function toggleCompound(c) {
@@ -595,9 +597,19 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
           </div>
           <div className="form-group">
             <label className="form-label">Photos (up to 5)</label>
-            <input type="file" accept="image/*" multiple className="form-input" onChange={handlePhotos} />
+            <p className="img-crop-hint">1200×900px · 4:3</p>
+            {photos.length < 5 && (
+              <ImageCropUploader
+                aspect={4 / 3}
+                targetWidth={1200}
+                targetHeight={900}
+                label={`+ Add Photo ${photos.length > 0 ? `(${photos.length}/5)` : ''}`}
+                onFile={addPhoto}
+                btnClassName="btn btn-outline btn-sm"
+              />
+            )}
             {photos.length > 0 && (
-              <div className="photo-preview-row">
+              <div className="photo-preview-row" style={{ marginTop: '.5rem' }}>
                 {photos.map((f, i) => (
                   <div key={i} className="photo-preview-thumb">
                     <img src={URL.createObjectURL(f)} alt="" />
