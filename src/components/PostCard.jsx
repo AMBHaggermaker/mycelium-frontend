@@ -133,7 +133,7 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
         )}
         <span className="post-meta" style={{ marginLeft: 'auto' }}>
           <Link
-            to={`/profile/${post.user_id}`}
+            to={`/profile/${post.username}`}
             className="username-link"
             onClick={e => e.stopPropagation()}
           >

@@ -45,7 +45,7 @@ function AuthorBlock({ post }) {
       </div>
       <div className="post-detail-author-info">
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-          <Link to={`/profile/${post.user_id}`} className="post-detail-author-name">
+          <Link to={`/profile/${post.username}`} className="post-detail-author-name">
             {post.username}
           </Link>
           {post.author_founding_member && (
@@ -109,7 +109,7 @@ function CommentItem({ comment }) {
       </div>
       <div className="post-detail-comment-body">
         <div className="post-detail-comment-meta">
-          <Link to={`/profile/${comment.user_id}`} className="username-link" style={{ fontWeight: 600 }}>
+          <Link to={`/profile/${comment.username}`} className="username-link" style={{ fontWeight: 600 }}>
             {comment.username}
           </Link>
           {comment.founding_member && (

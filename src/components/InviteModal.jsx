@@ -158,7 +158,7 @@ export default function InviteModal({ onClose }) {
                         Sent {new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         {inv.status === 'accepted' && inv.accepted_by_username && (
                           <> · Joined as{' '}
-                            <Link to={`/profile/${inv.accepted_by_id}`} onClick={onClose} style={{ color: 'var(--green)' }}>
+                            <Link to={`/profile/${inv.accepted_by_username}`} onClick={onClose} style={{ color: 'var(--green)' }}>
                               {inv.accepted_by_username}
                             </Link>
                           </>

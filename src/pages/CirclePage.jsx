@@ -150,7 +150,7 @@ export default function CirclePage({ onRequireAuth }) {
                   {thread.messages?.map(m => (
                     <div key={m.id} className="message-item">
                       <div className="message-header">
-                        <Link to={`/profile/${m.user_id}`} className="message-author username-link">{m.username}</Link>
+                        <Link to={`/profile/${m.username}`} className="message-author username-link">{m.username}</Link>
                         <span className="message-time">{new Date(m.created_at).toLocaleString()}</span>
                       </div>
                       <p className="message-body">{m.content}</p>
@@ -212,7 +212,7 @@ export default function CirclePage({ onRequireAuth }) {
                   fontWeight: 700, fontSize: '.85rem', color: 'var(--green)', flexShrink: 0 }}>
                   {m.username[0].toUpperCase()}
                 </div>
-                <Link to={`/profile/${m.id}`} className="member-name username-link">{m.username}</Link>
+                <Link to={`/profile/${m.username}`} className="member-name username-link">{m.username}</Link>
                 <span className="score">★ {parseFloat(m.reliability_score || 5).toFixed(1)}</span>
                 {m.role === 'admin' && <span className="badge badge-green">Admin</span>}
               </div>

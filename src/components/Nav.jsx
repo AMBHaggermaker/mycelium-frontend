@@ -87,7 +87,7 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
                 <button className="btn btn-outline btn-sm nav-invite-btn" onClick={onInviteOpen}>
                   + Invite
                 </button>
-                <Link to={`/profile/${user.id}`} className="nav-username">{user.username}</Link>
+                <Link to={`/profile/${user.username}`} className="nav-username">{user.username}</Link>
                 <Link to="/settings" className="btn btn-ghost btn-sm">Settings</Link>
                 <button className="btn btn-ghost btn-sm" onClick={logout}>Sign Out</button>
               </>
@@ -98,7 +98,7 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
           {/* Mobile: auth in top nav */}
           <div className="nav-auth-mobile">
             {user ? (
-              <Link to={`/profile/${user.id}`} className="nav-username" style={{ fontSize: '.85rem' }}>
+              <Link to={`/profile/${user.username}`} className="nav-username" style={{ fontSize: '.85rem' }}>
                 {user.username}
               </Link>
             ) : (

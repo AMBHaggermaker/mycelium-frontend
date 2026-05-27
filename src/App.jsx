@@ -90,7 +90,7 @@ export default function App() {
         <Route path="/"            element={<Feed onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/commons"     element={<Commons onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/commons/:id" element={<CirclePage onRequireAuth={() => setAuthOpen(true)} />} />
-        <Route path="/profile/:id" element={<Profile />} />
+        <Route path="/profile/:username" element={<Profile />} />
         <Route path="/chat"        element={<Chat onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/admin"       element={<Admin />} />
         <Route path="/watch"       element={<Watch onRequireAuth={() => setAuthOpen(true)} />} />

@@ -55,6 +55,43 @@ export default {
   getCirclePosts: (id, params)        => get(`/circles/${id}/posts${qs(params)}`),
   getCircleThreads: (id)              => get(`/circles/${id}/threads`),
 
+  // Profiles (by username)
+  getProfile:         (username)          => get(`/profiles/${username}`),
+  customizeProfile:   (data, token)       => patch('/profiles/customize', data, token),
+  uploadProfilePhoto: (file, opts, token) => {
+    const form = new FormData();
+    form.append('photo', file);
+    if (opts?.caption)          form.append('caption', opts.caption);
+    if (opts?.album_name)       form.append('album_name', opts.album_name);
+    if (opts?.is_profile_photo) form.append('is_profile_photo', 'true');
+    return fetch(`${BASE}/profiles/upload-photo`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    }).then(async res => {
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      return data;
+    });
+  },
+  uploadProfileBanner: (file, token) => {
+    const form = new FormData();
+    form.append('banner', file);
+    return fetch(`${BASE}/profiles/upload-banner`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    }).then(async res => {
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      return data;
+    });
+  },
+  deleteProfilePhoto: (photoId, token)   => del(`/profiles/photos/${photoId}`, token),
+  getWall:            (username)          => get(`/profiles/${username}/wall`),
+  postOnWall:         (username, data, token) => post(`/profiles/${username}/wall`, data, token),
+  deleteWallPost:     (username, postId, token) => del(`/profiles/${username}/wall/${postId}`, token),
+
   // Users
   getUser:            (id)                => get(`/users/${id}`),
   updateUser:         (id, data, token)   => patch(`/users/${id}`, data, token),
@@ -175,7 +212,7 @@ export default {
   // Direct Messages
   getUnreadCount:         (token)           => get('/messages/unread-count', token),
   getConversations:       (token)           => get('/messages/conversations', token),
-  getThread:              (userId, token)   => get(`/messages/${userId}`, token),
+  getDMThread:            (userId, token)   => get(`/messages/${userId}`, token),
   sendMessage:            (userId, data, token) => post(`/messages/${userId}`, data, token),
   reportMessage:          (msgId, data, token)  => post(`/messages/${msgId}/report`, data, token),
   getBlockedUsers:        (token)           => get('/messages/blocked', token),

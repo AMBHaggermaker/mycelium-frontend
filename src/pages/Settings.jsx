@@ -174,7 +174,7 @@ export default function Settings() {
   return (
     <main className="container settings-page">
       <div className="settings-header">
-        <Link to={`/profile/${activeUser.id}`} className="settings-back">← Profile</Link>
+        <Link to={`/profile/${activeUser.username}`} className="settings-back">← Profile</Link>
         <h1 className="settings-title">Settings</h1>
       </div>
 

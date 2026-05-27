@@ -125,7 +125,7 @@ function ThreadPanel({ userId, token, currentUser, onBack, onConvoUpdate, isMobi
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setData(await api.getThread(userId, token)); onConvoUpdate(); }
+    try { setData(await api.getDMThread(userId, token)); onConvoUpdate(); }
     catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   }, [userId, token]);
