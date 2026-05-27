@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
+import WatchMap, { AnomalyMap } from '../components/WatchMap';
 
-const VALID_TABS = ['infrastructure','environment','housing','health','watershed','food','surveillance','civic','land_development','atmospheric_observations','anomalies'];
+const VALID_TABS = ['overview','infrastructure','environment','housing','health','watershed','food','surveillance','civic','land_development','atmospheric_observations','anomalies'];
 
 const DASHBOARDS = [
   { id: 'infrastructure',  label: 'Infrastructure',   icon: '🏗️', description: 'Roads, bridges, utilities, public facilities, and city infrastructure conditions.' },
@@ -70,14 +71,36 @@ export default function Watch({ onRequireAuth }) {
 
   function tabFromSearch(search) {
     const t = new URLSearchParams(search).get('tab');
-    return VALID_TABS.includes(t) ? t : 'infrastructure';
+    return VALID_TABS.includes(t) ? t : 'overview';
   }
 
-  const [active, setActive] = useState(() => tabFromSearch(location.search));
+  const [active,       setActive]       = useState(() => tabFromSearch(location.search));
+  const [overviewRpts, setOverviewRpts] = useState([]);
+  const [overviewAnoms,setOverviewAnoms]= useState([]);
+  const [overviewLoad, setOverviewLoad] = useState(false);
+  const [isMobile,     setIsMobile]     = useState(() => window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   useEffect(() => {
     setActive(tabFromSearch(location.search));
   }, [location.search]);
+
+  useEffect(() => {
+    if (active !== 'overview') return;
+    setOverviewLoad(true);
+    Promise.all([
+      api.getAllWatchReports({ limit: 300 }).catch(() => []),
+      api.getWatchAnomalies().catch(() => []),
+    ]).then(([rpts, anoms]) => {
+      setOverviewRpts(rpts);
+      setOverviewAnoms(anoms);
+    }).finally(() => setOverviewLoad(false));
+  }, [active]);
 
   const highlightParam = new URLSearchParams(location.search).get('highlight');
   const highlightedIds = new Set(highlightParam ? highlightParam.split(',').filter(Boolean) : []);
@@ -95,6 +118,13 @@ export default function Watch({ onRequireAuth }) {
         </div>
 
         <div className="watch-tab-row">
+          <button
+            className={`watch-tab-btn${active === 'overview' ? ' active' : ''}`}
+            onClick={() => setActive('overview')}
+          >
+            <span className="watch-tab-icon">🗺</span>
+            <span className="watch-tab-label">Overview</span>
+          </button>
           {DASHBOARDS.map(d => (
             <button
               key={d.id}
@@ -114,13 +144,21 @@ export default function Watch({ onRequireAuth }) {
           </button>
         </div>
 
-        {active === 'anomalies' ? (
+        {active === 'overview' ? (
+          <WatchOverviewMap
+            reports={overviewRpts}
+            anomalies={overviewAnoms}
+            loading={overviewLoad}
+            isMobile={isMobile}
+          />
+        ) : active === 'anomalies' ? (
           <AnomaliesView />
         ) : active === 'land_development' ? (
           <LandDevelopmentDashboard
             dashboard={DASHBOARDS.find(d => d.id === 'land_development')}
             onRequireAuth={onRequireAuth}
             highlightedIds={highlightedIds}
+            isMobile={isMobile}
           />
         ) : active === 'atmospheric_observations' ? (
           <AtmosphericDashboard
@@ -134,6 +172,7 @@ export default function Watch({ onRequireAuth }) {
             dashboard={dashboard}
             onRequireAuth={onRequireAuth}
             highlightedIds={highlightedIds}
+            isMobile={isMobile}
           />
         ) : null}
       </div>
@@ -141,11 +180,47 @@ export default function Watch({ onRequireAuth }) {
   );
 }
 
-function WatchDashboard({ dashboard, onRequireAuth, highlightedIds }) {
+function WatchOverviewMap({ reports, anomalies, loading, isMobile }) {
+  return (
+    <div>
+      <div className="watch-dashboard-header">
+        <div className="watch-dashboard-title-row">
+          <span className="watch-dashboard-icon">🗺</span>
+          <h2 className="watch-dashboard-title">Watch Overview Map</h2>
+        </div>
+        <p className="watch-dashboard-desc">
+          All community reports across every dashboard, live on a single map.
+          Use the filters to focus on specific dashboards or severity levels.
+        </p>
+      </div>
+      {loading ? (
+        <div className="spinner" style={{ margin: '3rem auto' }} />
+      ) : (
+        <WatchMap
+          reports={reports}
+          anomalies={anomalies}
+          height={isMobile ? 'calc(100vh - 200px)' : '600px'}
+          showDashboardFilter
+          showSeverityFilter
+          showAnomalyToggle
+          className="watch-overview-map"
+        />
+      )}
+      <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: '.65rem', textAlign: 'center' }}>
+        {reports.filter(r => r.location_lat).length} of {reports.length} reports have location data · Select a dashboard tab to submit new reports
+      </p>
+    </div>
+  );
+}
+
+function WatchDashboard({ dashboard, onRequireAuth, highlightedIds, isMobile }) {
   const { user, token } = useAuth();
   const [reports,  setReports]  = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [viewMode, setViewMode] = useState(
+    () => localStorage.getItem(`watch-view-${dashboard.id}`) || 'list'
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -170,6 +245,11 @@ function WatchDashboard({ dashboard, onRequireAuth, highlightedIds }) {
     setShowForm(true);
   }
 
+  function toggleView(mode) {
+    setViewMode(mode);
+    localStorage.setItem(`watch-view-${dashboard.id}`, mode);
+  }
+
   return (
     <>
       <div className="watch-dashboard-header">
@@ -178,37 +258,54 @@ function WatchDashboard({ dashboard, onRequireAuth, highlightedIds }) {
           <h2 className="watch-dashboard-title">{dashboard.label}</h2>
         </div>
         <p className="watch-dashboard-desc">{dashboard.description}</p>
-        <button className="btn btn-primary" onClick={handleSubmitReport}>
-          + Submit Report
-        </button>
-      </div>
-
-      <div className="watch-map-placeholder">
-        <span className="watch-map-label">📍 Map View — Coming Soon</span>
-        <p className="watch-map-sub">Reports will be plotted on an interactive map of Huntsville and North Alabama</p>
-      </div>
-
-      <div className="watch-reports">
-        <h3 className="watch-reports-heading">
-          Community Reports
-          {reports.length > 0 && <span className="watch-reports-count"> ({reports.length})</span>}
-        </h3>
-        {loading ? (
-          <div className="spinner" />
-        ) : reports.length === 0 ? (
-          <p className="empty">No reports yet for this dashboard. Be the first to document what you see.</p>
-        ) : (
-          <div className="watch-report-list">
-            {reports.map(r => (
-              <WatchReportCard
-                key={r.id}
-                report={r}
-                highlighted={!!highlightedIds?.has(r.id)}
-              />
-            ))}
+        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={handleSubmitReport}>
+            + Submit Report
+          </button>
+          <div className="watch-view-toggle">
+            <button className={`watch-view-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => toggleView('list')}>
+              ☰ List
+            </button>
+            <button className={`watch-view-btn${viewMode === 'map' ? ' active' : ''}`} onClick={() => toggleView('map')}>
+              🗺 Map
+            </button>
           </div>
-        )}
+        </div>
       </div>
+
+      {viewMode === 'map' ? (
+        loading ? (
+          <div className="spinner" style={{ margin: '2rem auto' }} />
+        ) : (
+          <WatchMap
+            reports={reports}
+            dashboard={dashboard.id}
+            height={isMobile ? 'calc(100vh - 220px)' : '520px'}
+          />
+        )
+      ) : (
+        <div className="watch-reports">
+          <h3 className="watch-reports-heading">
+            Community Reports
+            {reports.length > 0 && <span className="watch-reports-count"> ({reports.length})</span>}
+          </h3>
+          {loading ? (
+            <div className="spinner" />
+          ) : reports.length === 0 ? (
+            <p className="empty">No reports yet for this dashboard. Be the first to document what you see.</p>
+          ) : (
+            <div className="watch-report-list">
+              {reports.map(r => (
+                <WatchReportCard
+                  key={r.id}
+                  report={r}
+                  highlighted={!!highlightedIds?.has(r.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {showForm && (
         <WatchReportModal
@@ -318,6 +415,9 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
   const [severity,      setSeverity]      = useState('');
   const [reportType,    setReportType]    = useState('');
   const [photos,        setPhotos]        = useState([]);
+  const [locationLat,   setLocationLat]   = useState('');
+  const [locationLng,   setLocationLng]   = useState('');
+  const [locating,      setLocating]      = useState(false);
   const [err,           setErr]           = useState(null);
   const [busy,          setBusy]          = useState(false);
 
@@ -370,6 +470,8 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
       if (sourceUrl)     form.append('source_url', sourceUrl);
       if (reportType)    form.append('report_type', reportType);
       photos.forEach(f => form.append('photos', f));
+      if (locationLat) form.append('location_lat', locationLat);
+      if (locationLng) form.append('location_lng', locationLng);
 
       // Lab results
       if (supportsLab && showLab && labSampleType) {
@@ -462,6 +564,34 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
               <input className="form-input" type="url" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)}
                 placeholder="https://..." />
             </div>
+          </div>
+          <div className="form-group">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.3rem' }}>
+              <label className="form-label" style={{ margin: 0 }}>GPS Coordinates <span style={{ fontSize: '.72rem', color: 'var(--muted)', fontWeight: 400 }}>(enables map pin)</span></label>
+              <button type="button" className="btn btn-sm btn-outline" style={{ fontSize: '.75rem', padding: '.2rem .55rem' }}
+                disabled={locating}
+                onClick={() => {
+                  setLocating(true);
+                  navigator.geolocation?.getCurrentPosition(pos => {
+                    setLocationLat(pos.coords.latitude.toFixed(6));
+                    setLocationLng(pos.coords.longitude.toFixed(6));
+                    setLocating(false);
+                  }, () => setLocating(false));
+                }}>
+                {locating ? '…' : '◎ Use My Location'}
+              </button>
+            </div>
+            <div className="form-row" style={{ marginBottom: 0 }}>
+              <input className="form-input" type="number" step="any" placeholder="Latitude (e.g. 34.7304)"
+                value={locationLat} onChange={e => setLocationLat(e.target.value)} />
+              <input className="form-input" type="number" step="any" placeholder="Longitude (e.g. -86.5861)"
+                value={locationLng} onChange={e => setLocationLng(e.target.value)} />
+            </div>
+            {!locationLat && locationLabel && (
+              <p style={{ fontSize: '.74rem', color: 'var(--muted)', margin: '.2rem 0 0' }}>
+                No GPS — your location label will be geocoded automatically after submission.
+              </p>
+            )}
           </div>
           <div className="form-group">
             <label className="form-label">Photos (up to 5)</label>
@@ -1238,7 +1368,7 @@ function DataSourcesPanel() {
 }
 
 // ── Main Land Development dashboard ──────────────────────────────────────────
-function LandDevelopmentDashboard({ dashboard, onRequireAuth, highlightedIds }) {
+function LandDevelopmentDashboard({ dashboard, onRequireAuth, highlightedIds, isMobile }) {
   const { user, token } = useAuth();
   const isAdmin = user?.role === 'admin';
 
@@ -1251,6 +1381,7 @@ function LandDevelopmentDashboard({ dashboard, onRequireAuth, highlightedIds }) 
   const [watchLoading,    setWatchLoading]    = useState(true);
   const [showForm,        setShowForm]        = useState(false);
   const [showRecordForm,  setShowRecordForm]  = useState(false);
+  const [viewMode,        setViewMode]        = useState('list');
 
   useEffect(() => {
     api.getLandIntelReports()
@@ -1299,7 +1430,7 @@ function LandDevelopmentDashboard({ dashboard, onRequireAuth, highlightedIds }) 
           <h2 className="watch-dashboard-title">{dashboard.label}</h2>
         </div>
         <p className="watch-dashboard-desc">{dashboard.description}</p>
-        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <button className="btn btn-primary" onClick={() => {
             if (!user) { onRequireAuth?.(); return; }
             setShowRecordForm(true);
@@ -1312,8 +1443,22 @@ function LandDevelopmentDashboard({ dashboard, onRequireAuth, highlightedIds }) 
           }}>
             + Submit Watch Report
           </button>
+          <div className="watch-view-toggle">
+            <button className={`watch-view-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')}>☰ List</button>
+            <button className={`watch-view-btn${viewMode === 'map'  ? ' active' : ''}`} onClick={() => setViewMode('map')}>🗺 Map</button>
+          </div>
         </div>
       </div>
+
+      {viewMode === 'map' && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <WatchMap
+            reports={watchReports}
+            dashboard="land_development"
+            height={isMobile ? 'calc(100vh - 220px)' : '480px'}
+          />
+        </div>
+      )}
 
       {/* AI Intelligence Reports */}
       <div className="land-intel-section">
@@ -1444,6 +1589,7 @@ const ANOMALY_TYPE_LABELS = {
 function AnomaliesView() {
   const [anomalies, setAnomalies] = useState([]);
   const [loading,   setLoading]   = useState(true);
+  const [viewMode,  setViewMode]  = useState('list');
 
   useEffect(() => {
     api.getWatchAnomalies()
@@ -1469,9 +1615,15 @@ function AnomaliesView() {
           cross-dashboard correlations, and reports near sensitive locations.
           Analysis runs every 30 minutes.
         </p>
+        <div className="watch-view-toggle">
+          <button className={`watch-view-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')}>☰ List</button>
+          <button className={`watch-view-btn${viewMode === 'map'  ? ' active' : ''}`} onClick={() => setViewMode('map')}>🗺 Map</button>
+        </div>
       </div>
 
-      {unreviewed.length === 0 && reviewed.length === 0 ? (
+      {viewMode === 'map' ? (
+        <AnomalyMap anomalies={anomalies} height="520px" />
+      ) : unreviewed.length === 0 && reviewed.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--muted)' }}>
           <div style={{ fontSize: '2.5rem', marginBottom: '1rem', opacity: .5 }}>◉</div>
           <p style={{ fontSize: '.95rem' }}>No anomalies detected yet. The AI analyzes all reports every 30 minutes.</p>

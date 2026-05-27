@@ -4183,3 +4183,171 @@ a { color: inherit; text-decoration: none; }
   align-self: flex-start;
 }
 .watch-soil-test-pdf:hover { text-decoration: underline; }
+
+/* ── Watch Map (Leaflet) ──────────────────────────────────────────────────── */
+.watch-map-container { margin-bottom: 1.5rem; }
+.watch-overview-map { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+
+/* Leaflet z-index fix for modal stacking */
+.leaflet-pane { z-index: 400; }
+.leaflet-control { z-index: 800; }
+.leaflet-popup { z-index: 850; }
+
+/* Pulsing circle for critical anomalies */
+@keyframes watch-map-pulse {
+  0%   { transform: scale(1);   opacity: .7; }
+  50%  { transform: scale(1.6); opacity: .3; }
+  100% { transform: scale(2.2); opacity: 0;  }
+}
+
+/* Map view filter toolbar */
+.watch-map-filters {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: .55rem .75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-bottom: none;
+}
+.watch-map-filter-select {
+  padding: .3rem .55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-size: .82rem;
+  font-family: inherit;
+}
+.watch-map-filter-check {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .82rem;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.watch-map-count {
+  margin-left: auto;
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+/* Locate me button */
+.watch-map-locate-btn {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 900;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.watch-map-locate-btn:hover { background: var(--bg); }
+
+/* Map legend */
+.watch-map-legend {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 900;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(4px);
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: .4rem .6rem;
+  font-size: .7rem;
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+}
+.watch-map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  color: #555;
+  text-transform: capitalize;
+}
+
+/* Map/List toggle */
+.watch-view-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.watch-view-btn {
+  padding: .3rem .7rem;
+  background: var(--surface);
+  border: none;
+  font-size: .82rem;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--muted);
+  transition: background .15s, color .15s;
+}
+.watch-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
+.watch-view-btn.active { background: var(--green); color: #fff; font-weight: 600; }
+.watch-view-btn:hover:not(.active) { background: var(--bg); color: var(--text); }
+
+/* Mobile bottom sheet for map pin taps */
+.watch-map-bottom-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0,0,0,.4);
+}
+.watch-map-sheet-card {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: var(--card);
+  border-radius: 14px 14px 0 0;
+  padding: 1rem 1rem 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.watch-map-sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto .75rem;
+}
+
+/* LF map toggle */
+.lf-view-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.lf-view-btn {
+  padding: .3rem .65rem;
+  background: var(--surface);
+  border: none;
+  font-size: .82rem;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--muted);
+  transition: background .15s, color .15s;
+}
+.lf-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
+.lf-view-btn.active { background: #15803d; color: #fff; font-weight: 600; }
+
+/* Mobile full-screen map height */
+@media (max-width: 640px) {
+  .watch-map-legend { display: none; }
+  .watch-map-filters { padding: .4rem .5rem; }
+  .watch-view-toggle, .lf-view-toggle { font-size: .8rem; }
+}
