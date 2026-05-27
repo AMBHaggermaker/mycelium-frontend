@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 
-const VALID_TABS = ['infrastructure','environment','housing','health','watershed','food','surveillance','civic','land_development','anomalies'];
+const VALID_TABS = ['infrastructure','environment','housing','health','watershed','food','surveillance','civic','land_development','atmospheric_observations','anomalies'];
 
 const DASHBOARDS = [
   { id: 'infrastructure',  label: 'Infrastructure',   icon: '🏗️', description: 'Roads, bridges, utilities, public facilities, and city infrastructure conditions.' },
@@ -14,7 +14,8 @@ const DASHBOARDS = [
   { id: 'food',            label: 'Food & Ag',        icon: '🌾', description: 'Food deserts, grocery access, farmland threats, and agricultural contamination.' },
   { id: 'surveillance',    label: 'Surveillance',     icon: '📡', description: 'Camera installations, license plate readers, facial recognition, and surveillance infrastructure.' },
   { id: 'civic',           label: 'Civic',            icon: '🏛️', description: 'Local government actions, policy decisions, zoning changes, and civic accountability.' },
-  { id: 'land_development',label: 'Land Development', icon: '🗺️', description: 'Property transfers, LLC acquisitions, annexation filings, rezoning requests, and displacement risk tracking.' },
+  { id: 'land_development',         label: 'Land Development',          icon: '🗺️', description: 'Property transfers, LLC acquisitions, annexation filings, rezoning requests, and displacement risk tracking.' },
+  { id: 'atmospheric_observations', label: 'Atmospheric Observations',   icon: '🌫️', description: 'Persistent contrails, grid patterns, unusual spray events — cross-referenced with flight data, weather conditions, and soil testing.' },
 ];
 
 const REPORT_TYPES = {
@@ -27,6 +28,7 @@ const REPORT_TYPES = {
   surveillance:    ['ALPR/Flock camera','facial recognition','cell tower','drone','other'],
   civic:           ['pothole response time','budget concern','development approval','other'],
   land_development:['commercial development approval','residential subdivision','annexation filing','zoning change request','demolition permit','historic property change','LLC property acquisition','bulk property purchase','agricultural land conversion','other'],
+  atmospheric_observations:['persistent_contrail','grid_pattern','low_altitude_trail','no_corresponding_flight','unusual_spray_pattern','other'],
 };
 
 const SEVERITY_OPTIONS = [
@@ -117,6 +119,12 @@ export default function Watch({ onRequireAuth }) {
         ) : active === 'land_development' ? (
           <LandDevelopmentDashboard
             dashboard={DASHBOARDS.find(d => d.id === 'land_development')}
+            onRequireAuth={onRequireAuth}
+            highlightedIds={highlightedIds}
+          />
+        ) : active === 'atmospheric_observations' ? (
+          <AtmosphericDashboard
+            dashboard={DASHBOARDS.find(d => d.id === 'atmospheric_observations')}
             onRequireAuth={onRequireAuth}
             highlightedIds={highlightedIds}
           />
@@ -1370,5 +1378,721 @@ function AnomalyCard({ anomaly }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ATMOSPHERIC OBSERVATIONS DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+
+const ATMOS_TYPE_LABELS = {
+  persistent_contrail:     'Persistent Contrail',
+  grid_pattern:            'Grid Pattern',
+  low_altitude_trail:      'Low Altitude Trail',
+  no_corresponding_flight: 'No Corresponding Flight',
+  unusual_spray_pattern:   'Unusual Spray Pattern',
+  other:                   'Other',
+};
+
+const CLASSIFICATION_STYLES = {
+  explained:    { color: '#15803d', bg: '#dcfce7', border: '#16a34a44', label: 'EXPLAINED' },
+  partial:      { color: '#854d0e', bg: '#fef9c3', border: '#ca8a0444', label: 'PARTIAL' },
+  unexplained:  { color: '#c2410c', bg: '#fff7ed', border: '#f9731644', label: 'UNEXPLAINED' },
+  unidentified: { color: '#991b1b', bg: '#fee2e2', border: '#dc262644', label: 'UNIDENTIFIED' },
+  pending:      { color: '#6b7280', bg: '#f3f4f6', border: '#9ca3af44', label: 'PENDING' },
+};
+
+function ClassificationBadge({ classification }) {
+  const s = CLASSIFICATION_STYLES[classification] || CLASSIFICATION_STYLES.pending;
+  return (
+    <span style={{
+      fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
+      padding: '.12rem .5rem', borderRadius: 99, background: s.bg, color: s.color,
+      border: `1px solid ${s.border}`, whiteSpace: 'nowrap',
+    }}>
+      {s.label}
+    </span>
+  );
+}
+
+function DriftZonesDisplay({ zones }) {
+  if (!zones?.length) return null;
+  const bearingToCardinal = b => {
+    const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    return dirs[Math.round(b / 22.5) % 16];
+  };
+  return (
+    <div className="atmos-drift-zones">
+      <div className="atmos-drift-title">🌬 Downwind Collection Zones</div>
+      <div className="atmos-drift-list">
+        {zones.map(z => (
+          <div key={z.miles} className="atmos-drift-item">
+            <span className="atmos-drift-dist">{z.miles} mi</span>
+            <span className="atmos-drift-dir">{bearingToCardinal(z.bearing)}</span>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${z.lat},${z.lng}`}
+              target="_blank" rel="noopener noreferrer"
+              className="atmos-drift-coords"
+            >
+              {z.lat.toFixed(4)}°N, {Math.abs(z.lng).toFixed(4)}°W ↗
+            </a>
+          </div>
+        ))}
+      </div>
+      <p className="atmos-drift-note">Soil and rainwater samples collected in these zones can be linked to this observation.</p>
+    </div>
+  );
+}
+
+function AtmosphericObsCard({ obs, highlighted, isAdmin, token, onDeleted }) {
+  const [expanded, setExpanded] = useState(false);
+  const date = new Date(obs.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const typeLabel  = ATMOS_TYPE_LABELS[obs.report_type] || obs.report_type;
+  const driftZones = obs.drift_zones     ? (typeof obs.drift_zones     === 'string' ? JSON.parse(obs.drift_zones)     : obs.drift_zones)     : null;
+  const weather    = obs.weather_data    ? (typeof obs.weather_data    === 'string' ? JSON.parse(obs.weather_data)    : obs.weather_data)    : null;
+  const flights    = obs.matched_flights ? (typeof obs.matched_flights === 'string' ? JSON.parse(obs.matched_flights) : obs.matched_flights) : null;
+
+  return (
+    <div id={`atmos-${obs.id}`} className={`watch-report-card${highlighted ? ' watch-report-highlighted' : ''}`}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.35rem' }}>
+        <ClassificationBadge classification={obs.classification} />
+        <SeverityBadge severity={obs.severity} />
+        <span style={{ fontSize: '.72rem', padding: '.12rem .45rem', borderRadius: 99, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}>{typeLabel}</span>
+        <span style={{ fontSize: '.72rem', color: 'var(--muted)', marginLeft: 'auto' }}>{date}</span>
+      </div>
+      <p className="watch-report-title">{obs.title}</p>
+      <div className="watch-report-meta">
+        <span>by {obs.username}</span>
+        {obs.location_label && <><span className="meta-sep">·</span><span>📍 {obs.location_label}</span></>}
+        {obs.estimated_altitude && <><span className="meta-sep">·</span><span>Alt: {obs.estimated_altitude}</span></>}
+        {obs.observation_duration_min && <><span className="meta-sep">·</span><span>{obs.observation_duration_min} min</span></>}
+        {obs.wind_direction && <><span className="meta-sep">·</span><span>Wind from {obs.wind_direction}</span></>}
+        {obs.weather_conditions && <><span className="meta-sep">·</span><span>{obs.weather_conditions.replace('_',' ')}</span></>}
+      </div>
+      {obs.description && <p className="watch-report-body">{obs.description}</p>}
+      {obs.photo_urls?.length > 0 && (
+        <div className="watch-report-photos">
+          {obs.photo_urls.map((u,i) => <img key={i} src={u} alt="" className="watch-report-photo" />)}
+        </div>
+      )}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{ fontSize: '.78rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green)', padding: '.25rem 0', fontFamily: 'inherit' }}
+      >
+        {expanded ? '▲ Hide details' : '▼ Show flight data & drift zones'}
+      </button>
+      {expanded && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '.65rem', marginTop: '.25rem', display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+          <div className="atmos-crossref">
+            <div className="atmos-crossref-label">Flight Cross-Reference (OpenSky Network)</div>
+            {obs.classification === 'pending' && <p style={{ fontSize: '.8rem', color: 'var(--muted)', margin: 0 }}>Classification pending — query runs immediately on submission. GPS coordinates required for flight matching.</p>}
+            {obs.classification !== 'pending' && (
+              <>
+                {flights && flights.length > 0 ? (
+                  <div style={{ fontSize: '.8rem', color: 'var(--text)' }}>
+                    <p style={{ margin: '0 0 .35rem' }}>{flights.length} flight{flights.length !== 1?'s':''} found in area at time of report:</p>
+                    {flights.slice(0,4).map((f,i) => (
+                      <div key={i} style={{ padding: '.2rem .5rem', background: 'var(--surface)', borderRadius: 4, marginBottom: '.2rem', display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600 }}>{f.callsign || f.icao24}</span>
+                        <span style={{ color: 'var(--muted)' }}>{f.origin}</span>
+                        {f.altitude_m && <span>{Math.round(f.altitude_m * 3.281)} ft</span>}
+                        {f.heading && <span>Hdg {Math.round(f.heading)}°</span>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '.8rem', color: 'var(--muted)', margin: 0 }}>
+                    {obs.classification === 'unidentified' ? 'No registered flights found in area (50-mile radius).' : 'No altitude-matching flight found for this observation.'}
+                  </p>
+                )}
+                {weather && (
+                  <p style={{ fontSize: '.78rem', color: 'var(--muted)', margin: '.35rem 0 0', lineHeight: 1.45 }}>
+                    NOAA — {weather.station}: Humidity {weather.humidity_pct !== null ? `${Math.round(weather.humidity_pct)}%` : 'unavailable'}{weather.temp_c !== null ? `, ${Math.round(weather.temp_c)}°C` : ''}
+                    {weather.description ? ` — ${weather.description}` : ''}
+                    {weather.humidity_pct !== null && obs.classification === 'explained'   && ' (≥60% humidity supports persistent contrail formation)'}
+                    {weather.humidity_pct !== null && obs.classification === 'unexplained' && ' (<40% humidity — persistent contrails not expected)'}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+          {driftZones && <DriftZonesDisplay zones={driftZones} />}
+          {obs.checked_flight_tracker && obs.flight_tracking_result && obs.flight_tracking_result !== 'did_not_check' && (
+            <div style={{ fontSize: '.8rem', color: 'var(--muted)' }}>
+              Observer checked flight tracker: <strong style={{ color: 'var(--text)' }}>{obs.flight_tracking_result.replace(/_/g,' ')}</strong>
+            </div>
+          )}
+        </div>
+      )}
+      {isAdmin && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '.5rem', marginTop: '.35rem', display: 'flex', gap: '.4rem' }}>
+          <button className="btn-xs btn-danger"
+            onClick={async () => { if (confirm('Delete this observation?')) { await api.deleteAtmosphericObservation(obs.id, token); onDeleted(obs.id); } }}>
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubmitAtmosphericObsModal({ token, onClose, onCreated }) {
+  const [form, setForm] = useState({ title:'', description:'', location_label:'', location_lat:'', location_lng:'', severity:'moderate', report_type:'persistent_contrail', observation_duration_min:'', estimated_altitude:'', wind_direction:'', wind_speed_estimate:'', weather_conditions:'', checked_flight_tracker:false, flight_tracking_result:'did_not_check', source_url:'' });
+  const [photos, setPhotos] = useState([]);
+  const [busy,   setBusy]   = useState(false);
+  const [err,    setErr]    = useState('');
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
+
+  async function handleSubmit(e) {
+    e.preventDefault(); setErr('');
+    if (!form.title.trim()) return setErr('Title is required');
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      Object.entries(form).forEach(([k,v]) => { if (v !== '' && v !== null) fd.append(k, String(v)); });
+      photos.forEach(f => fd.append('photos', f));
+      const created = await api.submitAtmosphericObservation(fd, token);
+      onCreated(created);
+    } catch(e) { setErr(e.message); setBusy(false); }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <h2 className="modal-title">Submit Atmospheric Observation</h2>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+            <div className="form-group">
+              <label className="form-label">Title *</label>
+              <input className="form-input" placeholder="Brief description of what you observed" value={form.title} onChange={set('title')} />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Observation Type *</label>
+                <select className="form-input" value={form.report_type} onChange={set('report_type')}>
+                  {Object.entries(ATMOS_TYPE_LABELS).map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Severity *</label>
+                <select className="form-input" value={form.severity} onChange={set('severity')}>
+                  {SEVERITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Description</label>
+              <textarea className="form-input" rows={3} placeholder="What did you see? Duration, direction, any other details..." value={form.description} onChange={set('description')} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Location</label>
+              <input className="form-input" placeholder="Neighborhood, street, or landmark" value={form.location_label} onChange={set('location_label')} />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">GPS Latitude</label>
+                <input className="form-input" type="number" step="any" placeholder="34.7304" value={form.location_lat} onChange={set('location_lat')} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">GPS Longitude</label>
+                <input className="form-input" type="number" step="any" placeholder="-86.5861" value={form.location_lng} onChange={set('location_lng')} />
+              </div>
+            </div>
+            <p style={{ fontSize: '.75rem', color: 'var(--green)', margin: '-.5rem 0 0', padding: '.3rem .5rem', background: 'var(--green-bg)', borderRadius: 4 }}>
+              GPS coordinates enable automatic flight cross-referencing and drift corridor calculation.
+            </p>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Duration (minutes)</label>
+                <input className="form-input" type="number" placeholder="e.g. 45" value={form.observation_duration_min} onChange={set('observation_duration_min')} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Estimated Altitude</label>
+                <select className="form-input" value={form.estimated_altitude} onChange={set('estimated_altitude')}>
+                  <option value="">Unknown</option>
+                  <option value="low">Low (&lt;10,000 ft)</option>
+                  <option value="medium">Medium (10,000–25,000 ft)</option>
+                  <option value="high">High (&gt;25,000 ft)</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Wind Direction (from)</label>
+                <select className="form-input" value={form.wind_direction} onChange={set('wind_direction')}>
+                  <option value="">Unknown</option>
+                  {['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'].map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Wind Speed Estimate</label>
+                <input className="form-input" placeholder="e.g. calm, 5-10 mph" value={form.wind_speed_estimate} onChange={set('wind_speed_estimate')} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Weather Conditions</label>
+              <select className="form-input" value={form.weather_conditions} onChange={set('weather_conditions')}>
+                <option value="">Not specified</option>
+                <option value="clear">Clear</option>
+                <option value="partly_cloudy">Partly Cloudy</option>
+                <option value="overcast">Overcast</option>
+                <option value="humid">Humid / Hazy</option>
+              </select>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer', fontSize: '.87rem' }}>
+              <input type="checkbox" checked={form.checked_flight_tracker} onChange={set('checked_flight_tracker')} style={{ accentColor: 'var(--green)' }} />
+              I checked a flight tracking app (FlightAware, Flightradar24, etc.)
+            </label>
+            {form.checked_flight_tracker && (
+              <div className="form-group">
+                <label className="form-label">Flight Tracking Result</label>
+                <select className="form-input" value={form.flight_tracking_result} onChange={set('flight_tracking_result')}>
+                  <option value="matched_known_flight">Matched a known commercial flight</option>
+                  <option value="no_match_found">No match found in area</option>
+                  <option value="partial_match">Partial match (wrong altitude/route)</option>
+                  <option value="did_not_check">Did not check</option>
+                </select>
+              </div>
+            )}
+            <div className="form-group">
+              <label className="form-label">Source URL</label>
+              <input className="form-input" placeholder="Optional link to related documentation" value={form.source_url} onChange={set('source_url')} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Photos</label>
+              <input type="file" accept="image/*" multiple className="form-input" onChange={e => setPhotos([...e.target.files])} />
+            </div>
+            {err && <p className="form-error">{err}</p>}
+            <button className="btn btn-primary btn-full" disabled={busy}>{busy ? '…' : 'Submit Observation'}</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WeatherModPermitsPanel({ isAdmin, token }) {
+  const [permits,  setPermits]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editId,   setEditId]   = useState(null);
+  const [form, setForm] = useState({ operator:'', permit_type:'', area_description:'', active_from:'', active_to:'', compounds_used:'', source_url:'', notes:'' });
+  const [busy, setBusy] = useState(false);
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const today = new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    api.getAtmosphericPermits().then(setPermits).catch(()=>setPermits([])).finally(()=>setLoading(false));
+  }, []);
+
+  async function savePermit(e) {
+    e.preventDefault(); setBusy(true);
+    try {
+      if (editId) { const p = await api.updateAtmosphericPermit(editId, form, token); setPermits(ps => ps.map(x => x.id===editId ? p : x)); }
+      else        { const p = await api.createAtmosphericPermit(form, token);          setPermits(ps => [p, ...ps]); }
+      setShowForm(false); setEditId(null);
+      setForm({ operator:'', permit_type:'', area_description:'', active_from:'', active_to:'', compounds_used:'', source_url:'', notes:'' });
+    } catch(e) { alert(e.message); } finally { setBusy(false); }
+  }
+
+  const activePermits = permits.filter(p => !p.active_to || p.active_to >= today);
+  const pastPermits   = permits.filter(p => p.active_to && p.active_to < today);
+
+  if (loading) return <div className="spinner" style={{ margin: '1rem auto' }} />;
+
+  return (
+    <div className="atmos-section">
+      <div className="atmos-section-header">
+        <div>
+          <h3 className="atmos-section-title">☁ Weather Modification Activity</h3>
+          <p className="atmos-section-sub">Active permits in Alabama and Tennessee Valley. Check whether a permitted operation was active when you made your observation.</p>
+        </div>
+        {isAdmin && !showForm && <button className="btn btn-sm btn-primary" onClick={() => { setEditId(null); setShowForm(true); }}>+ Add Permit</button>}
+      </div>
+
+      {showForm && (
+        <form onSubmit={savePermit} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '1rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+          <div className="form-row">
+            <div className="form-group"><label className="form-label">Operator *</label><input className="form-input" required value={form.operator} onChange={set('operator')} placeholder="Agency or company name" /></div>
+            <div className="form-group"><label className="form-label">Permit Type *</label><input className="form-input" required value={form.permit_type} onChange={set('permit_type')} placeholder="e.g. cloud seeding" /></div>
+          </div>
+          <div className="form-group"><label className="form-label">Area Description *</label><input className="form-input" required value={form.area_description} onChange={set('area_description')} placeholder="Geographic coverage" /></div>
+          <div className="form-row">
+            <div className="form-group"><label className="form-label">Active From</label><input className="form-input" type="date" value={form.active_from} onChange={set('active_from')} /></div>
+            <div className="form-group"><label className="form-label">Active To</label><input className="form-input" type="date" value={form.active_to} onChange={set('active_to')} /></div>
+          </div>
+          <div className="form-group"><label className="form-label">Compounds Used</label><input className="form-input" value={form.compounds_used} onChange={set('compounds_used')} placeholder="e.g. silver iodide, calcium chloride" /></div>
+          <div className="form-group"><label className="form-label">Source URL</label><input className="form-input" value={form.source_url} onChange={set('source_url')} /></div>
+          <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={2} value={form.notes} onChange={set('notes')} /></div>
+          <div style={{ display: 'flex', gap: '.5rem' }}>
+            <button className="btn btn-sm btn-primary" disabled={busy}>{busy ? '…' : editId ? 'Save Changes' : 'Add Permit'}</button>
+            <button type="button" className="btn btn-sm" onClick={() => { setShowForm(false); setEditId(null); }}>Cancel</button>
+          </div>
+        </form>
+      )}
+
+      {activePermits.length === 0 ? (
+        <p style={{ fontSize: '.85rem', color: 'var(--muted)', padding: '.5rem 0' }}>No active weather modification permits on record. Admins can add permits found via NOAA Weather Modification Reporting Program or TVA public records.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem', marginBottom: '.75rem' }}>
+          {activePermits.map(p => (
+            <div key={p.id} className="atmos-permit-item">
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
+                <div><span style={{ fontWeight: 700, fontSize: '.9rem' }}>{p.operator}</span><span style={{ fontSize: '.75rem', color: 'var(--muted)', marginLeft: '.5rem' }}>{p.permit_type}</span></div>
+                <span style={{ fontSize: '.7rem', padding: '.1rem .4rem', borderRadius: 99, background: '#dcfce7', color: '#15803d', border: '1px solid #16a34a44', fontWeight: 700 }}>ACTIVE</span>
+              </div>
+              <p style={{ fontSize: '.82rem', margin: '.2rem 0', color: 'var(--text)' }}>{p.area_description}</p>
+              {p.compounds_used && <p style={{ fontSize: '.78rem', color: 'var(--muted)', margin: '.1rem 0' }}>Compounds: {p.compounds_used}</p>}
+              <div style={{ fontSize: '.74rem', color: 'var(--muted)', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                {p.active_from && <span>From: {new Date(p.active_from).toLocaleDateString()}</span>}
+                {p.active_to   && <span>To: {new Date(p.active_to).toLocaleDateString()}</span>}
+                {p.source_url  && <a href={p.source_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>Source ↗</a>}
+              </div>
+              {isAdmin && (
+                <div style={{ display: 'flex', gap: '.4rem', marginTop: '.35rem' }}>
+                  <button className="btn-xs" onClick={() => { setForm({ operator:p.operator, permit_type:p.permit_type, area_description:p.area_description, active_from:p.active_from||'', active_to:p.active_to||'', compounds_used:p.compounds_used||'', source_url:p.source_url||'', notes:p.notes||'' }); setEditId(p.id); setShowForm(true); }}>Edit</button>
+                  <button className="btn-xs btn-danger" onClick={async () => { if(confirm('Delete?')) { await api.deleteAtmosphericPermit(p.id, token); setPermits(ps => ps.filter(x=>x.id!==p.id)); } }}>Delete</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {pastPermits.length > 0 && (
+        <details style={{ fontSize: '.78rem', color: 'var(--muted)' }}>
+          <summary style={{ cursor: 'pointer', marginBottom: '.5rem' }}>Past permits ({pastPermits.length})</summary>
+          {pastPermits.map(p => (
+            <div key={p.id} style={{ padding: '.4rem .6rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: '.5rem' }}>
+              <span>{p.operator} — {p.permit_type} — {p.area_description}</span>
+              {isAdmin && <button className="btn-xs btn-danger" onClick={async () => { await api.deleteAtmosphericPermit(p.id, token); setPermits(ps=>ps.filter(x=>x.id!==p.id)); }}>×</button>}
+            </div>
+          ))}
+        </details>
+      )}
+    </div>
+  );
+}
+
+const COMPOUND_LABELS  = { aluminum_ppb:'Al', barium_ppb:'Ba', strontium_ppb:'Sr', silver_ppb:'Ag', tio2_ppb:'TiO₂', pfas_ppb:'PFAS' };
+const COMPOUND_THRESH  = { aluminum_ppb:50, barium_ppb:2, strontium_ppb:5, silver_ppb:0.5, tio2_ppb:10, pfas_ppb:0.1 };
+
+function SoilSamplesPanel({ isAdmin, token, onRequireAuth, currentUser }) {
+  const [samples,  setSamples]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [busy,     setBusy]     = useState(false);
+  const [err,      setErr]      = useState('');
+  const [labPhoto, setLabPhoto] = useState(null);
+  const [form, setForm] = useState({ sample_type:'rainwater', collection_date:'', location_lat:'', location_lng:'', location_label:'', distance_from_obs_miles:'', direction_from_obs:'', linked_observation_id:'', lab_name:'', lab_cert_number:'', aluminum_ppb:'', barium_ppb:'', strontium_ppb:'', silver_ppb:'', tio2_ppb:'', pfas_ppb:'' });
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  useEffect(() => { api.getSoilSamples().then(setSamples).catch(()=>setSamples([])).finally(()=>setLoading(false)); }, []);
+
+  async function handleSubmit(e) {
+    e.preventDefault(); setErr('');
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      Object.entries(form).forEach(([k,v]) => { if (v !== '') fd.append(k, v); });
+      if (labPhoto) fd.append('lab_photo', labPhoto);
+      const created = await api.submitSoilSample(fd, token);
+      setSamples(s => [created, ...s]);
+      setShowForm(false);
+    } catch(e) { setErr(e.message); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="atmos-section">
+      <div className="atmos-section-header">
+        <div>
+          <h3 className="atmos-section-title">🧪 Soil & Rainwater Testing</h3>
+          <p className="atmos-section-sub">Community lab results for aluminum, barium, strontium, silver, TiO₂, and PFAS. Each submission is cross-referenced with EPA TRI industrial sources. AI compound origin analysis runs automatically on elevated readings.</p>
+        </div>
+        <button className="btn btn-sm btn-primary" onClick={() => { if (!currentUser) { onRequireAuth?.(); return; } setShowForm(true); }}>+ Submit Lab Results</button>
+      </div>
+
+      {showForm && (
+        <div className="modal-overlay" onClick={e => e.target===e.currentTarget && setShowForm(false)}>
+          <div className="modal">
+            <div className="modal-header"><h2 className="modal-title">Submit Lab Results</h2><button className="modal-close" onClick={() => setShowForm(false)}>✕</button></div>
+            <div className="modal-body">
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '.7rem' }}>
+                <div className="form-row">
+                  <div className="form-group"><label className="form-label">Sample Type *</label>
+                    <select className="form-input" value={form.sample_type} onChange={set('sample_type')}>
+                      <option value="rainwater">Rainwater</option>
+                      <option value="soil_surface">Soil — Surface (0–2 in)</option>
+                      <option value="soil_deep">Soil — Deep (6+ in)</option>
+                    </select>
+                  </div>
+                  <div className="form-group"><label className="form-label">Collection Date</label><input className="form-input" type="date" value={form.collection_date} onChange={set('collection_date')} /></div>
+                </div>
+                <div className="form-group"><label className="form-label">Location</label><input className="form-input" placeholder="Neighborhood, address, or landmark" value={form.location_label} onChange={set('location_label')} /></div>
+                <div className="form-row">
+                  <div className="form-group"><label className="form-label">GPS Latitude</label><input className="form-input" type="number" step="any" placeholder="34.7304" value={form.location_lat} onChange={set('location_lat')} /></div>
+                  <div className="form-group"><label className="form-label">GPS Longitude</label><input className="form-input" type="number" step="any" placeholder="-86.5861" value={form.location_lng} onChange={set('location_lng')} /></div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group"><label className="form-label">Distance from obs (mi)</label><input className="form-input" type="number" step="any" value={form.distance_from_obs_miles} onChange={set('distance_from_obs_miles')} /></div>
+                  <div className="form-group"><label className="form-label">Direction from obs</label>
+                    <select className="form-input" value={form.direction_from_obs} onChange={set('direction_from_obs')}>
+                      <option value="">Unknown</option>
+                      {['N','NE','E','SE','S','SW','W','NW'].map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group"><label className="form-label">Lab Name</label><input className="form-input" value={form.lab_name} onChange={set('lab_name')} /></div>
+                  <div className="form-group"><label className="form-label">Lab Cert #</label><input className="form-input" value={form.lab_cert_number} onChange={set('lab_cert_number')} /></div>
+                </div>
+                <p style={{ fontSize: '.8rem', fontWeight: 700, color: 'var(--text)', margin: 0 }}>Compound Results (ppb)</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem' }}>
+                  {Object.entries(COMPOUND_LABELS).map(([k,l]) => (
+                    <div key={k} className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">{l} (ppb)</label>
+                      <input className="form-input" type="number" step="any" placeholder="0.00" value={form[k]} onChange={set(k)} />
+                    </div>
+                  ))}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Lab Report Photo *</label>
+                  <input type="file" accept="image/*,application/pdf" className="form-input" onChange={e => setLabPhoto(e.target.files[0])} />
+                  <p style={{ fontSize: '.74rem', color: 'var(--muted)', margin: '.2rem 0 0' }}>Photo or PDF scan of lab report required for credibility</p>
+                </div>
+                {err && <p className="form-error">{err}</p>}
+                <button className="btn btn-primary btn-full" disabled={busy}>{busy ? '…' : 'Submit Lab Results'}</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? <div className="spinner" style={{ margin: '1rem auto' }} /> : samples.length === 0 ? (
+        <p style={{ fontSize: '.85rem', color: 'var(--muted)', padding: '.5rem 0' }}>No lab results submitted yet. If you have soil or rainwater test results showing elevated aluminum, barium, strontium, silver, TiO₂, or PFAS, submit them here.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+          {samples.map(s => {
+            const assessment = s.ai_assessment ? (typeof s.ai_assessment === 'string' ? JSON.parse(s.ai_assessment) : s.ai_assessment) : null;
+            return (
+              <div key={s.id} className="atmos-sample-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.3rem' }}>
+                  <span style={{ fontSize: '.75rem', padding: '.1rem .4rem', borderRadius: 99, background: 'var(--surface)', border: '1px solid var(--border)', fontWeight: 600 }}>{s.sample_type.replace(/_/g,' ')}</span>
+                  {Object.keys(COMPOUND_LABELS).map(k => s[k] > COMPOUND_THRESH[k] && (
+                    <span key={k} style={{ fontSize: '.66rem', padding: '.08rem .35rem', borderRadius: 99, background: '#fee2e2', color: '#991b1b', border: '1px solid #dc262644', fontWeight: 700 }}>{COMPOUND_LABELS[k]} ↑</span>
+                  ))}
+                  <span style={{ fontSize: '.72rem', color: 'var(--muted)', marginLeft: 'auto' }}>{new Date(s.created_at).toLocaleDateString()}</span>
+                </div>
+                <div style={{ fontSize: '.8rem', color: 'var(--text)', marginBottom: '.25rem' }}>
+                  {s.location_label && <span>📍 {s.location_label}</span>}
+                  {s.lab_name && <span style={{ color: 'var(--muted)', marginLeft: '.5rem' }}> — {s.lab_name}</span>}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px,1fr))', gap: '.3rem', marginBottom: '.35rem' }}>
+                  {Object.entries(COMPOUND_LABELS).map(([k,l]) => s[k] != null && s[k] !== '' && (
+                    <div key={k} style={{ fontSize: '.75rem', padding: '.2rem .4rem', background: s[k] > COMPOUND_THRESH[k] ? '#fee2e2' : 'var(--surface)', borderRadius: 4, border: '1px solid var(--border)' }}>
+                      <span style={{ fontWeight: 700, color: s[k] > COMPOUND_THRESH[k] ? '#991b1b' : 'var(--muted)' }}>{l}</span>
+                      <span style={{ color: 'var(--text)', marginLeft: '.3rem' }}>{s[k]} ppb</span>
+                    </div>
+                  ))}
+                </div>
+                {s.photo_url && <a href={s.photo_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.75rem', color: 'var(--green)' }}>View lab report ↗</a>}
+                {assessment && (
+                  <div style={{ marginTop: '.5rem', padding: '.6rem .75rem', background: '#fffbeb', border: '1px solid #d97706', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ fontSize: '.7rem', fontWeight: 700, textTransform: 'uppercase', color: '#92400e', marginBottom: '.25rem' }}>AI Origin Assessment — {s.ai_confidence} confidence</div>
+                    <p style={{ fontSize: '.8rem', color: 'var(--text)', margin: '0 0 .35rem', lineHeight: 1.5 }}>{assessment.assessment}</p>
+                    {assessment.flags?.geoengineering_signature && <p style={{ fontSize: '.75rem', color: '#991b1b', fontWeight: 600, margin: 0 }}>⚠ Compound signature matches proposed geoengineering materials (Al+Ba+Sr) — no confirmed industrial source identified</p>}
+                    {assessment.flags?.known_industrial_source_nearby && <p style={{ fontSize: '.75rem', color: '#92400e', margin: '.1rem 0 0' }}>Known industrial TRI source nearby — see EPA data for details</p>}
+                  </div>
+                )}
+                {isAdmin && (
+                  <div style={{ display: 'flex', gap: '.4rem', marginTop: '.4rem', borderTop: '1px solid var(--border)', paddingTop: '.4rem' }}>
+                    <button className="btn-xs" onClick={async () => { await api.analyzeSoilSample(s.id, token); alert('AI analysis triggered — refresh in a moment'); }}>Re-analyze</button>
+                    <button className="btn-xs btn-danger" onClick={async () => { if(confirm('Delete?')) { await api.deleteSoilSample(s.id, token); setSamples(prev=>prev.filter(x=>x.id!==s.id)); } }}>Delete</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MilitaryAirspacePanel({ isAdmin, token }) {
+  const [foiaItems, setFoiaItems] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [editId,    setEditId]    = useState(null);
+  const [editForm,  setEditForm]  = useState({});
+
+  useEffect(() => { api.getAtmosphericFoia().then(setFoiaItems).catch(()=>setFoiaItems([])).finally(()=>setLoading(false)); }, []);
+
+  const STATUS_S = {
+    pending:      { color: '#6b7280', bg: '#f3f4f6', border: '#d1d5db' },
+    acknowledged: { color: '#1e40af', bg: '#dbeafe', border: '#3b82f6' },
+    partial:      { color: '#92400e', bg: '#fef3c7', border: '#d97706' },
+    fulfilled:    { color: '#15803d', bg: '#dcfce7', border: '#16a34a' },
+    denied:       { color: '#991b1b', bg: '#fee2e2', border: '#dc2626' },
+    appealing:    { color: '#c2410c', bg: '#fff7ed', border: '#f97316' },
+  };
+
+  async function saveEdit(id) {
+    try {
+      const updated = await api.updateAtmosphericFoia(id, editForm, token);
+      setFoiaItems(items => items.map(x => x.id === id ? updated : x));
+      setEditId(null);
+    } catch(e) { alert(e.message); }
+  }
+
+  return (
+    <div className="atmos-section atmos-military-panel">
+      <h3 className="atmos-section-title">🪖 Military Airspace Documentation Gap</h3>
+      <div className="atmos-military-notice">
+        <p><strong>Known limitation:</strong> Redstone Arsenal flight operations are not fully reflected in public ADS-B flight tracking databases. Observations in the Redstone Arsenal corridor cannot be fully cross-referenced with available public flight data.</p>
+        <p>Military aircraft operating under IFR or special authorizations may not appear in OpenSky Network or FlightAware. Observations classified as UNIDENTIFIED in this corridor should be interpreted with this limitation in mind.</p>
+      </div>
+      <h4 style={{ fontSize: '.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', margin: '.85rem 0 .5rem' }}>Records Requests — Airspace Transparency</h4>
+      {loading ? <div className="spinner" style={{ margin: '1rem auto' }} /> : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          {foiaItems.map(item => {
+            const s = STATUS_S[item.status] || STATUS_S.pending;
+            const isEditing = editId === item.id;
+            return (
+              <div key={item.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '.75rem .9rem' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--text)', flex: 1 }}>{item.target_agency}</span>
+                  <span style={{ fontSize: '.68rem', padding: '.1rem .4rem', borderRadius: 99, background: s.bg, color: s.color, border: `1px solid ${s.border}44`, fontWeight: 700, whiteSpace: 'nowrap' }}>{item.status.toUpperCase()}</span>
+                </div>
+                <p style={{ fontSize: '.82rem', color: 'var(--text)', margin: '.2rem 0 .25rem', lineHeight: 1.5 }}>{item.records_sought}</p>
+                <div style={{ fontSize: '.75rem', color: 'var(--muted)', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                  {item.submitted_date && <span>Submitted: {new Date(item.submitted_date).toLocaleDateString()}</span>}
+                  {item.response_due   && <span>Due: {new Date(item.response_due).toLocaleDateString()}</span>}
+                </div>
+                {item.notes && <p style={{ fontSize: '.76rem', color: 'var(--muted)', fontStyle: 'italic', margin: '.25rem 0 0', lineHeight: 1.4 }}>{item.notes}</p>}
+                {isAdmin && !isEditing && (
+                  <button className="btn-xs" style={{ marginTop: '.4rem' }} onClick={() => { setEditId(item.id); setEditForm({ status: item.status, submitted_date: item.submitted_date||'', response_due: item.response_due||'', notes: item.notes||'' }); }}>Update Status</button>
+                )}
+                {isAdmin && isEditing && (
+                  <div style={{ marginTop: '.5rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+                    <div className="form-row" style={{ marginBottom: 0 }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Status</label>
+                        <select className="form-input" value={editForm.status} onChange={e => setEditForm(f=>({...f, status:e.target.value}))}>
+                          {Object.keys(STATUS_S).map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Submitted Date</label>
+                        <input className="form-input" type="date" value={editForm.submitted_date} onChange={e => setEditForm(f=>({...f,submitted_date:e.target.value}))} />
+                      </div>
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}><label className="form-label">Notes</label><textarea className="form-input" rows={2} value={editForm.notes} onChange={e => setEditForm(f=>({...f,notes:e.target.value}))} /></div>
+                    <div style={{ display: 'flex', gap: '.4rem' }}>
+                      <button className="btn btn-sm btn-primary" onClick={() => saveEdit(item.id)}>Save</button>
+                      <button className="btn btn-sm" onClick={() => setEditId(null)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AtmosphericDashboard({ dashboard, onRequireAuth, highlightedIds }) {
+  const { user, token } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const [observations, setObservations] = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [showForm,     setShowForm]     = useState(false);
+  const [filterClass,  setFilterClass]  = useState('');
+
+  useEffect(() => {
+    const params = {};
+    if (filterClass) params.classification = filterClass;
+    setLoading(true);
+    api.getAtmosphericObservations(params)
+      .then(setObservations)
+      .catch(() => setObservations([]))
+      .finally(() => setLoading(false));
+  }, [filterClass]);
+
+  useEffect(() => {
+    if (loading || !highlightedIds?.size) return;
+    const first = observations.find(o => highlightedIds.has(o.id));
+    if (!first) return;
+    setTimeout(() => document.getElementById(`atmos-${first.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+  }, [loading]);
+
+  const classFilters = [
+    { value: '',             label: 'All' },
+    { value: 'unidentified', label: 'Unidentified' },
+    { value: 'unexplained',  label: 'Unexplained' },
+    { value: 'partial',      label: 'Partial' },
+    { value: 'explained',    label: 'Explained' },
+    { value: 'pending',      label: 'Pending' },
+  ];
+
+  return (
+    <>
+      <div className="watch-dashboard-header">
+        <div className="watch-dashboard-title-row">
+          <span className="watch-dashboard-icon">{dashboard.icon}</span>
+          <h2 className="watch-dashboard-title">{dashboard.label}</h2>
+        </div>
+        <p className="watch-dashboard-desc">{dashboard.description}</p>
+        <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="btn btn-primary" onClick={() => { if (!user) { onRequireAuth?.(); return; } setShowForm(true); }}>+ Submit Observation</button>
+          <p style={{ fontSize: '.78rem', color: 'var(--muted)', margin: 0 }}>Submissions are automatically cross-referenced with OpenSky Network flight data and NOAA weather conditions.</p>
+        </div>
+      </div>
+
+      <WeatherModPermitsPanel isAdmin={isAdmin} token={token} />
+
+      <div className="atmos-section">
+        <div className="atmos-section-header" style={{ marginBottom: '.75rem' }}>
+          <h3 className="atmos-section-title">📋 Community Observations</h3>
+          <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
+            {classFilters.map(f => (
+              <button key={f.value} onClick={() => setFilterClass(f.value)} style={{ padding: '.25rem .6rem', fontSize: '.75rem', fontWeight: 600, borderRadius: 99, border: `1px solid ${filterClass===f.value ? 'var(--green)' : 'var(--border)'}`, background: filterClass===f.value ? 'var(--green)' : 'var(--surface)', color: filterClass===f.value ? '#fff' : 'var(--muted)', cursor: 'pointer' }}>{f.label}</button>
+            ))}
+          </div>
+        </div>
+        {loading ? <div className="spinner" style={{ margin: '1.5rem auto' }} /> :
+          observations.length === 0 ? (
+            <p style={{ fontSize: '.87rem', color: 'var(--muted)', padding: '1rem 0' }}>
+              {filterClass ? `No ${filterClass} observations.` : 'No observations submitted yet.'}
+            </p>
+          ) : (
+            <div className="watch-report-list">
+              {observations.map(o => (
+                <AtmosphericObsCard key={o.id} obs={o}
+                  highlighted={!!highlightedIds?.has(o.id)}
+                  isAdmin={isAdmin} token={token}
+                  onDeleted={id => setObservations(prev => prev.filter(x => x.id !== id))}
+                />
+              ))}
+            </div>
+          )
+        }
+      </div>
+
+      <SoilSamplesPanel isAdmin={isAdmin} token={token} onRequireAuth={onRequireAuth} currentUser={user} />
+      <MilitaryAirspacePanel isAdmin={isAdmin} token={token} />
+
+      {showForm && (
+        <SubmitAtmosphericObsModal
+          token={token}
+          onClose={() => setShowForm(false)}
+          onCreated={obs => { setObservations(prev => [obs, ...prev]); setShowForm(false); }}
+        />
+      )}
+    </>
   );
 }

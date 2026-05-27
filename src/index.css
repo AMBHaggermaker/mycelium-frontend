@@ -2866,3 +2866,148 @@ a { color: inherit; text-decoration: none; }
   color: var(--muted);
   line-height: 1.4;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ATMOSPHERIC OBSERVATIONS DASHBOARD
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.atmos-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.atmos-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-bottom: .65rem;
+}
+.atmos-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 .2rem;
+  color: var(--text);
+}
+.atmos-section-sub {
+  font-size: .8rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+  max-width: 600px;
+}
+
+/* Permit items */
+.atmos-permit-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid #16a34a;
+  border-radius: var(--radius-sm);
+  padding: .75rem .9rem;
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+/* Sample cards */
+.atmos-sample-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+
+/* Flight cross-reference block inside expanded card */
+.atmos-crossref {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .65rem .8rem;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+.atmos-crossref-label {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  margin-bottom: .1rem;
+}
+
+/* Drift corridor zones */
+.atmos-drift-zones {
+  background: var(--green-bg);
+  border: 1px solid var(--green);
+  border-radius: var(--radius-sm);
+  padding: .65rem .85rem;
+}
+.atmos-drift-title {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--green);
+  margin-bottom: .4rem;
+}
+.atmos-drift-list {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  margin-bottom: .4rem;
+}
+.atmos-drift-item {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  font-size: .8rem;
+}
+.atmos-drift-dist {
+  font-weight: 700;
+  color: var(--green);
+  min-width: 40px;
+}
+.atmos-drift-dir {
+  font-weight: 600;
+  color: var(--text);
+  min-width: 32px;
+}
+.atmos-drift-coords {
+  color: var(--green);
+  font-size: .77rem;
+  text-decoration: none;
+}
+.atmos-drift-coords:hover { text-decoration: underline; }
+.atmos-drift-note {
+  font-size: .74rem;
+  color: var(--green);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Military airspace notice panel */
+.atmos-military-panel { border-left: 4px solid #dc2626; }
+.atmos-military-notice {
+  background: #fef2f2;
+  border: 1px solid #dc262622;
+  border-radius: var(--radius-sm);
+  padding: .85rem 1rem;
+  margin: .5rem 0;
+}
+.atmos-military-notice p {
+  font-size: .84rem;
+  color: var(--text);
+  margin: 0 0 .5rem;
+  line-height: 1.55;
+}
+.atmos-military-notice p:last-child { margin-bottom: 0; }
+
+@media (max-width: 768px) {
+  .atmos-section { padding: 1rem; }
+  .atmos-drift-item { flex-wrap: wrap; gap: .4rem; }
+}

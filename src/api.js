@@ -144,6 +144,45 @@ export default {
   forgotPassword:       (data)          => post('/auth/forgot-password', data),
   resetPassword:        (data)          => post('/auth/reset-password', data),
 
+  // Atmospheric observations
+  getAtmosphericObservations: (params)        => get(`/watch/atmospheric/observations${qs(params)}`),
+  deleteAtmosphericObservation: (id, token)   => del(`/watch/atmospheric/observations/${id}`, token),
+  submitAtmosphericObservation: (formData, token) =>
+    fetch(`${BASE}/watch/atmospheric/observations`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    }).then(async res => {
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      if (!res.ok) throw new Error(data.error || 'Submit failed');
+      return data;
+    }),
+
+  // Weather modification permits
+  getAtmosphericPermits:    ()                => get('/watch/atmospheric/permits'),
+  createAtmosphericPermit:  (data, token)     => post('/watch/atmospheric/permits', data, token),
+  updateAtmosphericPermit:  (id, data, token) => patch(`/watch/atmospheric/permits/${id}`, data, token),
+  deleteAtmosphericPermit:  (id, token)       => del(`/watch/atmospheric/permits/${id}`, token),
+
+  // Soil / rainwater samples
+  getSoilSamples:   (params)          => get(`/watch/atmospheric/soil-samples${qs(params)}`),
+  deleteSoilSample: (id, token)       => del(`/watch/atmospheric/soil-samples/${id}`, token),
+  analyzeSoilSample:(id, token)       => post(`/watch/atmospheric/soil-samples/${id}/analyze`, {}, token),
+  submitSoilSample: (formData, token) =>
+    fetch(`${BASE}/watch/atmospheric/soil-samples`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    }).then(async res => {
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      if (!res.ok) throw new Error(data.error || 'Submit failed');
+      return data;
+    }),
+
+  // Atmospheric FOIA tracker
+  getAtmosphericFoia:    ()               => get('/watch/atmospheric/foia'),
+  updateAtmosphericFoia: (id, data, token)=> patch(`/watch/atmospheric/foia/${id}`, data, token),
+
   // Watch
   getLandIntelReports:    (params)       => get(`/watch/land-intelligence/reports${qs(params)}`),
   triggerLandIntelligence:(token)        => post('/watch/land-intelligence/trigger', {}, token),
