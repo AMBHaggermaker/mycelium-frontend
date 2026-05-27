@@ -52,7 +52,9 @@ function MediaGrid({ media }) {
   );
 }
 
-export default function PostCard({ post, onRequireAuth, onReserved }) {
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+export default function PostCard({ post, onRequireAuth, onReserved, onDeleted }) {
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [reserving, setReserving] = useState(false);
@@ -61,6 +63,7 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
   const [reported,  setReported]  = useState(false);
   const [rsvp,      setRsvp]      = useState(post.my_rsvp || null);
   const [rsvpBusy,  setRsvpBusy]  = useState(false);
+  const [deleting,  setDeleting]  = useState(false);
   const [err, setErr]             = useState(null);
 
   async function handleRsvp(status) {
@@ -78,7 +81,26 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
     finally { setRsvpBusy(false); }
   }
 
-  const isOwn  = user?.id === post.user_id;
+  const isOwn      = user?.id === post.user_id;
+  const canDelete  = isOwn || user?.role === 'admin' || user?.role === 'moderator';
+
+  const nowMs       = Date.now();
+  const expiresAtMs = post.expires_at ? new Date(post.expires_at).getTime() : null;
+  const isExpired   = expiresAtMs !== null && expiresAtMs < nowMs;
+  const isExpiringSoon = expiresAtMs !== null && !isExpired && (expiresAtMs - nowMs) < ONE_DAY_MS;
+
+  async function handleDelete(e) {
+    e.stopPropagation();
+    if (!confirm('This will permanently remove this post and all reservations. This cannot be undone. Confirm delete?')) return;
+    setDeleting(true);
+    try {
+      await api.deletePost(post.id, token);
+      onDeleted?.(post.id);
+    } catch (e) {
+      setErr(e.message);
+      setDeleting(false);
+    }
+  }
   const cap    = post.capacity;
   const filled = post.reserved_count ?? 0;
   const isFull = cap !== null && filled >= cap;
@@ -119,13 +141,21 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
 
   return (
     <div
-      className="card post-card"
+      className={`card post-card${isExpired ? ' post-card-expired' : ''}`}
       onClick={e => { if (!e.defaultPrevented) navigate(`/posts/${post.id}`); }}
       style={{ cursor: 'pointer' }}
     >
       <div className="post-header">
         <span className={`badge ${TYPE_BADGE[post.type]}`}>{post.type}</span>
         {urgencyDot}
+        {isExpiringSoon && (
+          <span className="badge-expiring-soon" title={`Expires ${new Date(post.expires_at).toLocaleString()}`}>
+            Expiring Soon
+          </span>
+        )}
+        {isExpired && (
+          <span className="badge-expired">Expired</span>
+        )}
         {(post.category || post.subcategory) && (
           <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
             {post.category && (
@@ -254,6 +284,11 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
           >
             {reported ? 'Reported' : 'Report'}
           </button>
+          {canDelete && (
+            <button className="btn btn-sm btn-danger" onClick={handleDelete} disabled={deleting}>
+              {deleting ? '…' : 'Delete'}
+            </button>
+          )}
         </div>
       )}
 
@@ -266,6 +301,19 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
             title={reported ? 'Reported' : 'Report this post'}
           >
             {reported ? 'Reported' : 'Report'}
+          </button>
+          {canDelete && (
+            <button className="btn btn-sm btn-danger" onClick={handleDelete} disabled={deleting}>
+              {deleting ? '…' : 'Delete'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {isOwn && (
+        <div className="post-actions post-owner-actions" onClick={e => e.stopPropagation()}>
+          <button className="btn btn-sm btn-danger" onClick={handleDelete} disabled={deleting}>
+            {deleting ? '…' : 'Delete'}
           </button>
         </div>
       )}

@@ -17,6 +17,7 @@ import PostDetailPage from './pages/PostDetailPage';
 import Advocate from './pages/Advocate';
 import Messages from './pages/Messages';
 import Covenant from './pages/Covenant';
+import MyPosts from './pages/MyPosts';
 import Businesses from './pages/Businesses';
 import BusinessProfile from './pages/BusinessProfile';
 import AuthModal from './components/AuthModal';
@@ -106,6 +107,7 @@ export default function App() {
         <Route path="/advocate"        element={<Advocate onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/messages"        element={<Messages onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/covenant"        element={<Covenant />} />
+        <Route path="/my-posts"        element={<MyPosts />} />
         <Route path="/businesses"      element={<Businesses onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/businesses/:id"  element={<BusinessProfile />} />
       </Routes>

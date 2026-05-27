@@ -250,7 +250,8 @@ export default function Feed({ onRequireAuth }) {
               ? <p className="empty">No posts yet — be the first to share a need or offer.</p>
               : <div className="post-grid">
                   {posts.map(p => (
-                    <PostCard key={p.id} post={p} onRequireAuth={onRequireAuth} onReserved={load} />
+                    <PostCard key={p.id} post={p} onRequireAuth={onRequireAuth} onReserved={load}
+                      onDeleted={id => setPosts(prev => prev.filter(x => x.id !== id))} />
                   ))}
                 </div>
         }

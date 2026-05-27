@@ -41,9 +41,12 @@ export default {
   getPostComments:    (id)             => get(`/posts/${id}/comments`),
   addPostComment:     (id, data, token)=> post(`/posts/${id}/comments`, data, token),
   getMyReservation:   (id, token)      => get(`/posts/${id}/my-reservation`, token),
-  createPost: (data, token)           => post('/posts', data, token),
-  updatePost: (id, data, token)       => patch(`/posts/${id}`, data, token),
-  deletePost: (id, token)             => del(`/posts/${id}`, token),
+  createPost:      (data, token)       => post('/posts', data, token),
+  updatePost:      (id, data, token)  => patch(`/posts/${id}`, data, token),
+  deletePost:      (id, token)        => del(`/posts/${id}`, token),
+  getMyPosts:      (token)            => get('/posts/my-posts', token),
+  completePost:    (id, token)        => patch(`/posts/${id}/complete`, {}, token),
+  extendPostExpiry:(id, expires_at, token) => patch(`/posts/${id}/extend`, { expires_at }, token),
 
   // Circles
   getCircles:     (params)            => get(`/circles${qs(params)}`),

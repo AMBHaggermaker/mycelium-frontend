@@ -248,7 +248,8 @@ export default function PostDetailPage({ onRequireAuth }) {
     </div>
   );
 
-  const isOwn  = user?.id === post.user_id;
+  const isOwn      = user?.id === post.user_id;
+  const canDelete  = isOwn || user?.role === 'admin' || user?.role === 'moderator';
   const cap    = post.capacity;
   const filled = post.reserved_count ?? 0;
   const isFull = cap !== null && filled >= cap;
@@ -259,6 +260,20 @@ export default function PostDetailPage({ onRequireAuth }) {
   const now = Date.now();
   const expiresAt = post.expires_at ? new Date(post.expires_at) : null;
   const isExpired = expiresAt && expiresAt < now;
+  const isExpiringSoon = expiresAt && !isExpired && (expiresAt - now) < 24 * 60 * 60 * 1000;
+
+  const [deleting, setDeleting] = useState(false);
+  async function handleDelete() {
+    if (!confirm('This will permanently remove this post and all reservations. This cannot be undone. Confirm delete?')) return;
+    setDeleting(true);
+    try {
+      await api.deletePost(post.id, token);
+      navigate(-1);
+    } catch (e) {
+      alert(e.message);
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="page">
@@ -297,12 +312,14 @@ export default function PostDetailPage({ onRequireAuth }) {
                 {post.subcategory}
               </span>
             )}
+            {isExpiringSoon && (
+              <span className="badge-expiring-soon"
+                title={`Expires ${expiresAt.toLocaleString()}`}>
+                Expiring Soon
+              </span>
+            )}
             {isExpired && (
-              <span style={{
-                fontSize: '.7rem', padding: '.15rem .45rem', borderRadius: 99,
-                background: '#fce8e8', color: '#b52424', border: '1px solid #b52424',
-                fontWeight: 700, textTransform: 'uppercase',
-              }}>Expired</span>
+              <span className="badge-expired">Expired</span>
             )}
           </div>
 
@@ -412,6 +429,18 @@ export default function PostDetailPage({ onRequireAuth }) {
                   {isFull ? 'Full' : reserving ? '…' : 'Reserve a Spot'}
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Delete */}
+          {canDelete && (
+            <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+              <button className="btn btn-sm btn-danger" onClick={handleDelete} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Delete Post'}
+              </button>
+              <span style={{ marginLeft: '.75rem', fontSize: '.78rem', color: 'var(--muted)' }}>
+                Permanently removes this post and all reservations.
+              </span>
             </div>
           )}
         </div>

@@ -431,7 +431,7 @@ function BoardContent({ board, user: u, profileData, boardsData, albumMap, isOwn
     case 'timeline':
       return <TimelineBoard timeline={timeline} />;
     case 'posts':
-      return <PostsBoard posts={posts} />;
+      return <PostsBoard posts={posts} isOwn={isOwn} />;
     case 'events':
       return <EventsBoard rsvpEvents={rsvpEvents} profileEvents={profileData.events} isOwn={isOwn} />;
     case 'photos':
@@ -550,8 +550,7 @@ function TimelineBoard({ timeline }) {
 
 // ── Board: My Posts ───────────────────────────────────────────────────────────
 
-function PostsBoard({ posts }) {
-  if (!posts.length) return <p className="empty board-empty">No posts yet.</p>;
+function PostsBoard({ posts, isOwn }) {
   return (
     <div className="board-posts-list">
       {posts.slice(0, 4).map(p => (
@@ -564,6 +563,14 @@ function PostsBoard({ posts }) {
           </span>
         </Link>
       ))}
+      {!posts.length && <p className="empty board-empty">No posts yet.</p>}
+      {isOwn && (
+        <div style={{ marginTop: '.6rem', paddingTop: '.6rem', borderTop: '1px solid var(--border)' }}>
+          <Link to="/my-posts" style={{ fontSize: '.8rem', color: 'var(--accent)', fontWeight: 600 }}>
+            Manage all posts →
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
