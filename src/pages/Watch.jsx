@@ -1039,11 +1039,8 @@ function DataSourcesPanel() {
         <span className="watch-dashboard-icon" style={{ fontSize: '1rem' }}>🔗</span>
         <h3 className="watch-dashboard-title" style={{ fontSize: '.95rem', margin: 0 }}>Reliable Data Sources</h3>
       </div>
-      <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: '.35rem' }}>
-        Use these sources to find records to submit above. The AI analyzes what the community submits — no unreliable scraping.
-      </p>
-      <p style={{ fontSize: '.78rem', color: 'var(--amber)', background: 'var(--amber-bg)', border: '1px solid var(--amber)', borderRadius: 'var(--radius-sm)', padding: '.45rem .65rem', marginBottom: '.75rem', lineHeight: 1.5 }}>
-        Public records sources are verified periodically — some government websites have limited availability. Submit records you find directly using the form below.
+      <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: '.75rem' }}>
+        Use these sources to find records to submit. The AI analyzes patterns across everything the community submits.
       </p>
       <div className="public-records-list">
         {DATA_SOURCES.map((src, i) => (
