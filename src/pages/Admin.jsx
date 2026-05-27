@@ -134,10 +134,11 @@ function ModerationQueue({ token }) {
 
 function UsersTab({ token }) {
   const { user: me } = useAuth();
-  const [users,      setUsers]      = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [err,        setErr]        = useState(null);
-  const [actionId,   setActionId]   = useState(null);
+  const [users,           setUsers]          = useState([]);
+  const [loading,         setLoading]        = useState(true);
+  const [err,             setErr]            = useState(null);
+  const [actionId,        setActionId]       = useState(null);
+  const [founderOnly,     setFounderOnly]    = useState(false);
 
   useEffect(() => {
     api.getAdminUsers(token)
@@ -197,6 +198,19 @@ function UsersTab({ token }) {
     }
   }
 
+  async function toggleFoundingMember(u, grant) {
+    if (!grant && !confirm(`Revoke founding member status from @${u.username}?`)) return;
+    setActionId(u.id);
+    try {
+      const updated = await api.setFoundingMember(u.id, grant, token);
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, founding_member: updated.founding_member } : x));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionId(null);
+    }
+  }
+
   if (loading) return <div className="spinner" />;
   if (err) return <p className="error-msg">{err}</p>;
 
@@ -204,17 +218,19 @@ function UsersTab({ token }) {
   const deletedUsers = users.filter(u => u.is_active === false);
 
   const UserRow = ({ u }) => {
-    const isMe      = u.id === me?.id;
-    const isFounder = u.username === 'AMBHaggermaker';
-    const canDelete = !isFounder && !isMe;
+    const isMe           = u.id === me?.id;
+    const isFounder      = u.username === 'AMBHaggermaker';
+    const canDelete      = !isFounder && !isMe;
+    const canRevokeFounder = !isFounder; // AMBHaggermaker founding status is permanent
+    const busy           = actionId === u.id;
 
     return (
       <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
         <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>
           {u.username}
-          {isFounder && (
-            <span style={{ marginLeft: '.4rem', fontSize: '.68rem', color: 'var(--green)', fontWeight: 700 }}>
-              FOUNDER
+          {u.founding_member && (
+            <span style={{ marginLeft: '.4rem', fontSize: '.65rem', background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid var(--green)', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700, verticalAlign: 'middle' }}>
+              ⬡ Founding
             </span>
           )}
         </td>
@@ -239,15 +255,32 @@ function UsersTab({ token }) {
         </td>
         <td style={{ padding: '.5rem .75rem' }}>
           <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
-            <button className="btn btn-sm btn-outline" disabled={actionId === u.id}
+            {u.founding_member ? (
+              canRevokeFounder && (
+                <button className="btn btn-sm btn-outline" disabled={busy}
+                  style={{ fontSize: '.72rem', color: 'var(--muted)', borderColor: 'var(--border)' }}
+                  onClick={() => toggleFoundingMember(u, false)}
+                  title="Revoke founding member status">
+                  {busy ? '…' : 'Revoke Founding'}
+                </button>
+              )
+            ) : (
+              <button className="btn btn-sm btn-outline" disabled={busy}
+                style={{ fontSize: '.72rem', color: 'var(--green)', borderColor: 'var(--green)' }}
+                onClick={() => toggleFoundingMember(u, true)}
+                title="Grant founding member status">
+                {busy ? '…' : '⬡ Grant Founding'}
+              </button>
+            )}
+            <button className="btn btn-sm btn-outline" disabled={busy}
               onClick={() => sendPasswordReset(u)}
               title="Send password reset email">
-              {actionId === u.id ? '…' : 'Reset PW'}
+              {busy ? '…' : 'Reset PW'}
             </button>
             {canDelete ? (
-              <button className="btn btn-sm btn-danger" disabled={actionId === u.id}
+              <button className="btn btn-sm btn-danger" disabled={busy}
                 onClick={() => deleteUser(u)}>
-                {actionId === u.id ? '…' : 'Delete'}
+                {busy ? '…' : 'Delete'}
               </button>
             ) : (
               <span style={{ fontSize: '.75rem', color: 'var(--muted)', alignSelf: 'center' }}>—</span>
@@ -271,17 +304,29 @@ function UsersTab({ token }) {
     </thead>
   );
 
+  const foundingMembers = activeUsers.filter(u => u.founding_member);
+  const displayedActive = founderOnly ? foundingMembers : activeUsers;
+
   return (
     <div>
-      <p style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-        {activeUsers.length} active · {deletedUsers.length} deleted
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <p style={{ fontSize: '.85rem', color: 'var(--muted)', margin: 0 }}>
+          {activeUsers.length} active · {deletedUsers.length} deleted · {foundingMembers.length} founding members
+        </p>
+        <button
+          className={`btn btn-sm${founderOnly ? ' btn-primary' : ' btn-outline'}`}
+          style={{ fontSize: '.78rem', ...(founderOnly ? {} : { color: 'var(--green)', borderColor: 'var(--green)' }) }}
+          onClick={() => setFounderOnly(v => !v)}
+        >
+          ⬡ {founderOnly ? 'Showing Founding Members' : 'Filter: Founding Members'}
+        </button>
+      </div>
 
       <div className="table-scroll-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
           {tableHead}
           <tbody>
-            {activeUsers.map(u => <UserRow key={u.id} u={u} />)}
+            {displayedActive.map(u => <UserRow key={u.id} u={u} />)}
           </tbody>
         </table>
       </div>
