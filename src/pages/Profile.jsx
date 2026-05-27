@@ -5,6 +5,7 @@ import api from '../api';
 import PostCard from '../components/PostCard';
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors,
+  DragOverlay,
 } from '@dnd-kit/core';
 import {
   SortableContext, rectSortingStrategy, useSortable, arrayMove,
@@ -76,6 +77,7 @@ export default function Profile() {
   const [loading,     setLoading]     = useState(true);
   const [boardOrder,  setBoardOrder]  = useState(null); // current ordered board list
   const [dragMode,    setDragMode]    = useState(false);
+  const [activeId,    setActiveId]    = useState(null);
   const [showEditor,  setShowEditor]  = useState(false);
 
   const isOwn = data && authUser && data.user.id === authUser.id;
@@ -103,7 +105,12 @@ export default function Profile() {
     useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } })
   );
 
+  function handleDragStart(event) {
+    setActiveId(event.active.id);
+  }
+
   async function handleDragEnd(event) {
+    setActiveId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const oldIndex = boardOrder.findIndex(b => b.board_type === active.id);
@@ -141,7 +148,7 @@ export default function Profile() {
       {/* Banner */}
       <div className="profile-banner" style={
         u.banner_image_url
-          ? { backgroundImage: `url(${u.banner_image_url})` }
+          ? { backgroundImage: `url(${resolveUrl(u.banner_image_url)})` }
           : u.accent_color ? { background: `linear-gradient(135deg, ${u.accent_color}44, ${u.accent_color}22)` } : {}
       }>
         {isOwn && <BannerUpload token={token} onUploaded={url => setData(d => ({ ...d, user: { ...d.user, banner_image_url: url } }))} />}
@@ -219,9 +226,20 @@ export default function Profile() {
         )}
 
         {/* Board grid */}
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        {dragMode && (
+          <div className="profile-drag-mode-banner">
+            ⠿ Drag mode active — grab the ⠿ handle on any board to reorder
+          </div>
+        )}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveId(null)}
+        >
           <SortableContext items={visibleBoards.map(b => b.board_type)} strategy={rectSortingStrategy}>
-            <div className="profile-board-grid">
+            <div className={'profile-board-grid' + (dragMode ? ' drag-mode-active' : '')}>
               {visibleBoards.map(board => (
                 <SortableBoard
                   key={board.board_type}
@@ -251,6 +269,16 @@ export default function Profile() {
               ))}
             </div>
           </SortableContext>
+          <DragOverlay>
+            {activeId ? (
+              <div className="profile-drag-overlay-card">
+                <span className="profile-board-card-header" style={{ background: u.accent_color || 'var(--green)', color: '#fff', padding: '.5rem .75rem', display: 'flex', alignItems: 'center', gap: '.4rem', borderRadius: 'var(--radius) var(--radius) 0 0' }}>
+                  <span style={{ fontSize: '1.1rem' }}>⠿</span>
+                  <span style={{ fontWeight: 700, fontSize: '.82rem' }}>{BOARD_TITLES[activeId]}</span>
+                </span>
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       </div>
 
@@ -279,10 +307,12 @@ function SortableBoard({ board, children, isOwn, dragMode, accentColor, onSettin
     disabled: !dragMode,
   });
   const style = {
+    position: 'relative',
     transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 100 : undefined,
-    opacity: isDragging ? 0.6 : 1,
+    transition: isDragging ? undefined : transition,
+    zIndex: isDragging ? 999 : 'auto',
+    opacity: isDragging ? 0.75 : 1,
+    outline: isDragging ? '2px dashed var(--green)' : undefined,
   };
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
@@ -624,8 +654,8 @@ function PhotosBoard({ photos, albumMap, isOwn, token, onUpload, onDelete }) {
       ) : (
         <div className="profile-photo-grid">
           {display.map(photo => (
-            <div key={photo.id} className="profile-photo-item" onClick={() => setLightbox(photo.url)}>
-              <img src={photo.url} alt={photo.caption || ''} loading="lazy" />
+            <div key={photo.id} className="profile-photo-item" onClick={() => setLightbox(resolveUrl(photo.url))}>
+              <img src={resolveUrl(photo.url)} alt={photo.caption || ''} loading="lazy" />
               {photo.caption && <div className="profile-photo-caption">{photo.caption}</div>}
               {isOwn && (
                 <button className="profile-photo-delete" onClick={async e => {

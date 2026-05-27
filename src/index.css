@@ -3775,7 +3775,7 @@ a { color: inherit; text-decoration: none; }
   background: var(--green); color: #fff;
   border: none; border-radius: 99px; padding: .4rem .85rem;
   font-size: .82rem; font-weight: 700; cursor: pointer;
-  display: none; align-items: center; gap: .35rem;
+  align-items: center; gap: .35rem;
   box-shadow: 0 2px 8px rgba(0,0,0,.2);
 }
 .live-mobile-badge {
@@ -3803,4 +3803,153 @@ a { color: inherit; text-decoration: none; }
 }
 @media (max-width: 640px) {
   .profile-board-grid { grid-template-columns: 1fr; }
+}
+
+/* ── DnD Drag Mode ─────────────────────────────────────────────────────────── */
+
+.profile-drag-mode-banner {
+  font-size: .8rem; color: var(--muted); text-align: center;
+  background: var(--bg); border: 1px dashed var(--green);
+  border-radius: var(--radius); padding: .5rem 1rem;
+  margin-bottom: .75rem;
+}
+.drag-mode-active .profile-board-card {
+  cursor: grab;
+}
+.drag-mode-active .profile-board-card:hover {
+  border-color: var(--green); box-shadow: 0 0 0 2px var(--green-bg);
+}
+.profile-drag-handle {
+  /* override: bigger touch target */
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; min-height: 28px;
+  cursor: grab; font-size: 1.1rem; opacity: .85; flex-shrink: 0;
+  touch-action: none; user-select: none;
+  pointer-events: all;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+.profile-drag-handle:active { cursor: grabbing; }
+.profile-drag-handle:hover { opacity: 1; background: rgba(255,255,255,.2); }
+.profile-drag-overlay-card {
+  border-radius: var(--radius); overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  min-width: 200px;
+  cursor: grabbing;
+}
+
+/* ── Board gear button - larger touch target ───────────────────────────────── */
+.profile-board-gear-btn {
+  min-width: 32px; min-height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* ── RSVP buttons - minimum touch targets ─────────────────────────────────── */
+@media (max-width: 768px) {
+  .post-rsvp-btn {
+    min-height: 36px; padding: .35rem .65rem; font-size: .8rem;
+  }
+  .post-rsvp-row { gap: .5rem; }
+}
+
+/* ── Profile board - mobile ────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .profile-board-card-body { max-height: 220px; }
+  .profile-board-settings-panel { flex-direction: column; align-items: flex-start; }
+  .profile-board-grid { gap: .65rem; margin-top: .65rem; }
+  .profile-drag-mode-banner { font-size: .75rem; }
+}
+
+/* ── Profile header - mobile ───────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .profile-header-row {
+    flex-direction: column; gap: .75rem; align-items: flex-start;
+  }
+  .profile-actions { width: 100%; }
+  .profile-actions .btn { flex: 1; justify-content: center; }
+  .profile-banner { height: 120px; }
+  .profile-banner-edit-btn { font-size: .75rem; padding: .35rem .6rem; }
+}
+
+/* ── Watch tab row - mobile ────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .watch-tab-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .3rem;
+  }
+  .watch-tab-btn {
+    flex-direction: column; gap: .15rem; padding: .4rem .25rem;
+    font-size: .7rem;
+  }
+  .watch-tab-label { font-size: .68rem; }
+  .watch-tab-icon { font-size: 1rem; }
+}
+
+/* ── Advocate/Watch forms - mobile ────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .modal-body .form-row {
+    flex-direction: column;
+  }
+  .modal-body .form-group { width: 100%; }
+}
+
+/* ── Messages modal - keyboard safe on mobile ─────────────────────────────── */
+@media (max-width: 768px) {
+  .modal-overlay {
+    /* Ensure modal isn't obscured by on-screen keyboard */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .messages-thread-pane {
+    height: calc(100dvh - var(--nav-h) - 56px - env(safe-area-inset-bottom, 0px));
+  }
+  .messages-compose {
+    padding-bottom: max(.75rem, env(safe-area-inset-bottom, .75rem));
+  }
+}
+
+/* ── Live network mobile improvements ─────────────────────────────────────── */
+@media (max-width: 900px) {
+  .live-mobile-btn {
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    right: 1rem;
+  }
+  .live-mobile-drawer {
+    max-height: 65vh;
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 1.5rem));
+  }
+}
+
+/* ── Feed page - mobile ─────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .feed-subtabs {
+    gap: .25rem; overflow-x: auto; flex-wrap: nowrap; padding-bottom: .25rem;
+  }
+  .feed-subtab { white-space: nowrap; flex-shrink: 0; }
+  .filter-tab  { white-space: nowrap; }
+}
+
+/* ── Post card - mobile ────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .post-grid { grid-template-columns: 1fr; }
+  .post-actions {
+    flex-wrap: wrap; gap: .5rem;
+  }
+  .post-actions .btn { min-height: 40px; }
+  .btn-report { min-height: 36px; padding: .3rem .65rem; }
+}
+
+/* ── Commons page - mobile ─────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .commons-tabs { overflow-x: auto; flex-wrap: nowrap; }
+  .commons-tab  { white-space: nowrap; flex-shrink: 0; }
+}
+
+/* ── General touch target helpers ─────────────────────────────────────────── */
+@media (hover: none) and (pointer: coarse) {
+  /* Anything that should be easier to tap on touch screens */
+  .btn-xs { min-height: 36px; padding: .35rem .65rem; }
+  .filter-tab, .feed-subtab { min-height: 38px; }
+  .tab-btn { min-height: 36px; }
+  select.form-select, select.sort-select { min-height: 44px; }
 }

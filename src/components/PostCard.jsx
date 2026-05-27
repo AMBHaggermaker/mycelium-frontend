@@ -29,7 +29,7 @@ function MediaGrid({ media }) {
       <div className={`media-grid ${countClass}`}>
         {visible.map((m, i) => {
           const isVideo = m.mime_type?.startsWith('video/');
-          const url = `${BASE_URL}${m.url}`;
+          const url = m.url?.startsWith('http') ? m.url : `${BASE_URL}${m.url}`;
           const isLast = i === 3 && extra > 0;
           return (
             <div key={m.id} className="media-item" onClick={() => !isVideo && setLightbox(url)}>
