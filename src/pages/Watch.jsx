@@ -412,42 +412,43 @@ const LAND_REPORT_TYPE_LABELS = {
   property_transfer_cluster: 'Property Transfer Cluster',
 };
 
-const PUBLIC_RECORDS = [
+// ── Reliable public data source references ────────────────────────────────────
+const DATA_SOURCES = [
   {
-    name: 'Madison County property transfers',
-    how: 'Madison County Revenue Commission',
-    url: 'https://www.madisoncountyal.gov/departments/revenue',
-    note: 'Deed transfers searchable by name, address, or parcel',
+    name: 'Alabama GIS Hub — property datasets',
+    url:  'https://www.alabamagis.com/',
+    note: 'Downloadable county property transfer datasets including Madison County',
+    tag:  'GIS',
   },
   {
-    name: 'City annexation petitions',
-    how: 'Huntsville City Council public records request',
-    url: 'https://www.huntsvilleal.gov/government/city-clerk/',
-    note: 'Pending petitions reviewed at Council meetings',
+    name: 'Huntsville Open Data Portal',
+    url:  'https://data.huntsvilleai.gov',
+    note: 'Planning approvals, building permits, and zoning data',
+    tag:  'Open Data',
   },
   {
-    name: 'Planning commission approvals',
-    how: 'Huntsville Planning Commission agenda/minutes',
-    url: 'https://www.huntsvilleal.gov/government/boards-committees/planning/',
-    note: 'Monthly public meetings, agendas posted 72h prior',
+    name: 'EPA ECHO — environmental permits',
+    url:  'https://echo.epa.gov',
+    note: 'Facility permits and compliance records — integrated into AI analysis automatically',
+    tag:  'API',
   },
   {
-    name: 'Building permits by area',
-    how: 'City of Huntsville permits portal',
-    url: 'https://www.huntsvilleal.gov/business/permits-inspections/',
-    note: 'Search by address, contractor, or permit type',
+    name: 'Alabama Secretary of State — LLC lookup',
+    url:  'https://www.sos.alabama.gov/government-records/business-entity-records',
+    note: 'Registered agents and member names for any Alabama LLC',
+    tag:  'SOS',
   },
   {
-    name: 'Zoning variance requests',
-    how: 'Board of Zoning Adjustment / Planning Dept',
-    url: 'https://www.huntsvilleal.gov/government/boards-committees/board-of-zoning-adjustment/',
-    note: 'Public hearings with 15-day notice requirement',
+    name: 'Huntsville Board of Zoning Adjustment',
+    url:  'https://www.huntsvilleal.gov/government/boards-committees/board-of-zoning-adjustment/',
+    note: 'Variance requests — public hearings posted 15 days in advance',
+    tag:  'BZA',
   },
   {
-    name: 'LLC ownership chains',
-    how: 'Alabama Secretary of State entity search',
-    url: 'https://www.sos.alabama.gov/government-records/business-entity-records',
-    note: 'Registered agents and member names for Alabama LLCs',
+    name: 'City Clerk — annexation petitions',
+    url:  'https://www.huntsvilleal.gov/government/city-clerk/',
+    note: 'Pending petitions reviewed at City Council meetings',
+    tag:  'City',
   },
 ];
 
@@ -485,32 +486,591 @@ function LandIntelCard({ report }) {
   );
 }
 
-function PublicRecordsTracker() {
+// ── Submitted land record types config ───────────────────────────────────────
+const LAND_RECORD_TYPES = [
+  { value: 'property_transfer',  label: 'Property Transfer',       color: '#b86b10', bg: '#fdf2e3' },
+  { value: 'annexation_filing',  label: 'Annexation Filing',       color: '#dc2626', bg: '#fef2f2' },
+  { value: 'zoning_change',      label: 'Zoning Change',           color: '#2563eb', bg: '#eff6ff' },
+  { value: 'planning_decision',  label: 'Planning Decision',       color: '#16a34a', bg: '#f0fdf4' },
+];
+
+const PRR_STATUSES = {
+  pending:      { label: 'Pending',      color: '#6b7280', bg: '#f3f4f6' },
+  acknowledged: { label: 'Acknowledged', color: '#2563eb', bg: '#eff6ff' },
+  partial:      { label: 'Partial',      color: '#ca8a04', bg: '#fefce8' },
+  fulfilled:    { label: 'Fulfilled',    color: '#16a34a', bg: '#f0fdf4' },
+  denied:       { label: 'Denied',       color: '#dc2626', bg: '#fef2f2' },
+  appealing:    { label: 'Appealing',    color: '#ea580c', bg: '#fff7ed' },
+};
+
+function LandRecordTypeBadge({ type }) {
+  const cfg = LAND_RECORD_TYPES.find(t => t.value === type);
+  if (!cfg) return null;
   return (
-    <div className="public-records-tracker">
-      <div className="watch-dashboard-title-row" style={{ marginBottom: '.75rem' }}>
-        <span className="watch-dashboard-icon">📋</span>
-        <h3 className="watch-dashboard-title" style={{ fontSize: '1rem' }}>Public Records Tracker</h3>
+    <span style={{
+      fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em',
+      padding: '.15rem .5rem', borderRadius: 99,
+      background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}44`,
+    }}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function LandRecordCard({ record, isAdmin, onVerify, onDelete }) {
+  const date = record.record_date
+    ? new Date(record.record_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : null;
+  const submitted = new Date(record.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  return (
+    <div className="land-record-card">
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.4rem' }}>
+        <LandRecordTypeBadge type={record.record_type} />
+        {record.verified && (
+          <span style={{ fontSize: '.68rem', fontWeight: 700, color: '#16a34a', background: '#f0fdf4',
+            padding: '.15rem .45rem', borderRadius: 99, border: '1px solid #16a34a44' }}>
+            ✓ Verified
+          </span>
+        )}
+        <span style={{ fontSize: '.72rem', color: 'var(--muted)', marginLeft: 'auto' }}>
+          Submitted {submitted} by {record.submitted_by_username}
+        </span>
       </div>
-      <p style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-        These records are publicly requestable. Submit FOIA/public records requests to track land activity in your area.
+
+      {/* Type-specific key fields */}
+      {record.record_type === 'property_transfer' && (
+        <div className="land-record-fields">
+          {record.address  && <span><strong>Address:</strong> {record.address}</span>}
+          {record.buyer    && <span><strong>Buyer:</strong> {record.buyer}</span>}
+          {record.seller   && <span><strong>Seller:</strong> {record.seller}</span>}
+          {record.sale_price && <span><strong>Price:</strong> ${parseFloat(record.sale_price).toLocaleString()}</span>}
+          {date            && <span><strong>Date:</strong> {date}</span>}
+        </div>
+      )}
+      {record.record_type === 'annexation_filing' && (
+        <div className="land-record-fields">
+          {record.area_affected && <span><strong>Area:</strong> {record.area_affected}</span>}
+          {record.petitioner    && <span><strong>Petitioner:</strong> {record.petitioner}</span>}
+          {date                 && <span><strong>Filed:</strong> {date}</span>}
+        </div>
+      )}
+      {record.record_type === 'zoning_change' && (
+        <div className="land-record-fields">
+          {record.location_label   && <span><strong>Location:</strong> {record.location_label}</span>}
+          {(record.from_zone || record.to_zone) && (
+            <span><strong>Zone:</strong> {record.from_zone} → {record.to_zone}</span>
+          )}
+          {record.requesting_party && <span><strong>Requestor:</strong> {record.requesting_party}</span>}
+          {date                    && <span><strong>Filed:</strong> {date}</span>}
+        </div>
+      )}
+      {record.record_type === 'planning_decision' && (
+        <div className="land-record-fields">
+          {record.project_name    && <span><strong>Project:</strong> {record.project_name}</span>}
+          {record.location_label  && <span><strong>Location:</strong> {record.location_label}</span>}
+          {record.decision        && <span><strong>Decision:</strong> {record.decision}</span>}
+          {date                   && <span><strong>Date:</strong> {date}</span>}
+        </div>
+      )}
+
+      {record.notes && (
+        <p style={{ fontSize: '.8rem', color: 'var(--muted)', marginTop: '.3rem', lineHeight: 1.5 }}>
+          {record.notes}
+        </p>
+      )}
+
+      <div style={{ display: 'flex', gap: '.75rem', alignItems: 'center', marginTop: '.4rem', flexWrap: 'wrap' }}>
+        {record.source_url && (
+          <a href={record.source_url} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: '.75rem', color: 'var(--blue)' }}
+            onClick={e => e.stopPropagation()}>
+            Source →
+          </a>
+        )}
+        {isAdmin && (
+          <>
+            <button className="btn btn-sm btn-outline" style={{ fontSize: '.72rem', padding: '.2rem .55rem' }}
+              onClick={() => onVerify(record.id)}>
+              {record.verified ? 'Unverify' : 'Verify'}
+            </button>
+            <button className="btn btn-sm" style={{ fontSize: '.72rem', padding: '.2rem .55rem', color: '#dc2626', background: '#fef2f2', border: '1px solid #dc262644' }}
+              onClick={() => onDelete(record.id)}>
+              Delete
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Submit Land Record modal ──────────────────────────────────────────────────
+function SubmitLandRecordModal({ token, onClose, onCreated }) {
+  const [recordType,      setRecordType]      = useState('property_transfer');
+  const [locationLabel,   setLocationLabel]   = useState('');
+  const [recordDate,      setRecordDate]       = useState('');
+  const [sourceUrl,       setSourceUrl]       = useState('');
+  const [notes,           setNotes]           = useState('');
+  // property_transfer
+  const [address,         setAddress]         = useState('');
+  const [buyer,           setBuyer]           = useState('');
+  const [seller,          setSeller]          = useState('');
+  const [salePrice,       setSalePrice]       = useState('');
+  // annexation_filing
+  const [areaAffected,    setAreaAffected]    = useState('');
+  const [petitioner,      setPetitioner]      = useState('');
+  // zoning_change
+  const [fromZone,        setFromZone]        = useState('');
+  const [toZone,          setToZone]          = useState('');
+  const [requestingParty, setRequestingParty] = useState('');
+  // planning_decision
+  const [projectName,     setProjectName]     = useState('');
+  const [decision,        setDecision]        = useState('');
+
+  const [busy, setBusy] = useState(false);
+  const [err,  setErr]  = useState(null);
+
+  const dateLabels = {
+    property_transfer: 'Sale Date', annexation_filing: 'Filing Date',
+    zoning_change: 'Filing Date', planning_decision: 'Decision Date',
+  };
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true); setErr(null);
+    try {
+      const record = await api.submitLandRecord({
+        record_type:      recordType,
+        location_label:   locationLabel.trim() || null,
+        record_date:      recordDate || null,
+        source_url:       sourceUrl.trim() || null,
+        notes:            notes.trim() || null,
+        address:          address.trim() || null,
+        buyer:            buyer.trim() || null,
+        seller:           seller.trim() || null,
+        sale_price:       salePrice ? parseFloat(salePrice) : null,
+        area_affected:    areaAffected.trim() || null,
+        petitioner:       petitioner.trim() || null,
+        from_zone:        fromZone.trim() || null,
+        to_zone:          toZone.trim() || null,
+        requesting_party: requestingParty.trim() || null,
+        project_name:     projectName.trim() || null,
+        decision:         decision.trim() || null,
+      }, token);
+      onCreated(record);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const cfg = LAND_RECORD_TYPES.find(t => t.value === recordType);
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="modal-header">
+          <span className="modal-title">Submit Land Development Record</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <form className="modal-body" onSubmit={submit}>
+          <p style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
+            Submit public records you find through the Alabama GIS Hub, Alabama Secretary of State, courthouse records,
+            or planning commission agendas. The AI analyzes submitted records for patterns.
+          </p>
+
+          <div className="form-group">
+            <label className="form-label">Record Type <span className="form-required">*</span></label>
+            <select className="form-select" value={recordType} onChange={e => setRecordType(e.target.value)}
+              style={{ borderLeft: `4px solid ${cfg?.color}`, fontWeight: 600, color: cfg?.color }}>
+              {LAND_RECORD_TYPES.map(t => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Property Transfer fields */}
+          {recordType === 'property_transfer' && (<>
+            <div className="form-group">
+              <label className="form-label">Property Address <span className="form-required">*</span></label>
+              <input className="form-input" value={address} onChange={e => setAddress(e.target.value)}
+                placeholder="Street address" required />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Buyer / LLC Name</label>
+                <input className="form-input" value={buyer} onChange={e => setBuyer(e.target.value)}
+                  placeholder="e.g. Smith Holdings LLC" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Seller</label>
+                <input className="form-input" value={seller} onChange={e => setSeller(e.target.value)}
+                  placeholder="Previous owner" />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Sale Price ($)</label>
+                <input className="form-input" type="number" min="0" step="1" value={salePrice}
+                  onChange={e => setSalePrice(e.target.value)} placeholder="e.g. 285000" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">{dateLabels[recordType]}</label>
+                <input className="form-input" type="date" value={recordDate}
+                  onChange={e => setRecordDate(e.target.value)} />
+              </div>
+            </div>
+          </>)}
+
+          {/* Annexation Filing fields */}
+          {recordType === 'annexation_filing' && (<>
+            <div className="form-group">
+              <label className="form-label">Area Affected <span className="form-required">*</span></label>
+              <input className="form-input" value={areaAffected} onChange={e => setAreaAffected(e.target.value)}
+                placeholder="Neighborhood, street, or parcel description" required />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Petitioner</label>
+                <input className="form-input" value={petitioner} onChange={e => setPetitioner(e.target.value)}
+                  placeholder="Who filed the petition" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">{dateLabels[recordType]}</label>
+                <input className="form-input" type="date" value={recordDate}
+                  onChange={e => setRecordDate(e.target.value)} />
+              </div>
+            </div>
+          </>)}
+
+          {/* Zoning Change fields */}
+          {recordType === 'zoning_change' && (<>
+            <div className="form-group">
+              <label className="form-label">Location / Address <span className="form-required">*</span></label>
+              <input className="form-input" value={locationLabel} onChange={e => setLocationLabel(e.target.value)}
+                placeholder="Address or area description" required />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">From Zone <span className="form-required">*</span></label>
+                <input className="form-input" value={fromZone} onChange={e => setFromZone(e.target.value)}
+                  placeholder="e.g. R-1 Residential" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">To Zone <span className="form-required">*</span></label>
+                <input className="form-input" value={toZone} onChange={e => setToZone(e.target.value)}
+                  placeholder="e.g. I-1 Light Industrial" required />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Requesting Party</label>
+                <input className="form-input" value={requestingParty} onChange={e => setRequestingParty(e.target.value)}
+                  placeholder="Who requested the change" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">{dateLabels[recordType]}</label>
+                <input className="form-input" type="date" value={recordDate}
+                  onChange={e => setRecordDate(e.target.value)} />
+              </div>
+            </div>
+          </>)}
+
+          {/* Planning Decision fields */}
+          {recordType === 'planning_decision' && (<>
+            <div className="form-group">
+              <label className="form-label">Project Name <span className="form-required">*</span></label>
+              <input className="form-input" value={projectName} onChange={e => setProjectName(e.target.value)}
+                placeholder="Development project name" required />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Location</label>
+                <input className="form-input" value={locationLabel} onChange={e => setLocationLabel(e.target.value)}
+                  placeholder="Address or area" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Decision</label>
+                <input className="form-input" value={decision} onChange={e => setDecision(e.target.value)}
+                  placeholder="e.g. Approved, Denied, Tabled" />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">{dateLabels[recordType]}</label>
+              <input className="form-input" type="date" value={recordDate}
+                onChange={e => setRecordDate(e.target.value)} />
+            </div>
+          </>)}
+
+          {/* Shared fields */}
+          <div className="form-group">
+            <label className="form-label">Source URL</label>
+            <input className="form-input" type="url" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)}
+              placeholder="Link to where you found this record" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Notes</label>
+            <textarea className="form-textarea" rows={3} value={notes} onChange={e => setNotes(e.target.value)}
+              placeholder="Any additional context — related transactions, entity connections, community impact…" />
+          </div>
+
+          {err && <p className="form-error">{err}</p>}
+          <button className="btn btn-primary btn-full" disabled={busy}>
+            {busy ? '…' : 'Submit Record'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── PRR tracker ───────────────────────────────────────────────────────────────
+function PRRModal({ existing, token, onClose, onSaved }) {
+  const [agency,        setAgency]        = useState(existing?.agency        || '');
+  const [recordsSought, setRecordsSought] = useState(existing?.records_sought || '');
+  const [submittedDate, setSubmittedDate] = useState(existing?.submitted_date || '');
+  const [status,        setStatus]        = useState(existing?.status         || 'pending');
+  const [responseDue,   setResponseDue]   = useState(existing?.response_due  || '');
+  const [notes,         setNotes]         = useState(existing?.notes          || '');
+  const [busy, setBusy] = useState(false);
+  const [err,  setErr]  = useState(null);
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true); setErr(null);
+    try {
+      const payload = {
+        agency: agency.trim(), records_sought: recordsSought.trim(),
+        submitted_date: submittedDate || null, status,
+        response_due: responseDue || null, notes: notes.trim() || null,
+      };
+      const saved = existing
+        ? await api.updatePRR(existing.id, payload, token)
+        : await api.createPRR(payload, token);
+      onSaved(saved, !!existing);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 480 }}>
+        <div className="modal-header">
+          <span className="modal-title">{existing ? 'Update Request' : 'Log Records Request'}</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <form className="modal-body" onSubmit={submit}>
+          <div className="form-group">
+            <label className="form-label">Agency <span className="form-required">*</span></label>
+            <select className="form-select" value={agency} onChange={e => setAgency(e.target.value)} required>
+              <option value="">— Select agency —</option>
+              <option value="Madison County Revenue Commission">Madison County Revenue Commission</option>
+              <option value="Madison County Commission">Madison County Commission</option>
+              <option value="City of Huntsville City Clerk">City of Huntsville City Clerk</option>
+              <option value="Huntsville Planning Department">Huntsville Planning Department</option>
+              <option value="Huntsville Building Permits">Huntsville Building Permits</option>
+              <option value="Board of Zoning Adjustment">Board of Zoning Adjustment</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Records Sought <span className="form-required">*</span></label>
+            <textarea className="form-textarea" rows={3} value={recordsSought}
+              onChange={e => setRecordsSought(e.target.value)} required
+              placeholder="Describe exactly what records you requested" />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Date Submitted</label>
+              <input className="form-input" type="date" value={submittedDate}
+                onChange={e => setSubmittedDate(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Response Due</label>
+              <input className="form-input" type="date" value={responseDue}
+                onChange={e => setResponseDue(e.target.value)} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
+              {Object.entries(PRR_STATUSES).map(([k, v]) => (
+                <option key={k} value={k}>{v.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Notes</label>
+            <textarea className="form-textarea" rows={2} value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Updates, reference numbers, contacts…" />
+          </div>
+          {err && <p className="form-error">{err}</p>}
+          <button className="btn btn-primary btn-full" disabled={busy}>
+            {busy ? '…' : existing ? 'Save Changes' : 'Log Request'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function PRRTracker({ isAdmin, token }) {
+  const [requests,  setRequests]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editing,   setEditing]   = useState(null);
+
+  useEffect(() => {
+    api.getPRR()
+      .then(setRequests)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  function handleSaved(saved, isUpdate) {
+    if (isUpdate) {
+      setRequests(prev => prev.map(r => r.id === saved.id ? saved : r));
+    } else {
+      setRequests(prev => [saved, ...prev]);
+    }
+    setShowModal(false);
+    setEditing(null);
+  }
+
+  async function handleDelete(id) {
+    if (!confirm('Remove this records request?')) return;
+    try {
+      await api.deletePRR(id, token);
+      setRequests(prev => prev.filter(r => r.id !== id));
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  return (
+    <div className="prr-tracker">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.75rem' }}>
+        <div className="watch-dashboard-title-row" style={{ margin: 0 }}>
+          <span className="watch-dashboard-icon" style={{ fontSize: '1.1rem' }}>📬</span>
+          <h3 className="watch-dashboard-title" style={{ fontSize: '1rem', margin: 0 }}>
+            Public Records Request Tracker
+          </h3>
+        </div>
+        {isAdmin && (
+          <button className="btn btn-outline btn-sm" onClick={() => { setEditing(null); setShowModal(true); }}>
+            + Log Request
+          </button>
+        )}
+      </div>
+      <p style={{ fontSize: '.8rem', color: 'var(--muted)', marginBottom: '.85rem', lineHeight: 1.4 }}>
+        Formal records requests submitted to Madison County and City of Huntsville agencies.
+        {!isAdmin && ' Admins can log and track request status here.'}
+      </p>
+
+      {loading ? <div className="spinner" style={{ margin: '.5rem 0' }} /> : (
+        requests.length === 0 ? (
+          <p className="empty" style={{ margin: '.25rem 0' }}>
+            {isAdmin ? 'No requests logged yet. Use "Log Request" to track a FOIA/public records submission.' : 'No records requests logged yet.'}
+          </p>
+        ) : (
+          <div className="prr-list">
+            {requests.map(r => {
+              const st = PRR_STATUSES[r.status] || PRR_STATUSES.pending;
+              const submitted = r.submitted_date
+                ? new Date(r.submitted_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : null;
+              const due = r.response_due
+                ? new Date(r.response_due).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : null;
+              return (
+                <div key={r.id} className="prr-item">
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.2rem' }}>
+                        <span style={{
+                          fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase',
+                          padding: '.15rem .45rem', borderRadius: 99,
+                          background: st.bg, color: st.color, border: `1px solid ${st.color}44`,
+                        }}>
+                          {st.label}
+                        </span>
+                        <span style={{ fontSize: '.78rem', fontWeight: 600, color: 'var(--text)' }}>{r.agency}</span>
+                      </div>
+                      <p style={{ fontSize: '.82rem', color: 'var(--text)', margin: '0 0 .2rem', lineHeight: 1.45 }}>
+                        {r.records_sought}
+                      </p>
+                      <div style={{ fontSize: '.72rem', color: 'var(--muted)', display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
+                        {submitted && <span>Submitted: {submitted}</span>}
+                        {due       && <span>Due: {due}</span>}
+                        {r.notes   && <span>{r.notes}</span>}
+                      </div>
+                    </div>
+                    {isAdmin && (
+                      <div style={{ display: 'flex', gap: '.35rem', flexShrink: 0 }}>
+                        <button className="btn btn-sm btn-outline" style={{ fontSize: '.7rem', padding: '.2rem .45rem' }}
+                          onClick={() => { setEditing(r); setShowModal(true); }}>
+                          Edit
+                        </button>
+                        <button className="btn btn-sm" style={{ fontSize: '.7rem', padding: '.2rem .45rem', color: '#dc2626', background: '#fef2f2', border: '1px solid #dc262644' }}
+                          onClick={() => handleDelete(r.id)}>
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {showModal && (
+        <PRRModal
+          existing={editing}
+          token={token}
+          onClose={() => { setShowModal(false); setEditing(null); }}
+          onSaved={handleSaved}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Data Sources reference panel ──────────────────────────────────────────────
+function DataSourcesPanel() {
+  return (
+    <div className="public-records-tracker" style={{ marginBottom: '1.5rem' }}>
+      <div className="watch-dashboard-title-row" style={{ marginBottom: '.6rem' }}>
+        <span className="watch-dashboard-icon" style={{ fontSize: '1rem' }}>🔗</span>
+        <h3 className="watch-dashboard-title" style={{ fontSize: '.95rem', margin: 0 }}>Reliable Data Sources</h3>
+      </div>
+      <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: '.75rem' }}>
+        Use these sources to find records to submit above. The AI analyzes what the community submits — no unreliable scraping.
       </p>
       <div className="public-records-list">
-        {PUBLIC_RECORDS.map((rec, i) => (
+        {DATA_SOURCES.map((src, i) => (
           <div key={i} className="public-records-item">
-            <div className="public-records-check">☐</div>
+            <span style={{
+              fontSize: '.65rem', fontWeight: 700, padding: '.1rem .35rem', borderRadius: 4,
+              background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)',
+              flexShrink: 0, alignSelf: 'center', whiteSpace: 'nowrap',
+            }}>
+              {src.tag}
+            </span>
             <div className="public-records-info">
-              <div className="public-records-name">{rec.name}</div>
-              <div className="public-records-note">{rec.note}</div>
+              <div className="public-records-name">{src.name}</div>
+              <div className="public-records-note">{src.note}</div>
             </div>
-            <a
-              href={rec.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="public-records-link"
-              onClick={e => e.stopPropagation()}
-            >
-              Request →
+            <a href={src.url} target="_blank" rel="noopener noreferrer"
+              className="public-records-link" onClick={e => e.stopPropagation()}>
+              Open →
             </a>
           </div>
         ))}
@@ -519,34 +1079,59 @@ function PublicRecordsTracker() {
   );
 }
 
+// ── Main Land Development dashboard ──────────────────────────────────────────
 function LandDevelopmentDashboard({ dashboard, onRequireAuth, highlightedIds }) {
   const { user, token } = useAuth();
-  const [intelReports, setIntelReports] = useState([]);
-  const [intelLoading, setIntelLoading] = useState(true);
-  const [reports,      setReports]      = useState([]);
-  const [reportsLoading, setReportsLoading] = useState(true);
-  const [showForm,     setShowForm]     = useState(false);
+  const isAdmin = user?.role === 'admin';
+
+  const [intelReports,    setIntelReports]    = useState([]);
+  const [intelLoading,    setIntelLoading]    = useState(true);
+  const [landRecords,     setLandRecords]     = useState([]);
+  const [recordsLoading,  setRecordsLoading]  = useState(true);
+  const [recordFilter,    setRecordFilter]    = useState('');
+  const [watchReports,    setWatchReports]    = useState([]);
+  const [watchLoading,    setWatchLoading]    = useState(true);
+  const [showForm,        setShowForm]        = useState(false);
+  const [showRecordForm,  setShowRecordForm]  = useState(false);
 
   useEffect(() => {
     api.getLandIntelReports()
-      .then(setIntelReports)
-      .catch(() => setIntelReports([]))
-      .finally(() => setIntelLoading(false));
+      .then(setIntelReports).catch(() => []).finally(() => setIntelLoading(false));
+
+    api.getLandRecords()
+      .then(setLandRecords).catch(() => []).finally(() => setRecordsLoading(false));
 
     api.getWatchReports('land_development')
-      .then(setReports)
-      .catch(() => setReports([]))
-      .finally(() => setReportsLoading(false));
+      .then(setWatchReports).catch(() => []).finally(() => setWatchLoading(false));
   }, []);
 
   useEffect(() => {
-    if (reportsLoading || !highlightedIds?.size) return;
-    const first = reports.find(r => highlightedIds.has(r.id));
+    if (watchLoading || !highlightedIds?.size) return;
+    const first = watchReports.find(r => highlightedIds.has(r.id));
     if (!first) return;
     setTimeout(() => {
       document.getElementById(`report-${first.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 150);
-  }, [reportsLoading]);
+  }, [watchLoading]);
+
+  async function handleVerifyRecord(id) {
+    try {
+      const updated = await api.verifyLandRecord(id, token);
+      setLandRecords(prev => prev.map(r => r.id === id ? { ...r, verified: updated.verified } : r));
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleDeleteRecord(id) {
+    if (!confirm('Delete this submitted record?')) return;
+    try {
+      await api.deleteLandRecord(id, token);
+      setLandRecords(prev => prev.filter(r => r.id !== id));
+    } catch (e) { alert(e.message); }
+  }
+
+  const filteredRecords = recordFilter
+    ? landRecords.filter(r => r.record_type === recordFilter)
+    : landRecords;
 
   return (
     <>
@@ -556,72 +1141,132 @@ function LandDevelopmentDashboard({ dashboard, onRequireAuth, highlightedIds }) 
           <h2 className="watch-dashboard-title">{dashboard.label}</h2>
         </div>
         <p className="watch-dashboard-desc">{dashboard.description}</p>
-        <button className="btn btn-primary" onClick={() => {
-          if (!user) { onRequireAuth?.(); return; }
-          setShowForm(true);
-        }}>
-          + Submit Report
-        </button>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={() => {
+            if (!user) { onRequireAuth?.(); return; }
+            setShowRecordForm(true);
+          }}>
+            + Submit Property Record
+          </button>
+          <button className="btn btn-outline" onClick={() => {
+            if (!user) { onRequireAuth?.(); return; }
+            setShowForm(true);
+          }}>
+            + Submit Watch Report
+          </button>
+        </div>
       </div>
 
       {/* AI Intelligence Reports */}
       <div className="land-intel-section">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.75rem' }}>
-          <h3 className="watch-reports-heading" style={{ margin: 0 }}>AI Intelligence Reports</h3>
-          <span style={{ fontSize: '.72rem', background: '#1a1710', color: '#c8e6b0', padding: '.15rem .5rem', borderRadius: 99, fontWeight: 700 }}>
-            AI
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.6rem' }}>
+          <h3 className="watch-reports-heading" style={{ margin: 0, color: '#c8e6b0' }}>AI Intelligence Reports</h3>
+          <span style={{ fontSize: '.7rem', background: '#2a5f0a', color: '#c8e6b0', padding: '.1rem .45rem', borderRadius: 99, fontWeight: 700, border: '1px solid #3a7f14' }}>
+            EPA ECHO + Community Data
           </span>
         </div>
-        <p style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
-          Patterns detected by AI analysis of community reports and regional development data.
-          Analysis runs every 6 hours. Flag patterns: same LLC in multiple transactions,
-          bulk purchases (3+ properties, 90 days, same area), annexations affecting housing-report areas.
+        <p style={{ fontSize: '.8rem', color: '#8ab882', marginBottom: '1rem', lineHeight: 1.5 }}>
+          Runs every 6 hours. Analyzes community-submitted records for: same LLC across multiple transactions,
+          bulk purchases (3+ in 90 days), zoning changes near housing violation areas, and EPA facility permit patterns.
+          Submit records below to feed this analysis.
         </p>
-        {intelLoading ? (
-          <div className="spinner" />
-        ) : intelReports.length === 0 ? (
-          <div className="land-intel-empty">
-            <p>No intelligence reports generated yet. Analysis runs every 6 hours once community reports accumulate.</p>
-          </div>
-        ) : (
-          <div className="land-intel-list">
-            {intelReports.map(r => <LandIntelCard key={r.id} report={r} />)}
-          </div>
-        )}
+        {intelLoading ? <div className="spinner" /> :
+          intelReports.length === 0 ? (
+            <div className="land-intel-empty">
+              <p>No intelligence reports yet. Analysis runs every 6 hours once community-submitted records accumulate.</p>
+            </div>
+          ) : (
+            <div className="land-intel-list">
+              {intelReports.map(r => <LandIntelCard key={r.id} report={r} />)}
+            </div>
+          )
+        }
       </div>
 
-      {/* Public Records Tracker */}
-      <PublicRecordsTracker />
-
-      {/* Community reports */}
-      <div className="watch-reports">
-        <h3 className="watch-reports-heading">
-          Community Reports
-          {reports.length > 0 && <span className="watch-reports-count"> ({reports.length})</span>}
-        </h3>
-        {reportsLoading ? (
-          <div className="spinner" />
-        ) : reports.length === 0 ? (
-          <p className="empty">No community reports yet. Document what you observe — permit activity, demolitions, LLC signage on vacant land.</p>
-        ) : (
-          <div className="watch-report-list">
-            {reports.map(r => (
-              <WatchReportCard
-                key={r.id}
-                report={r}
-                highlighted={!!highlightedIds?.has(r.id)}
-              />
+      {/* Community-submitted land records */}
+      <div className="land-records-section">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', marginBottom: '.75rem' }}>
+          <h3 className="watch-reports-heading" style={{ margin: 0 }}>
+            Submitted Records
+            {landRecords.length > 0 && <span className="watch-reports-count"> ({landRecords.length})</span>}
+          </h3>
+          <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap' }}>
+            <button className={`filter-tab${!recordFilter ? ' active' : ''}`} onClick={() => setRecordFilter('')} style={{ fontSize: '.75rem', padding: '.2rem .55rem' }}>All</button>
+            {LAND_RECORD_TYPES.map(t => (
+              <button key={t.value}
+                className={`filter-tab${recordFilter === t.value ? ' active' : ''}`}
+                style={{ fontSize: '.75rem', padding: '.2rem .55rem' }}
+                onClick={() => setRecordFilter(recordFilter === t.value ? '' : t.value)}>
+                {t.label}
+              </button>
             ))}
           </div>
-        )}
+        </div>
+        <p style={{ fontSize: '.8rem', color: 'var(--muted)', marginBottom: '.85rem', lineHeight: 1.4 }}>
+          Public records submitted by community members from courthouse documents, Alabama GIS Hub, and planning commission agendas.
+          These records feed the AI analysis above.
+        </p>
+        {recordsLoading ? <div className="spinner" /> :
+          filteredRecords.length === 0 ? (
+            <p className="empty">
+              {landRecords.length === 0
+                ? 'No records submitted yet. Use "Submit Property Record" to document transfers, annexations, zoning changes, or planning decisions you find.'
+                : 'No records match this filter.'}
+            </p>
+          ) : (
+            <div className="land-record-list">
+              {filteredRecords.map(r => (
+                <LandRecordCard
+                  key={r.id}
+                  record={r}
+                  isAdmin={isAdmin}
+                  onVerify={handleVerifyRecord}
+                  onDelete={handleDeleteRecord}
+                />
+              ))}
+            </div>
+          )
+        }
       </div>
 
+      {/* Reliable data sources reference */}
+      <DataSourcesPanel />
+
+      {/* PRR tracker */}
+      <PRRTracker isAdmin={isAdmin} token={token} />
+
+      {/* Community watch reports */}
+      <div className="watch-reports">
+        <h3 className="watch-reports-heading">
+          Community Watch Reports
+          {watchReports.length > 0 && <span className="watch-reports-count"> ({watchReports.length})</span>}
+        </h3>
+        {watchLoading ? <div className="spinner" /> :
+          watchReports.length === 0 ? (
+            <p className="empty">No watch reports yet. Use "Submit Watch Report" to document what you observe on the ground.</p>
+          ) : (
+            <div className="watch-report-list">
+              {watchReports.map(r => (
+                <WatchReportCard key={r.id} report={r} highlighted={!!highlightedIds?.has(r.id)} />
+              ))}
+            </div>
+          )
+        }
+      </div>
+
+      {showRecordForm && (
+        <SubmitLandRecordModal
+          token={token}
+          onClose={() => setShowRecordForm(false)}
+          onCreated={record => { setLandRecords(prev => [record, ...prev]); setShowRecordForm(false); }}
+        />
+      )}
       {showForm && dashboard && (
         <WatchReportModal
           dashboard={dashboard}
           token={token}
           onClose={() => setShowForm(false)}
-          onCreated={report => { setReports(prev => [report, ...prev]); setShowForm(false); }}
+          onCreated={report => { setWatchReports(prev => [report, ...prev]); setShowForm(false); }}
         />
       )}
     </>

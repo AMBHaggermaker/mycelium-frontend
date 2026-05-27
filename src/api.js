@@ -145,8 +145,18 @@ export default {
   resetPassword:        (data)          => post('/auth/reset-password', data),
 
   // Watch
-  getLandIntelReports:    ()             => get('/watch/land-intelligence/reports'),
+  getLandIntelReports:    (params)       => get(`/watch/land-intelligence/reports${qs(params)}`),
   triggerLandIntelligence:(token)        => post('/watch/land-intelligence/trigger', {}, token),
+  // Land records (community submissions)
+  getLandRecords:         (params)       => get(`/watch/land-intelligence/records${qs(params)}`),
+  submitLandRecord:       (data, token)  => post('/watch/land-intelligence/records', data, token),
+  verifyLandRecord:       (id, token)    => patch(`/watch/land-intelligence/records/${id}/verify`, {}, token),
+  deleteLandRecord:       (id, token)    => del(`/watch/land-intelligence/records/${id}`, token),
+  // Public Records Requests
+  getPRR:                 ()             => get('/watch/land-intelligence/prr'),
+  createPRR:              (data, token)  => post('/watch/land-intelligence/prr', data, token),
+  updatePRR:              (id, d, token) => patch(`/watch/land-intelligence/prr/${id}`, d, token),
+  deletePRR:              (id, token)    => del(`/watch/land-intelligence/prr/${id}`, token),
   getWatchReports:   (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),
   getWatchAnomalies: (params)            => get(`/watch/anomalies${qs(params)}`),
   getAdminWatchAnomalies: (token)        => get('/admin/watch-anomalies', token),
