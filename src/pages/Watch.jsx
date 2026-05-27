@@ -421,12 +421,6 @@ const DATA_SOURCES = [
     tag:  'GIS',
   },
   {
-    name: 'Huntsville Open Data Portal',
-    url:  'https://data.huntsvilleai.gov',
-    note: 'Planning approvals, building permits, and zoning data',
-    tag:  'Open Data',
-  },
-  {
     name: 'EPA ECHO — environmental permits',
     url:  'https://echo.epa.gov',
     note: 'Facility permits and compliance records — integrated into AI analysis automatically',
@@ -437,12 +431,6 @@ const DATA_SOURCES = [
     url:  'https://www.sos.alabama.gov/government-records/business-entity-records',
     note: 'Registered agents and member names for any Alabama LLC',
     tag:  'SOS',
-  },
-  {
-    name: 'Huntsville Board of Zoning Adjustment',
-    url:  'https://www.huntsvilleal.gov/government/boards-committees/board-of-zoning-adjustment/',
-    note: 'Variance requests — public hearings posted 15 days in advance',
-    tag:  'BZA',
   },
   {
     name: 'City Clerk — annexation petitions',
@@ -1051,8 +1039,11 @@ function DataSourcesPanel() {
         <span className="watch-dashboard-icon" style={{ fontSize: '1rem' }}>🔗</span>
         <h3 className="watch-dashboard-title" style={{ fontSize: '.95rem', margin: 0 }}>Reliable Data Sources</h3>
       </div>
-      <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: '.75rem' }}>
+      <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: '.35rem' }}>
         Use these sources to find records to submit above. The AI analyzes what the community submits — no unreliable scraping.
+      </p>
+      <p style={{ fontSize: '.78rem', color: 'var(--amber)', background: 'var(--amber-bg)', border: '1px solid var(--amber)', borderRadius: 'var(--radius-sm)', padding: '.45rem .65rem', marginBottom: '.75rem', lineHeight: 1.5 }}>
+        Public records sources are verified periodically — some government websites have limited availability. Submit records you find directly using the form below.
       </p>
       <div className="public-records-list">
         {DATA_SOURCES.map((src, i) => (
