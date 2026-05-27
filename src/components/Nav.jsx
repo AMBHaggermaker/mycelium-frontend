@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
+import api from '../api';
 
 const BOTTOM_TABS = [
   { to: '/',        end: true, icon: '⚡', label: 'Hotlight' },
@@ -10,10 +11,25 @@ const BOTTOM_TABS = [
 ];
 
 export default function Nav({ onAuthOpen, onInviteOpen }) {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const navigate = useNavigate();
   const isMod = user?.role === 'moderator' || user?.role === 'admin';
   const [meOpen, setMeOpen] = useState(false);
+  const [unreadDMs, setUnreadDMs] = useState(0);
+
+  // Poll unread DM count
+  useEffect(() => {
+    if (!user || !token) { setUnreadDMs(0); return; }
+    let cancelled = false;
+    function fetchUnread() {
+      api.getUnreadCount(token)
+        .then(res => { if (!cancelled) setUnreadDMs(res.count || 0); })
+        .catch(() => {});
+    }
+    fetchUnread();
+    const t = setInterval(fetchUnread, 30000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [user, token]);
 
   function handleLogout() {
     setMeOpen(false);
@@ -47,6 +63,9 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
             <NavLink to="/watch" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Watch
             </NavLink>
+            <NavLink to="/advocate" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              Advocate
+            </NavLink>
             <NavLink to="/merch" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Merch
             </NavLink>
@@ -62,6 +81,9 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
           <div className="nav-auth">
             {user ? (
               <>
+                <NavLink to="/messages" className={({ isActive }) => 'nav-link nav-messages-link' + (isActive ? ' active' : '')}>
+                  Messages{unreadDMs > 0 && <span className="nav-unread-badge">{unreadDMs}</span>}
+                </NavLink>
                 <button className="btn btn-outline btn-sm nav-invite-btn" onClick={onInviteOpen}>
                   + Invite
                 </button>
@@ -108,7 +130,12 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
               onClick={() => setMeOpen(o => !o)}
               aria-label="Account menu"
             >
-              <span className="bottom-tab-icon">👤</span>
+              <span className="bottom-tab-icon" style={{ position: 'relative' }}>
+                👤
+                {unreadDMs > 0 && (
+                  <span className="bottom-tab-unread-dot" aria-label={`${unreadDMs} unread messages`} />
+                )}
+              </span>
               <span className="bottom-tab-label">Me</span>
             </button>
           ) : (
@@ -131,6 +158,13 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
             <nav className="me-sheet-nav">
               <button className="me-sheet-item" onClick={() => handleNavigate(`/profile/${user?.id}`)}>
                 <span className="me-sheet-item-icon">⬡</span> My Profile
+              </button>
+              <button className="me-sheet-item" onClick={() => handleNavigate('/messages')}>
+                <span className="me-sheet-item-icon">✉</span> Messages
+                {unreadDMs > 0 && <span className="nav-unread-badge" style={{ marginLeft: '.5rem' }}>{unreadDMs}</span>}
+              </button>
+              <button className="me-sheet-item" onClick={() => handleNavigate('/advocate')}>
+                <span className="me-sheet-item-icon">⚖</span> Advocate
               </button>
               <button className="me-sheet-item" onClick={() => handleNavigate('/settings')}>
                 <span className="me-sheet-item-icon">⚙</span> Settings

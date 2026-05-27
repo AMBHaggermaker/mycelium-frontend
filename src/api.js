@@ -56,10 +56,12 @@ export default {
   getCircleThreads: (id)              => get(`/circles/${id}/threads`),
 
   // Users
-  getUser:        (id)                => get(`/users/${id}`),
-  updateUser:     (id, data, token)   => patch(`/users/${id}`, data, token),
-  getUserPosts:   (id, params)        => get(`/users/${id}/posts${qs(params)}`),
-  getUserCircles: (id)                => get(`/users/${id}/circles`),
+  getUser:            (id)                => get(`/users/${id}`),
+  updateUser:         (id, data, token)   => patch(`/users/${id}`, data, token),
+  getUserPosts:       (id, params)        => get(`/users/${id}/posts${qs(params)}`),
+  getUserCircles:     (id)                => get(`/users/${id}/circles`),
+  declareVeteran:     (id, data, token)   => patch(`/users/${id}/declare-veteran`, data, token),
+  vouchVeteran:       (id, token)         => post(`/users/${id}/vouch-veteran`, {}, token),
 
   // Reservations
   createReservation: (data, token)    => post('/reservations', data, token),
@@ -143,6 +145,61 @@ export default {
   verifyEmailChange:    (changeToken)   => get(`/auth/verify-email-change?token=${encodeURIComponent(changeToken)}`),
   forgotPassword:       (data)          => post('/auth/forgot-password', data),
   resetPassword:        (data)          => post('/auth/reset-password', data),
+
+  // Advocate
+  getAdvocateCases:       (token)           => get('/advocate/cases', token),
+  createAdvocateCase:     (data, token)     => post('/advocate/cases', data, token),
+  getAdvocateCase:        (id, token)       => get(`/advocate/cases/${id}`, token),
+  updateAdvocateCase:     (id, data, token) => patch(`/advocate/cases/${id}`, data, token),
+  deleteAdvocateCase:     (id, token)       => del(`/advocate/cases/${id}`, token),
+  addCaseTimeline:        (id, data, token) => patch(`/advocate/cases/${id}/timeline`, data, token),
+  uploadCaseEvidence:     (id, file, token) => {
+    const form = new FormData();
+    form.append('file', file);
+    return fetch(`${BASE}/advocate/cases/${id}/evidence`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    }).then(async res => {
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      return data;
+    });
+  },
+  getAdvocatePatterns:    (params)          => get(`/advocate/patterns${qs(params)}`),
+  getAdvocatePattern:     (id)              => get(`/advocate/patterns/${id}`),
+  submitPatternResponse:  (id, data)        => post(`/advocate/patterns/${id}/response`, data),
+  getMoralInjuryReports:  (token)           => get('/advocate/moral-injury', token),
+  submitMoralInjury:      (data, token)     => post('/advocate/moral-injury', data, token),
+
+  // Direct Messages
+  getUnreadCount:         (token)           => get('/messages/unread-count', token),
+  getConversations:       (token)           => get('/messages/conversations', token),
+  getThread:              (userId, token)   => get(`/messages/${userId}`, token),
+  sendMessage:            (userId, data, token) => post(`/messages/${userId}`, data, token),
+  reportMessage:          (msgId, data, token)  => post(`/messages/${msgId}/report`, data, token),
+  getBlockedUsers:        (token)           => get('/messages/blocked', token),
+  blockUser:              (userId, token)   => post(`/messages/block/${userId}`, {}, token),
+  unblockUser:            (userId, token)   => del(`/messages/block/${userId}`, token),
+
+  // Schools
+  getSchools:             ()                => get('/schools'),
+  createSchool:           (data, token)     => post('/schools', data, token),
+  getSchool:              (id)              => get(`/schools/${id}`),
+  updateSchool:           (id, data, token) => patch(`/schools/${id}`, data, token),
+  getSchoolPosts:         (id, params)      => get(`/schools/${id}/posts${qs(params)}`),
+  createSchoolPost:       (id, form, token) =>
+    fetch(`${BASE}/schools/${id}/posts`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    }).then(async res => {
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      if (!res.ok) throw new Error(data.error || 'Post failed');
+      return data;
+    }),
+  deleteSchoolPost:       (schoolId, postId, token) => del(`/schools/${schoolId}/posts/${postId}`, token),
+  getSchoolLostFound:     ()                => get('/schools/lost-found/all'),
 
   // Atmospheric observations
   getAtmosphericObservations: (params)        => get(`/watch/atmospheric/observations${qs(params)}`),

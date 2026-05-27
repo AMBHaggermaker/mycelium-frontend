@@ -14,6 +14,8 @@ import Settings from './pages/Settings';
 import EmailVerifyPage from './pages/EmailVerifyPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PostDetailPage from './pages/PostDetailPage';
+import Advocate from './pages/Advocate';
+import Messages from './pages/Messages';
 import AuthModal from './components/AuthModal';
 import InviteModal from './components/InviteModal';
 import { useAuth } from './auth';
@@ -98,6 +100,8 @@ export default function App() {
         <Route path="/verify-email"    element={<EmailVerifyPage />} />
         <Route path="/reset-password"  element={<ResetPasswordPage />} />
         <Route path="/posts/:id"       element={<PostDetailPage onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/advocate"        element={<Advocate onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/messages"        element={<Messages onRequireAuth={() => setAuthOpen(true)} />} />
       </Routes>
       {authOpen   && <AuthModal onClose={() => setAuthOpen(false)} />}
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
