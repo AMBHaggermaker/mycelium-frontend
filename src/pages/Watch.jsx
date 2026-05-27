@@ -27,7 +27,7 @@ const REPORT_TYPES = {
   food:            ['farmland contamination','spray drift','CAFO runoff','discharge','other'],
   surveillance:    ['ALPR/Flock camera','facial recognition','cell tower','drone','other'],
   civic:           ['pothole response time','budget concern','development approval','other'],
-  land_development:['commercial development approval','residential subdivision','annexation filing','zoning change request','demolition permit','historic property change','LLC property acquisition','bulk property purchase','agricultural land conversion','other'],
+  land_development:['commercial development approval','residential subdivision','annexation filing','zoning change request','demolition permit','historic property change','LLC property acquisition','bulk property purchase','agricultural land conversion','easement','eminent domain','probate/property abuse','other'],
   atmospheric_observations:['persistent_contrail','grid_pattern','low_altitude_trail','no_corresponding_flight','unusual_spray_pattern','other'],
 };
 
@@ -263,9 +263,52 @@ function WatchReportCard({ report, highlighted }) {
           ))}
         </div>
       )}
+      {report.soil_test && (
+        <div className="watch-soil-test">
+          <div className="watch-soil-test-header">
+            <span className="watch-soil-test-icon">🧪</span>
+            <strong className="watch-soil-test-title">Lab Results</strong>
+            {report.soil_test.sample_type && (
+              <span className="watch-soil-test-type">{report.soil_test.sample_type.replace(/_/g, ' ')}</span>
+            )}
+            {report.soil_test.lab_name && (
+              <span className="watch-soil-test-lab">{report.soil_test.lab_name}</span>
+            )}
+            {report.soil_test.collection_date && (
+              <span className="watch-soil-test-date">
+                {new Date(report.soil_test.collection_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            )}
+          </div>
+          {report.soil_test.compounds_tested?.length > 0 && (
+            <div className="watch-soil-test-compounds">
+              {report.soil_test.compounds_tested.map(c => {
+                const res = report.soil_test.results?.[c];
+                return (
+                  <div key={c} className="watch-soil-compound-pill">
+                    <span className="watch-soil-compound-name">{c}</span>
+                    {res?.value && (
+                      <span className="watch-soil-compound-val">{res.value} {res.unit || 'ppb'}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {report.soil_test.lab_report_url && (
+            <a href={`https://mycelium.unprecedentedtimes.org${report.soil_test.lab_report_url}`}
+              target="_blank" rel="noopener noreferrer" className="watch-soil-test-pdf">
+              View Lab Report PDF →
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
+const LAB_COMPOUNDS = ['aluminum','barium','strontium','silver','PFAS','lead','nitrates','coliform','other'];
+const LAB_DASHBOARDS = new Set(['environment','food']);
 
 function WatchReportModal({ dashboard, token, onClose, onCreated }) {
   const [title,         setTitle]         = useState('');
@@ -278,13 +321,39 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
   const [err,           setErr]           = useState(null);
   const [busy,          setBusy]          = useState(false);
 
-  const reportTypes = REPORT_TYPES[dashboard.id] || [];
-  const selectedSev = SEVERITY_OPTIONS.find(s => s.value === severity);
+  // Lab results state
+  const [showLab,         setShowLab]         = useState(false);
+  const [labSampleType,   setLabSampleType]   = useState('');
+  const [labCollDate,     setLabCollDate]      = useState('');
+  const [labName,         setLabName]         = useState('');
+  const [labCompounds,    setLabCompounds]    = useState(new Set());
+  const [labResults,      setLabResults]      = useState({});
+  const [labReportFile,   setLabReportFile]   = useState(null);
+
+  const reportTypes   = REPORT_TYPES[dashboard.id] || [];
+  const selectedSev   = SEVERITY_OPTIONS.find(s => s.value === severity);
+  const supportsLab   = LAB_DASHBOARDS.has(dashboard.id);
 
   function handlePhotos(e) {
     const files = Array.from(e.target.files);
     e.target.value = '';
     setPhotos(prev => [...prev, ...files].slice(0, 5));
+  }
+
+  function toggleCompound(c) {
+    setLabCompounds(prev => {
+      const next = new Set(prev);
+      if (next.has(c)) { next.delete(c); setLabResults(r => { const n = {...r}; delete n[c]; return n; }); }
+      else next.add(c);
+      return next;
+    });
+  }
+
+  function setResult(compound, field, value) {
+    setLabResults(prev => ({
+      ...prev,
+      [compound]: { ...(prev[compound] || { value: '', unit: 'ppb' }), [field]: value },
+    }));
   }
 
   async function submit(e) {
@@ -301,6 +370,17 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
       if (sourceUrl)     form.append('source_url', sourceUrl);
       if (reportType)    form.append('report_type', reportType);
       photos.forEach(f => form.append('photos', f));
+
+      // Lab results
+      if (supportsLab && showLab && labSampleType) {
+        form.append('lab_sample_type', labSampleType);
+        if (labCollDate)    form.append('lab_collection_date', labCollDate);
+        if (labName)        form.append('lab_name', labName);
+        form.append('lab_compounds', JSON.stringify([...labCompounds]));
+        form.append('lab_results',   JSON.stringify(labResults));
+        if (labReportFile)  form.append('lab_report', labReportFile);
+      }
+
       const report = await api.submitWatchReport(dashboard.id, form, token);
       onCreated(report);
     } catch (e) {
@@ -398,6 +478,88 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
               </div>
             )}
           </div>
+
+          {supportsLab && (
+            <div className="lab-section">
+              <button type="button" className="lab-toggle" onClick={() => setShowLab(v => !v)}>
+                <span className="lab-toggle-icon">🧪</span>
+                <span>Lab Results {showLab ? '▲' : '▼'}</span>
+                <span className="lab-toggle-optional">optional</span>
+              </button>
+              {showLab && (
+                <div className="lab-body">
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label className="form-label">Sample Type <span className="form-required">*</span></label>
+                      <select className="form-select" value={labSampleType} onChange={e => setLabSampleType(e.target.value)}>
+                        <option value="">— Select —</option>
+                        <option value="soil_surface">Soil — Surface</option>
+                        <option value="soil_deep">Soil — Deep</option>
+                        <option value="rainwater">Rainwater</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Collection Date</label>
+                      <input className="form-input" type="date" value={labCollDate} onChange={e => setLabCollDate(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Lab Name</label>
+                    <input className="form-input" value={labName} onChange={e => setLabName(e.target.value)}
+                      placeholder="Name of testing laboratory" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Compounds Tested</label>
+                    <div className="lab-compound-grid">
+                      {LAB_COMPOUNDS.map(c => (
+                        <label key={c} className={`lab-compound-check${labCompounds.has(c) ? ' checked' : ''}`}>
+                          <input type="checkbox" checked={labCompounds.has(c)} onChange={() => toggleCompound(c)} />
+                          {c}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {labCompounds.size > 0 && (
+                    <div className="form-group">
+                      <label className="form-label">Results</label>
+                      <div className="lab-results-inputs">
+                        {[...labCompounds].map(c => (
+                          <div key={c} className="lab-result-row">
+                            <span className="lab-result-name">{c}</span>
+                            <input
+                              className="form-input lab-result-value"
+                              type="number" step="any" min="0"
+                              placeholder="value"
+                              value={labResults[c]?.value || ''}
+                              onChange={e => setResult(c, 'value', e.target.value)}
+                            />
+                            <select
+                              className="form-select lab-result-unit"
+                              value={labResults[c]?.unit || 'ppb'}
+                              onChange={e => setResult(c, 'unit', e.target.value)}
+                            >
+                              <option value="ppb">ppb</option>
+                              <option value="ppm">ppm</option>
+                              <option value="mg/L">mg/L</option>
+                              <option value="cfu/100mL">cfu/100mL</option>
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="form-group">
+                    <label className="form-label">Lab Report PDF</label>
+                    <input type="file" accept="application/pdf,.pdf" className="form-input"
+                      onChange={e => setLabReportFile(e.target.files[0] || null)} />
+                    {labReportFile && <p style={{ fontSize: '.77rem', color: 'var(--muted)', marginTop: '.2rem' }}>{labReportFile.name}</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {err && <p className="form-error">{err}</p>}
           <button className="btn btn-primary btn-full" disabled={busy}>
             {busy ? '…' : 'Submit Report'}

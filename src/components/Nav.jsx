@@ -66,6 +66,9 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
             <NavLink to="/advocate" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Advocate
             </NavLink>
+            <a href="https://unprecedentedtimes.org/the-mycelium-covenant" className="nav-link nav-link-covenant" target="_blank" rel="noopener noreferrer">
+              Covenant
+            </a>
             <NavLink to="/merch" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Merch
             </NavLink>
@@ -172,6 +175,15 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
               <button className="me-sheet-item" onClick={() => { setMeOpen(false); onInviteOpen(); }}>
                 <span className="me-sheet-item-icon">+</span> Invite Someone
               </button>
+              <a
+                className="me-sheet-item me-sheet-item--covenant"
+                href="https://unprecedentedtimes.org/the-mycelium-covenant"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMeOpen(false)}
+              >
+                <span className="me-sheet-item-icon">⬡</span> The Mycelium Covenant
+              </a>
               <a
                 className="me-sheet-item"
                 href="https://lostfound.unprecedentedtimes.org"

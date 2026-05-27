@@ -48,6 +48,9 @@ export default function Feed({ onRequireAuth }) {
   const [err,             setErr]             = useState(null);
   const [showNew,         setShowNew]         = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [covenantDismissed, setCovenantDismissed] = useState(
+    () => typeof localStorage !== 'undefined' && localStorage.getItem('covenant_banner_dismissed') === '1'
+  );
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
@@ -124,6 +127,37 @@ export default function Feed({ onRequireAuth }) {
         </div>
 
         <UrgentStrip />
+
+        {/* Covenant banner */}
+        {!covenantDismissed && (
+          <div className="covenant-banner">
+            <div className="covenant-banner-body">
+              <span className="covenant-banner-icon">⬡</span>
+              <div>
+                <strong className="covenant-banner-title">The Mycelium Covenant</strong>
+                <p className="covenant-banner-desc">The principles this community is built on</p>
+              </div>
+              <a
+                href="https://unprecedentedtimes.org/the-mycelium-covenant"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-sm btn-primary covenant-banner-btn"
+              >
+                Read &amp; Agree
+              </a>
+              <button
+                className="covenant-banner-dismiss"
+                onClick={() => {
+                  setCovenantDismissed(true);
+                  localStorage.setItem('covenant_banner_dismissed', '1');
+                }}
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Feed sub-tabs */}
         <div className="feed-subtabs">
