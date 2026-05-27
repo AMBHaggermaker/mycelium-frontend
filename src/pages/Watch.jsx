@@ -1731,11 +1731,14 @@ const CLASSIFICATION_STYLES = {
 function ClassificationBadge({ classification }) {
   const s = CLASSIFICATION_STYLES[classification] || CLASSIFICATION_STYLES.pending;
   return (
-    <span style={{
-      fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
-      padding: '.12rem .5rem', borderRadius: 99, background: s.bg, color: s.color,
-      border: `1px solid ${s.border}`, whiteSpace: 'nowrap',
-    }}>
+    <span
+      className={classification === 'unidentified' ? 'atmos-badge-unidentified' : undefined}
+      style={{
+        fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
+        padding: '.12rem .5rem', borderRadius: 99, background: s.bg, color: s.color,
+        border: `1px solid ${s.border}`, whiteSpace: 'nowrap',
+      }}
+    >
       {s.label}
     </span>
   );
