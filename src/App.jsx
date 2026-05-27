@@ -13,9 +13,11 @@ import InvitePage from './pages/InvitePage';
 import Settings from './pages/Settings';
 import EmailVerifyPage from './pages/EmailVerifyPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import PostDetailPage from './pages/PostDetailPage';
 import AuthModal from './components/AuthModal';
 import InviteModal from './components/InviteModal';
 import { useAuth } from './auth';
+import api from './api';
 
 function CriticalAnomalyBanner() {
   const { user } = useAuth();
@@ -45,6 +47,17 @@ function CriticalAnomalyBanner() {
     sessionStorage.setItem('critical_anomaly_dismissed', '1');
   }
 
+  const dashboards = anomaly.dashboard_types || [];
+  const reports    = anomaly.affected_reports || [];
+  let watchHref;
+  if (dashboards.length === 1) {
+    const params = new URLSearchParams({ tab: dashboards[0] });
+    if (reports.length > 0) params.set('highlight', reports.join(','));
+    watchHref = `/watch?${params.toString()}`;
+  } else {
+    watchHref = '/watch?tab=anomalies';
+  }
+
   return (
     <div className="critical-anomaly-banner">
       <span className="critical-anomaly-banner-text">
@@ -52,7 +65,7 @@ function CriticalAnomalyBanner() {
           ? anomaly.description.slice(0, 120) + '…'
           : anomaly.description}
       </span>
-      <Link to="/watch" className="critical-anomaly-banner-link" onClick={() => sessionStorage.setItem('watch_tab', 'anomalies')}>
+      <Link to={watchHref} className="critical-anomaly-banner-link">
         View in Watch →
       </Link>
       <button className="critical-anomaly-banner-close" onClick={dismiss} aria-label="Dismiss">✕</button>
@@ -84,6 +97,7 @@ export default function App() {
         <Route path="/settings"        element={<Settings />} />
         <Route path="/verify-email"    element={<EmailVerifyPage />} />
         <Route path="/reset-password"  element={<ResetPasswordPage />} />
+        <Route path="/posts/:id"       element={<PostDetailPage onRequireAuth={() => setAuthOpen(true)} />} />
       </Routes>
       {authOpen   && <AuthModal onClose={() => setAuthOpen(false)} />}
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}

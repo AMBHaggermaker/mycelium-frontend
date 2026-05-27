@@ -36,8 +36,11 @@ export default {
   restoreAccount:  (userId, data)     => post(`/auth/restore/${userId}`, data),
 
   // Posts
-  getPosts:   (params, token)         => get(`/posts${qs(params)}`, token),
-  getPost:    (id, token)             => get(`/posts/${id}`, token),
+  getPosts:           (params, token)  => get(`/posts${qs(params)}`, token),
+  getPost:            (id, token)      => get(`/posts/${id}`, token),
+  getPostComments:    (id)             => get(`/posts/${id}/comments`),
+  addPostComment:     (id, data, token)=> post(`/posts/${id}/comments`, data, token),
+  getMyReservation:   (id, token)      => get(`/posts/${id}/my-reservation`, token),
   createPost: (data, token)           => post('/posts', data, token),
   updatePost: (id, data, token)       => patch(`/posts/${id}`, data, token),
   deletePost: (id, token)             => del(`/posts/${id}`, token),
@@ -142,6 +145,8 @@ export default {
   resetPassword:        (data)          => post('/auth/reset-password', data),
 
   // Watch
+  getLandIntelReports:    ()             => get('/watch/land-intelligence/reports'),
+  triggerLandIntelligence:(token)        => post('/watch/land-intelligence/trigger', {}, token),
   getWatchReports:   (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),
   getWatchAnomalies: (params)            => get(`/watch/anomalies${qs(params)}`),
   getAdminWatchAnomalies: (token)        => get('/admin/watch-anomalies', token),

@@ -1,27 +1,32 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 
+const VALID_TABS = ['infrastructure','environment','housing','health','watershed','food','surveillance','civic','land_development','anomalies'];
+
 const DASHBOARDS = [
-  { id: 'infrastructure', label: 'Infrastructure', icon: '🏗️', description: 'Roads, bridges, utilities, public facilities, and city infrastructure conditions.' },
-  { id: 'environment',    label: 'Environment',    icon: '🌿', description: 'Air quality, pollution, illegal dumping, toxic sites, and environmental hazards.' },
-  { id: 'housing',        label: 'Housing',        icon: '🏠', description: 'Vacant lots, code violations, slumlords, displacement, and affordable housing conditions.' },
-  { id: 'health',         label: 'Health',         icon: '🏥', description: 'Disease patterns, clinic access, hospital conditions, and public health concerns.' },
-  { id: 'watershed',      label: 'Watershed',      icon: '💧', description: 'Creek contamination, wetland destruction, industrial runoff, and land use changes.' },
-  { id: 'food',           label: 'Food & Ag',      icon: '🌾', description: 'Food deserts, grocery access, farmland threats, and agricultural contamination.' },
-  { id: 'surveillance',   label: 'Surveillance',   icon: '📡', description: 'Camera installations, license plate readers, facial recognition, and surveillance infrastructure.' },
-  { id: 'civic',          label: 'Civic',          icon: '🏛️', description: 'Local government actions, policy decisions, zoning changes, and civic accountability.' },
+  { id: 'infrastructure',  label: 'Infrastructure',   icon: '🏗️', description: 'Roads, bridges, utilities, public facilities, and city infrastructure conditions.' },
+  { id: 'environment',     label: 'Environment',      icon: '🌿', description: 'Air quality, pollution, illegal dumping, toxic sites, and environmental hazards.' },
+  { id: 'housing',         label: 'Housing',          icon: '🏠', description: 'Vacant lots, code violations, slumlords, displacement, and affordable housing conditions.' },
+  { id: 'health',          label: 'Health',           icon: '🏥', description: 'Disease patterns, clinic access, hospital conditions, and public health concerns.' },
+  { id: 'watershed',       label: 'Watershed',        icon: '💧', description: 'Creek contamination, wetland destruction, industrial runoff, and land use changes.' },
+  { id: 'food',            label: 'Food & Ag',        icon: '🌾', description: 'Food deserts, grocery access, farmland threats, and agricultural contamination.' },
+  { id: 'surveillance',    label: 'Surveillance',     icon: '📡', description: 'Camera installations, license plate readers, facial recognition, and surveillance infrastructure.' },
+  { id: 'civic',           label: 'Civic',            icon: '🏛️', description: 'Local government actions, policy decisions, zoning changes, and civic accountability.' },
+  { id: 'land_development',label: 'Land Development', icon: '🗺️', description: 'Property transfers, LLC acquisitions, annexation filings, rezoning requests, and displacement risk tracking.' },
 ];
 
 const REPORT_TYPES = {
-  infrastructure: ['bridge/overpass','road/pothole','retaining wall','drainage','signage','utility','other'],
-  environment:    ['water contamination','air quality','soil contamination','EMF/RF','atmospheric','other'],
-  housing:        ['mold','structural','no heat/AC','pest infestation','electrical','plumbing','code violation','other'],
-  health:         ['respiratory illness','GI illness','MRSA/skin infection','neurological','wildlife disease','tick exposure','other'],
-  watershed:      ['development near water','flooding','erosion','impervious surface','other'],
-  food:           ['farmland contamination','spray drift','CAFO runoff','discharge','other'],
-  surveillance:   ['ALPR/Flock camera','facial recognition','cell tower','drone','other'],
-  civic:          ['pothole response time','budget concern','development approval','other'],
+  infrastructure:  ['bridge/overpass','road/pothole','retaining wall','drainage','signage','utility','other'],
+  environment:     ['water contamination','air quality','soil contamination','EMF/RF','atmospheric','other'],
+  housing:         ['mold','structural','no heat/AC','pest infestation','electrical','plumbing','code violation','other'],
+  health:          ['respiratory illness','GI illness','MRSA/skin infection','neurological','wildlife disease','tick exposure','mental illness','mental health crisis','suicide risk','substance abuse crisis','domestic violence','other'],
+  watershed:       ['development near water','flooding','erosion','impervious surface','other'],
+  food:            ['farmland contamination','spray drift','CAFO runoff','discharge','other'],
+  surveillance:    ['ALPR/Flock camera','facial recognition','cell tower','drone','other'],
+  civic:           ['pothole response time','budget concern','development approval','other'],
+  land_development:['commercial development approval','residential subdivision','annexation filing','zoning change request','demolition permit','historic property change','LLC property acquisition','bulk property purchase','agricultural land conversion','other'],
 };
 
 const SEVERITY_OPTIONS = [
@@ -59,7 +64,22 @@ function SeverityBadge({ severity, style = {} }) {
 }
 
 export default function Watch({ onRequireAuth }) {
-  const [active, setActive] = useState('infrastructure');
+  const location = useLocation();
+
+  function tabFromSearch(search) {
+    const t = new URLSearchParams(search).get('tab');
+    return VALID_TABS.includes(t) ? t : 'infrastructure';
+  }
+
+  const [active, setActive] = useState(() => tabFromSearch(location.search));
+
+  useEffect(() => {
+    setActive(tabFromSearch(location.search));
+  }, [location.search]);
+
+  const highlightParam = new URLSearchParams(location.search).get('highlight');
+  const highlightedIds = new Set(highlightParam ? highlightParam.split(',').filter(Boolean) : []);
+
   const dashboard = DASHBOARDS.find(d => d.id === active);
 
   return (
@@ -94,11 +114,18 @@ export default function Watch({ onRequireAuth }) {
 
         {active === 'anomalies' ? (
           <AnomaliesView />
+        ) : active === 'land_development' ? (
+          <LandDevelopmentDashboard
+            dashboard={DASHBOARDS.find(d => d.id === 'land_development')}
+            onRequireAuth={onRequireAuth}
+            highlightedIds={highlightedIds}
+          />
         ) : dashboard ? (
           <WatchDashboard
             key={dashboard.id}
             dashboard={dashboard}
             onRequireAuth={onRequireAuth}
+            highlightedIds={highlightedIds}
           />
         ) : null}
       </div>
@@ -106,7 +133,7 @@ export default function Watch({ onRequireAuth }) {
   );
 }
 
-function WatchDashboard({ dashboard, onRequireAuth }) {
+function WatchDashboard({ dashboard, onRequireAuth, highlightedIds }) {
   const { user, token } = useAuth();
   const [reports,  setReports]  = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -119,6 +146,16 @@ function WatchDashboard({ dashboard, onRequireAuth }) {
       .catch(() => setReports([]))
       .finally(() => setLoading(false));
   }, [dashboard.id]);
+
+  useEffect(() => {
+    if (loading || !highlightedIds?.size) return;
+    const first = reports.find(r => highlightedIds.has(r.id));
+    if (!first) return;
+    setTimeout(() => {
+      document.getElementById(`report-${first.id}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+  }, [loading]);
 
   function handleSubmitReport() {
     if (!user) { onRequireAuth?.(); return; }
@@ -154,7 +191,13 @@ function WatchDashboard({ dashboard, onRequireAuth }) {
           <p className="empty">No reports yet for this dashboard. Be the first to document what you see.</p>
         ) : (
           <div className="watch-report-list">
-            {reports.map(r => <WatchReportCard key={r.id} report={r} />)}
+            {reports.map(r => (
+              <WatchReportCard
+                key={r.id}
+                report={r}
+                highlighted={!!highlightedIds?.has(r.id)}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -171,11 +214,14 @@ function WatchDashboard({ dashboard, onRequireAuth }) {
   );
 }
 
-function WatchReportCard({ report }) {
+function WatchReportCard({ report, highlighted }) {
   const date = new Date(report.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   return (
-    <div className="watch-report-card">
+    <div
+      id={`report-${report.id}`}
+      className={`watch-report-card${highlighted ? ' watch-report-highlighted' : ''}`}
+    >
       <div className="watch-report-card-header">
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
@@ -351,6 +397,234 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
         </form>
       </div>
     </div>
+  );
+}
+
+// ── Land Development dashboard ───────────────────────────────────────────────
+
+const LAND_REPORT_TYPE_LABELS = {
+  displacement_risk:       'Displacement Risk',
+  llc_acquisition_pattern: 'LLC Acquisition Pattern',
+  zoning_change_request:   'Zoning Change Request',
+  annexation_activity:     'Annexation Activity',
+  bulk_purchase_pattern:   'Bulk Purchase Pattern',
+  agricultural_conversion: 'Agricultural Conversion',
+  property_transfer_cluster: 'Property Transfer Cluster',
+};
+
+const PUBLIC_RECORDS = [
+  {
+    name: 'Madison County property transfers',
+    how: 'Madison County Revenue Commission',
+    url: 'https://www.madisoncountyal.gov/departments/revenue',
+    note: 'Deed transfers searchable by name, address, or parcel',
+  },
+  {
+    name: 'City annexation petitions',
+    how: 'Huntsville City Council public records request',
+    url: 'https://www.huntsvilleal.gov/government/city-clerk/',
+    note: 'Pending petitions reviewed at Council meetings',
+  },
+  {
+    name: 'Planning commission approvals',
+    how: 'Huntsville Planning Commission agenda/minutes',
+    url: 'https://www.huntsvilleal.gov/government/boards-committees/planning/',
+    note: 'Monthly public meetings, agendas posted 72h prior',
+  },
+  {
+    name: 'Building permits by area',
+    how: 'City of Huntsville permits portal',
+    url: 'https://www.huntsvilleal.gov/business/permits-inspections/',
+    note: 'Search by address, contractor, or permit type',
+  },
+  {
+    name: 'Zoning variance requests',
+    how: 'Board of Zoning Adjustment / Planning Dept',
+    url: 'https://www.huntsvilleal.gov/government/boards-committees/board-of-zoning-adjustment/',
+    note: 'Public hearings with 15-day notice requirement',
+  },
+  {
+    name: 'LLC ownership chains',
+    how: 'Alabama Secretary of State entity search',
+    url: 'https://www.sos.alabama.gov/government-records/business-entity-records',
+    note: 'Registered agents and member names for Alabama LLCs',
+  },
+];
+
+function LandIntelCard({ report }) {
+  const confidenceColors = { high: '#16a34a', medium: '#ca8a04', low: '#6b7280' };
+  const typeLabel = LAND_REPORT_TYPE_LABELS[report.report_type] || report.report_type.replace(/_/g,' ');
+  const confColor = confidenceColors[report.ai_confidence] || '#6b7280';
+  const date = new Date(report.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  return (
+    <div className="land-intel-card">
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.4rem' }}>
+        <span className="land-intel-type-badge">{typeLabel}</span>
+        <span style={{ fontSize: '.72rem', color: confColor, fontWeight: 600 }}>
+          {report.ai_confidence} confidence
+        </span>
+        <span style={{ fontSize: '.72rem', color: 'var(--muted)', marginLeft: 'auto' }}>{date}</span>
+      </div>
+      <p className="land-intel-title">{report.title}</p>
+      <p className="land-intel-summary">{report.summary}</p>
+      {report.affected_areas?.length > 0 && (
+        <div style={{ fontSize: '.77rem', color: 'var(--muted)', marginTop: '.35rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 600 }}>Areas:</span>
+          {report.affected_areas.map((a, i) => (
+            <span key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 4, padding: '.1rem .35rem' }}>{a}</span>
+          ))}
+        </div>
+      )}
+      {report.data_sources?.length > 0 && (
+        <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: '.25rem' }}>
+          Sources: {report.data_sources.join(' · ')}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PublicRecordsTracker() {
+  return (
+    <div className="public-records-tracker">
+      <div className="watch-dashboard-title-row" style={{ marginBottom: '.75rem' }}>
+        <span className="watch-dashboard-icon">📋</span>
+        <h3 className="watch-dashboard-title" style={{ fontSize: '1rem' }}>Public Records Tracker</h3>
+      </div>
+      <p style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: '1rem' }}>
+        These records are publicly requestable. Submit FOIA/public records requests to track land activity in your area.
+      </p>
+      <div className="public-records-list">
+        {PUBLIC_RECORDS.map((rec, i) => (
+          <div key={i} className="public-records-item">
+            <div className="public-records-check">☐</div>
+            <div className="public-records-info">
+              <div className="public-records-name">{rec.name}</div>
+              <div className="public-records-note">{rec.note}</div>
+            </div>
+            <a
+              href={rec.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="public-records-link"
+              onClick={e => e.stopPropagation()}
+            >
+              Request →
+            </a>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LandDevelopmentDashboard({ dashboard, onRequireAuth, highlightedIds }) {
+  const { user, token } = useAuth();
+  const [intelReports, setIntelReports] = useState([]);
+  const [intelLoading, setIntelLoading] = useState(true);
+  const [reports,      setReports]      = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [showForm,     setShowForm]     = useState(false);
+
+  useEffect(() => {
+    api.getLandIntelReports()
+      .then(setIntelReports)
+      .catch(() => setIntelReports([]))
+      .finally(() => setIntelLoading(false));
+
+    api.getWatchReports('land_development')
+      .then(setReports)
+      .catch(() => setReports([]))
+      .finally(() => setReportsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (reportsLoading || !highlightedIds?.size) return;
+    const first = reports.find(r => highlightedIds.has(r.id));
+    if (!first) return;
+    setTimeout(() => {
+      document.getElementById(`report-${first.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+  }, [reportsLoading]);
+
+  return (
+    <>
+      <div className="watch-dashboard-header">
+        <div className="watch-dashboard-title-row">
+          <span className="watch-dashboard-icon">{dashboard.icon}</span>
+          <h2 className="watch-dashboard-title">{dashboard.label}</h2>
+        </div>
+        <p className="watch-dashboard-desc">{dashboard.description}</p>
+        <button className="btn btn-primary" onClick={() => {
+          if (!user) { onRequireAuth?.(); return; }
+          setShowForm(true);
+        }}>
+          + Submit Report
+        </button>
+      </div>
+
+      {/* AI Intelligence Reports */}
+      <div className="land-intel-section">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.75rem' }}>
+          <h3 className="watch-reports-heading" style={{ margin: 0 }}>AI Intelligence Reports</h3>
+          <span style={{ fontSize: '.72rem', background: '#1a1710', color: '#c8e6b0', padding: '.15rem .5rem', borderRadius: 99, fontWeight: 700 }}>
+            AI
+          </span>
+        </div>
+        <p style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
+          Patterns detected by AI analysis of community reports and regional development data.
+          Analysis runs every 6 hours. Flag patterns: same LLC in multiple transactions,
+          bulk purchases (3+ properties, 90 days, same area), annexations affecting housing-report areas.
+        </p>
+        {intelLoading ? (
+          <div className="spinner" />
+        ) : intelReports.length === 0 ? (
+          <div className="land-intel-empty">
+            <p>No intelligence reports generated yet. Analysis runs every 6 hours once community reports accumulate.</p>
+          </div>
+        ) : (
+          <div className="land-intel-list">
+            {intelReports.map(r => <LandIntelCard key={r.id} report={r} />)}
+          </div>
+        )}
+      </div>
+
+      {/* Public Records Tracker */}
+      <PublicRecordsTracker />
+
+      {/* Community reports */}
+      <div className="watch-reports">
+        <h3 className="watch-reports-heading">
+          Community Reports
+          {reports.length > 0 && <span className="watch-reports-count"> ({reports.length})</span>}
+        </h3>
+        {reportsLoading ? (
+          <div className="spinner" />
+        ) : reports.length === 0 ? (
+          <p className="empty">No community reports yet. Document what you observe — permit activity, demolitions, LLC signage on vacant land.</p>
+        ) : (
+          <div className="watch-report-list">
+            {reports.map(r => (
+              <WatchReportCard
+                key={r.id}
+                report={r}
+                highlighted={!!highlightedIds?.has(r.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {showForm && dashboard && (
+        <WatchReportModal
+          dashboard={dashboard}
+          token={token}
+          onClose={() => setShowForm(false)}
+          onCreated={report => { setReports(prev => [report, ...prev]); setShowForm(false); }}
+        />
+      )}
+    </>
   );
 }
 

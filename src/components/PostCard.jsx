@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 
@@ -54,6 +54,7 @@ function MediaGrid({ media }) {
 
 export default function PostCard({ post, onRequireAuth, onReserved }) {
   const { user, token } = useAuth();
+  const navigate = useNavigate();
   const [reserving, setReserving] = useState(false);
   const [reserved,  setReserved]  = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -100,7 +101,11 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
       : null;
 
   return (
-    <div className="card post-card">
+    <div
+      className="card post-card"
+      onClick={e => { if (!e.defaultPrevented) navigate(`/posts/${post.id}`); }}
+      style={{ cursor: 'pointer' }}
+    >
       <div className="post-header">
         <span className={`badge ${TYPE_BADGE[post.type]}`}>{post.type}</span>
         {urgencyDot}
@@ -127,7 +132,11 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
           </div>
         )}
         <span className="post-meta" style={{ marginLeft: 'auto' }}>
-          <Link to={`/profile/${post.user_id}`} className="username-link">
+          <Link
+            to={`/profile/${post.user_id}`}
+            className="username-link"
+            onClick={e => e.stopPropagation()}
+          >
             {post.username}
           </Link>
           {post.founding_member && (
@@ -149,7 +158,9 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
 
       {post.description && <p className="post-description">{post.description}</p>}
 
-      <MediaGrid media={post.media} />
+      <div onClick={e => e.stopPropagation()}>
+        <MediaGrid media={post.media} />
+      </div>
 
       <div className="post-details">
         {post.location    && <span>📍 {post.location}</span>}
@@ -175,7 +186,7 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
       {err && <p className="card-error">{err}</p>}
 
       {!isOwn && post.status === 'active' && (
-        <div className="post-actions">
+        <div className="post-actions" onClick={e => e.stopPropagation()}>
           <button
             className={`btn btn-sm ${reserved ? 'btn-success' : 'btn-primary'}`}
             onClick={reserve}
