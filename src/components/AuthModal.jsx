@@ -47,11 +47,12 @@ export default function AuthModal({ onClose }) {
         if (!form.covenant) { setErr('You must agree to The Mycelium Covenant to join.'); setBusy(false); return; }
         if (!form.how_found) { setErr('Please tell us how you found Mycelium.'); setBusy(false); return; }
         const res = await api.register({
-          username:  form.username.trim(),
-          email:     form.email,
-          password:  form.password,
-          location:  form.location.trim(),
-          how_found: form.how_found,
+          username:        form.username.trim(),
+          email:           form.email,
+          password:        form.password,
+          location:        form.location.trim(),
+          how_found:       form.how_found,
+          covenant_agreed: true,
         });
         login(res.token, res.user);
         onClose();
@@ -165,7 +166,7 @@ export default function AuthModal({ onClose }) {
             <label className="invite-covenant-check" style={{ fontSize: '.85rem' }}>
               <input type="checkbox" checked={covenantRestore} onChange={e => setCovenantRestore(e.target.checked)} />
               {' '}I agree to{' '}
-              <a href="https://unprecedentedtimes.org/the-mycelium-covenant" target="_blank" rel="noopener noreferrer">
+              <a href="/covenant">
                 The Mycelium Covenant
               </a>
             </label>
@@ -280,7 +281,7 @@ export default function AuthModal({ onClose }) {
             <label className="invite-covenant-check" style={{ fontSize: '.85rem' }}>
               <input type="checkbox" checked={form.covenant} onChange={e => set('covenant', e.target.checked)} />
               {' '}I have read and agree to{' '}
-              <a href="https://unprecedentedtimes.org/the-mycelium-covenant" target="_blank" rel="noopener noreferrer">
+              <a href="/covenant">
                 The Mycelium Covenant
               </a>
             </label>

@@ -16,6 +16,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import PostDetailPage from './pages/PostDetailPage';
 import Advocate from './pages/Advocate';
 import Messages from './pages/Messages';
+import Covenant from './pages/Covenant';
 import AuthModal from './components/AuthModal';
 import InviteModal from './components/InviteModal';
 import { useAuth } from './auth';
@@ -102,6 +103,7 @@ export default function App() {
         <Route path="/posts/:id"       element={<PostDetailPage onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/advocate"        element={<Advocate onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/messages"        element={<Messages onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/covenant"        element={<Covenant />} />
       </Routes>
       {authOpen   && <AuthModal onClose={() => setAuthOpen(false)} />}
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}

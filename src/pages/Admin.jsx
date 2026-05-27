@@ -211,6 +211,22 @@ function UsersTab({ token }) {
     }
   }
 
+  async function markCovenantAgreed(u) {
+    if (!confirm(`Mark covenant agreement for @${u.username}?\n\nThis records that they have agreed to The Mycelium Covenant.`)) return;
+    setActionId(u.id);
+    try {
+      const updated = await api.adminMarkCovenantAgreed(u.id, token);
+      setUsers(prev => prev.map(x => x.id === u.id
+        ? { ...x, covenant_agreed: updated.covenant_agreed, covenant_agreed_at: updated.covenant_agreed_at }
+        : x
+      ));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionId(null);
+    }
+  }
+
   if (loading) return <div className="spinner" />;
   if (err) return <p className="error-msg">{err}</p>;
 
@@ -218,11 +234,11 @@ function UsersTab({ token }) {
   const deletedUsers = users.filter(u => u.is_active === false);
 
   const UserRow = ({ u }) => {
-    const isMe           = u.id === me?.id;
-    const isFounder      = u.username === 'AMBHaggermaker';
-    const canDelete      = !isFounder && !isMe;
-    const canRevokeFounder = !isFounder; // AMBHaggermaker founding status is permanent
-    const busy           = actionId === u.id;
+    const isMe             = u.id === me?.id;
+    const isFounder        = u.username === 'AMBHaggermaker';
+    const canDelete        = !isFounder && !isMe;
+    const canRevokeFounder = !isFounder;
+    const busy             = actionId === u.id;
 
     return (
       <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -231,6 +247,16 @@ function UsersTab({ token }) {
           {u.founding_member && (
             <span style={{ marginLeft: '.4rem', fontSize: '.65rem', background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid var(--green)', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700, verticalAlign: 'middle' }}>
               ⬡ Founding
+            </span>
+          )}
+          {u.covenant_agreed ? (
+            <span style={{ marginLeft: '.4rem', fontSize: '.65rem', background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700, verticalAlign: 'middle' }}
+              title={u.covenant_agreed_at ? `Agreed ${new Date(u.covenant_agreed_at).toLocaleDateString()}` : 'Covenant agreed'}>
+              ✓ Covenant
+            </span>
+          ) : (
+            <span style={{ marginLeft: '.4rem', fontSize: '.65rem', background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '.1rem .35rem', borderRadius: 99, verticalAlign: 'middle' }}>
+              No Covenant
             </span>
           )}
         </td>
@@ -270,6 +296,14 @@ function UsersTab({ token }) {
                 onClick={() => toggleFoundingMember(u, true)}
                 title="Grant founding member status">
                 {busy ? '…' : '⬡ Grant Founding'}
+              </button>
+            )}
+            {!u.covenant_agreed && (
+              <button className="btn btn-sm btn-outline" disabled={busy}
+                style={{ fontSize: '.72rem', color: '#2e7d32', borderColor: '#a5d6a7' }}
+                onClick={() => markCovenantAgreed(u)}
+                title="Mark covenant as agreed (for founding accounts)">
+                {busy ? '…' : '✓ Mark Covenant'}
               </button>
             )}
             <button className="btn btn-sm btn-outline" disabled={busy}

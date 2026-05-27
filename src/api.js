@@ -92,6 +92,9 @@ export default {
   postOnWall:         (username, data, token) => post(`/profiles/${username}/wall`, data, token),
   deleteWallPost:     (username, postId, token) => del(`/profiles/${username}/wall/${postId}`, token),
 
+  // Covenant
+  agreeToCovenant:    (token)             => request('PATCH', '/users/me/covenant', {}, token),
+
   // Users
   getUser:            (id)                => get(`/users/${id}`),
   updateUser:         (id, data, token)   => patch(`/users/${id}`, data, token),
@@ -171,7 +174,8 @@ export default {
   removePost:         (postId, token)      => del(`/admin/moderation/${postId}`, token),
   getAdminUsers:      (token)              => get('/admin/users', token),
   setUserRole:          (userId, role, token)  => patch(`/admin/users/${userId}/role`, { role }, token),
-  setFoundingMember:    (userId, grant, token) => patch(`/admin/users/${userId}/founding-member`, { grant }, token),
+  setFoundingMember:       (userId, grant, token) => patch(`/admin/users/${userId}/founding-member`, { grant }, token),
+  adminMarkCovenantAgreed: (userId, token)        => patch(`/admin/users/${userId}/covenant-agreed`, {}, token),
   deleteUser:             (userId, token)   => patch(`/admin/users/${userId}/delete`, {}, token),
   restoreUser:            (userId, token)   => patch(`/admin/users/${userId}/restore`, {}, token),
   adminSendPasswordReset: (userId, token)   => post(`/admin/users/${userId}/send-password-reset`, {}, token),

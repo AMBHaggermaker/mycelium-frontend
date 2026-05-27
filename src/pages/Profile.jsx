@@ -169,6 +169,12 @@ export default function Profile() {
               {u.founding_member && <span className="founding-badge">⬡ Founding</span>}
               {u.verified && !u.founding_member && <span className="verified-badge">✓ Verified</span>}
               {u.is_veteran && u.veteran_confirmed && <span className="veteran-badge-sm">⬡ Veteran</span>}
+              {authUser?.role === 'admin' && u.covenant_agreed && (
+                <span className="covenant-badge-sm"
+                  title={u.covenant_agreed_at ? `Covenant agreed ${new Date(u.covenant_agreed_at).toLocaleDateString()}` : 'Covenant agreed'}>
+                  ✓ Covenant
+                </span>
+              )}
             </div>
             {u.mood && <div className="profile-mood-line">{u.mood_emoji} <span>{u.mood}</span></div>}
             {u.status_text && <p className="profile-status-text">{u.status_text}</p>}

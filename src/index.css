@@ -4036,6 +4036,100 @@ a { color: inherit; text-decoration: none; }
   .covenant-banner-btn { margin-left: 0; }
 }
 
+/* ── Covenant page ────────────────────────────────────────────────────────── */
+.covenant-page-body {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.75;
+}
+.covenant-preamble {
+  font-size: 1rem;
+  color: var(--muted);
+  border-left: 3px solid var(--green);
+  padding-left: 1rem;
+  margin-bottom: 0;
+}
+.covenant-section {
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.covenant-section:first-child { padding-top: 0; }
+.covenant-section:last-child  { border-bottom: none; padding-bottom: 0; }
+.covenant-heading {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--green);
+  margin-bottom: .6rem;
+}
+.covenant-closing {
+  background: var(--green-bg);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  margin-top: .5rem;
+}
+.covenant-agree-box {
+  background: var(--card);
+  border: 2px solid var(--green);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+.covenant-agree-label {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  font-size: .95rem;
+  cursor: pointer;
+  flex: 1;
+}
+.covenant-agree-label input[type=checkbox] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.covenant-agreed-notice {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  background: var(--green-bg);
+  border: 1.5px solid var(--green);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  font-size: .95rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.covenant-agreed-check {
+  font-size: 1.25rem;
+  color: var(--green);
+  font-weight: 700;
+}
+.covenant-agreed-date {
+  margin-left: auto;
+  font-size: .82rem;
+  color: var(--muted);
+}
+.covenant-badge-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: .2rem;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+  border-radius: 99px;
+  padding: .15rem .5rem;
+  font-size: .72rem;
+  font-weight: 700;
+}
+
 /* ── Watch Lab Results (WatchReportModal) ─────────────────────────────────── */
 .lab-section {
   border: 1px solid var(--border);

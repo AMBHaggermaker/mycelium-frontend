@@ -138,9 +138,7 @@ export default function Feed({ onRequireAuth }) {
                 <p className="covenant-banner-desc">The principles this community is built on</p>
               </div>
               <a
-                href="https://unprecedentedtimes.org/the-mycelium-covenant"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/covenant"
                 className="btn btn-sm btn-primary covenant-banner-btn"
               >
                 Read &amp; Agree
