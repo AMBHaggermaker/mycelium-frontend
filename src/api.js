@@ -104,6 +104,18 @@ export default {
   createReservation: (data, token)    => post('/reservations', data, token),
   cancelReservation: (id, token)      => del(`/reservations/${id}`, token),
 
+  // RSVPs
+  getRsvp:        (postId, token)          => get(`/posts/${postId}/rsvp`, token),
+  setRsvp:        (postId, status, token)  => post(`/posts/${postId}/rsvp`, { status }, token),
+  removeRsvp:     (postId, token)          => del(`/posts/${postId}/rsvp`, token),
+
+  // Profile boards
+  getProfileBoards:  (username, token)     => get(`/profiles/${username}/boards`, token),
+  saveBoardSettings: (boards, token)       => patch('/profiles/boards/settings', { boards }, token),
+
+  // Activity
+  getTodayActivity: ()                     => get('/activity/today'),
+
   // Threads
   getThread:   (id)                   => get(`/threads/${id}`),
   createThread:(data, token)          => post('/threads', data, token),

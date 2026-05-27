@@ -142,6 +142,9 @@ export default function PostDetailPage({ onRequireAuth }) {
   const [cancelling,    setCancelling]    = useState(false);
   const [reserveErr,    setReserveErr]    = useState(null);
 
+  const [rsvp,     setRsvp]     = useState(null);
+  const [rsvpBusy, setRsvpBusy] = useState(false);
+
   const [comments,        setComments]        = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [newComment,      setNewComment]      = useState('');
@@ -163,8 +166,26 @@ export default function PostDetailPage({ onRequireAuth }) {
       api.getMyReservation(id, token)
         .then(r => { if (r?.reservation_id) setReservationId(r.reservation_id); })
         .catch(() => {});
+      api.getRsvp(id, token)
+        .then(r => { if (r?.status) setRsvp(r.status); })
+        .catch(() => {});
     }
   }, [id, token]);
+
+  async function handleRsvp(status) {
+    if (!user) { onRequireAuth?.(); return; }
+    setRsvpBusy(true);
+    try {
+      if (rsvp === status) {
+        await api.removeRsvp(id, token);
+        setRsvp(null);
+      } else {
+        const r = await api.setRsvp(id, status, token);
+        setRsvp(r.rsvp.status);
+      }
+    } catch { /* ignore */ }
+    finally { setRsvpBusy(false); }
+  }
 
   async function handleReserve() {
     if (!user) { onRequireAuth?.(); return; }
@@ -341,9 +362,25 @@ export default function PostDetailPage({ onRequireAuth }) {
             </div>
           )}
 
+          {/* RSVP (events) */}
+          {post.type === 'event' && (
+            <div className="post-rsvp-row" style={{ marginTop: '1rem' }}>
+              <span style={{ fontSize: '.82rem', color: 'var(--muted)', marginRight: '.5rem' }}>RSVP:</span>
+              {['going', 'interested', 'saved'].map(s => (
+                <button key={s}
+                  className={`btn btn-sm post-rsvp-btn rsvp-${s}${rsvp === s ? ' active' : ''}`}
+                  onClick={() => handleRsvp(s)}
+                  disabled={rsvpBusy}
+                >
+                  {s === 'going' ? '✓ Going' : s === 'interested' ? '★ Interested' : '🔖 Save'}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Reserve / cancel */}
           {reserveErr && <p className="card-error" style={{ marginTop: '.75rem' }}>{reserveErr}</p>}
-          {!isOwn && post.status === 'active' && !isExpired && (
+          {!isOwn && post.status === 'active' && !isExpired && post.type !== 'event' && (
             <div style={{ marginTop: '1rem', display: 'flex', gap: '.5rem' }}>
               {reservationId ? (
                 <button

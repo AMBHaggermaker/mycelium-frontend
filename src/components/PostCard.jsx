@@ -59,7 +59,24 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
   const [reserved,  setReserved]  = useState(false);
   const [reporting, setReporting] = useState(false);
   const [reported,  setReported]  = useState(false);
+  const [rsvp,      setRsvp]      = useState(post.my_rsvp || null);
+  const [rsvpBusy,  setRsvpBusy]  = useState(false);
   const [err, setErr]             = useState(null);
+
+  async function handleRsvp(status) {
+    if (!user) { onRequireAuth?.(); return; }
+    setRsvpBusy(true); setErr(null);
+    try {
+      if (rsvp === status) {
+        await api.removeRsvp(post.id, token);
+        setRsvp(null);
+      } else {
+        const r = await api.setRsvp(post.id, status, token);
+        setRsvp(r.rsvp.status);
+      }
+    } catch (e) { setErr(e.message); }
+    finally { setRsvpBusy(false); }
+  }
 
   const isOwn  = user?.id === post.user_id;
   const cap    = post.capacity;
@@ -185,7 +202,25 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
 
       {err && <p className="card-error">{err}</p>}
 
-      {!isOwn && post.status === 'active' && (
+      {post.type === 'event' && (
+        <div className="post-rsvp-row" onClick={e => e.stopPropagation()}>
+          {['going', 'interested', 'saved'].map(s => (
+            <button key={s}
+              className={`btn btn-xs post-rsvp-btn rsvp-${s}${rsvp === s ? ' active' : ''}`}
+              onClick={() => handleRsvp(s)}
+              disabled={rsvpBusy}
+              title={s.charAt(0).toUpperCase() + s.slice(1)}
+            >
+              {s === 'going' ? '✓ Going' : s === 'interested' ? '★ Interested' : '🔖 Save'}
+            </button>
+          ))}
+          {(post.rsvp_going_count > 0 || post.user_id === user?.id) && (
+            <span className="post-rsvp-count">{post.rsvp_going_count || 0} going</span>
+          )}
+        </div>
+      )}
+
+      {!isOwn && post.status === 'active' && post.type !== 'event' && (
         <div className="post-actions" onClick={e => e.stopPropagation()}>
           <button
             className={`btn btn-sm ${reserved ? 'btn-success' : 'btn-primary'}`}
@@ -200,6 +235,19 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
             disabled={reporting || reported}
             title={reported ? 'Reported' : 'Report this post'}
             style={{ marginLeft: 'auto' }}
+          >
+            {reported ? 'Reported' : 'Report'}
+          </button>
+        </div>
+      )}
+
+      {!isOwn && post.status === 'active' && post.type === 'event' && (
+        <div className="post-actions" onClick={e => e.stopPropagation()}>
+          <button
+            className={`btn-report${reported ? ' reported' : ''}`}
+            onClick={report}
+            disabled={reporting || reported}
+            title={reported ? 'Reported' : 'Report this post'}
           >
             {reported ? 'Reported' : 'Report'}
           </button>

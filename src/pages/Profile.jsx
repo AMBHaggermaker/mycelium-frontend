@@ -3,32 +3,28 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 import PostCard from '../components/PostCard';
+import {
+  DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext, rectSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const BASE_URL = 'https://mycelium.unprecedentedtimes.org';
 
 const MOODS = [
-  { emoji: '😊', label: 'Good' },
-  { emoji: '🌱', label: 'Growing' },
-  { emoji: '🔥', label: 'Fired up' },
-  { emoji: '😴', label: 'Tired' },
-  { emoji: '🤔', label: 'Thinking' },
-  { emoji: '💪', label: 'Motivated' },
-  { emoji: '😤', label: 'Frustrated' },
-  { emoji: '🌊', label: 'Flowing' },
-  { emoji: '🦠', label: 'Shenaniganning' },
-  { emoji: '😂', label: 'Chaotic' },
-  { emoji: '💙', label: 'Grateful' },
-  { emoji: '🌧️', label: 'Heavy' },
-  { emoji: '⚡', label: 'Energized' },
-  { emoji: '🕊️', label: 'Peaceful' },
-  { emoji: '🤯', label: 'Overwhelmed' },
-  { emoji: '🛠️', label: 'Building' },
-  { emoji: '🌻', label: 'Hopeful' },
-  { emoji: '😏', label: 'Plotting' },
-  { emoji: '🦋', label: 'Flibberdigibetting' },
-  { emoji: '🫠', label: 'Melting' },
-  { emoji: '🌀', label: 'Scattered' },
-  { emoji: '😌', label: 'Unbothered' },
+  { emoji: '😊', label: 'Good' }, { emoji: '🌱', label: 'Growing' },
+  { emoji: '🔥', label: 'Fired up' }, { emoji: '😴', label: 'Tired' },
+  { emoji: '🤔', label: 'Thinking' }, { emoji: '💪', label: 'Motivated' },
+  { emoji: '😤', label: 'Frustrated' }, { emoji: '🌊', label: 'Flowing' },
+  { emoji: '🦠', label: 'Shenaniganning' }, { emoji: '😂', label: 'Chaotic' },
+  { emoji: '💙', label: 'Grateful' }, { emoji: '🌧️', label: 'Heavy' },
+  { emoji: '⚡', label: 'Energized' }, { emoji: '🕊️', label: 'Peaceful' },
+  { emoji: '🤯', label: 'Overwhelmed' }, { emoji: '🛠️', label: 'Building' },
+  { emoji: '🌻', label: 'Hopeful' }, { emoji: '😏', label: 'Plotting' },
+  { emoji: '🦋', label: 'Flibberdigibetting' }, { emoji: '🫠', label: 'Melting' },
+  { emoji: '🌀', label: 'Scattered' }, { emoji: '😌', label: 'Unbothered' },
   { emoji: '🐉', label: 'Feral' },
 ];
 
@@ -36,17 +32,23 @@ const FONT_STYLES = {
   classic:    { label: 'Classic',    css: "'Georgia', serif" },
   modern:     { label: 'Modern',     css: "-apple-system, 'Segoe UI', sans-serif" },
   typewriter: { label: 'Typewriter', css: "'Courier New', monospace" },
-  editorial:  { label: 'Editorial',  css: "'Palatino Linotype', 'Book Antiqua', serif" },
+  editorial:  { label: 'Editorial',  css: "'Palatino Linotype', serif" },
 };
 
-const LAYOUT_OPTIONS = [
-  { value: 'standard', label: 'Standard' },
-  { value: 'wide',     label: 'Wide' },
-  { value: 'minimal',  label: 'Minimal' },
-  { value: 'sidebar',  label: 'Sidebar' },
-];
+const BOARD_TITLES = {
+  bulletin:    '📌 Bulletin',
+  timeline:    '📅 Timeline',
+  posts:       '📋 My Posts',
+  events:      '🗓 Events',
+  photos:      '📷 Photos',
+  circles:     '⬡ My Circles',
+  people:      '🤝 People I\'ve Shown Up With',
+  invitations: '✉️ Invitations',
+  messages:    '💬 Messages',
+  chats:       '🗨 Chat Rooms',
+};
 
-function resolveAvatar(url) {
+function resolveUrl(url) {
   if (!url) return null;
   if (url.startsWith('http')) return url;
   return `${BASE_URL}${url}`;
@@ -54,17 +56,12 @@ function resolveAvatar(url) {
 
 function profileStyle(u) {
   if (!u) return {};
-  const styles = {};
-  if (u.font_style && FONT_STYLES[u.font_style]) {
-    styles['--profile-font'] = FONT_STYLES[u.font_style].css;
-  }
-  if (u.accent_color) styles['--profile-accent'] = u.accent_color;
-  if (u.background_gradient) {
-    styles.background = u.background_gradient;
-  } else if (u.background_color) {
-    styles.background = u.background_color;
-  }
-  return styles;
+  const s = {};
+  if (u.font_style && FONT_STYLES[u.font_style]) s['--profile-font'] = FONT_STYLES[u.font_style].css;
+  if (u.accent_color) s['--profile-accent'] = u.accent_color;
+  if (u.background_gradient) s.background = u.background_gradient;
+  else if (u.background_color) s.background = u.background_color;
+  return s;
 }
 
 // ── Main Profile Page ─────────────────────────────────────────────────────────
@@ -74,56 +71,60 @@ export default function Profile() {
   const { user: authUser, token } = useAuth();
   const navigate = useNavigate();
 
-  const [data,       setData]       = useState(null);
-  const [loading,    setLoading]    = useState(true);
-  const [err,        setErr]        = useState(null);
-  const [showEditor, setShowEditor] = useState(false);
-  const [activeTab,  setActiveTab]  = useState('board');
-  const [wallInput,  setWallInput]  = useState('');
-  const [posting,    setPosting]    = useState(false);
+  const [data,        setData]        = useState(null);
+  const [boards,      setBoards]      = useState(null); // board settings + supplemental data
+  const [loading,     setLoading]     = useState(true);
+  const [boardOrder,  setBoardOrder]  = useState(null); // current ordered board list
+  const [dragMode,    setDragMode]    = useState(false);
+  const [showEditor,  setShowEditor]  = useState(false);
 
   const isOwn = data && authUser && data.user.id === authUser.id;
 
   const load = useCallback(async () => {
-    setLoading(true); setErr(null);
+    setLoading(true);
     try {
-      setData(await api.getProfile(username));
+      const [profileData, boardData] = await Promise.all([
+        api.getProfile(username),
+        api.getProfileBoards(username, token || undefined),
+      ]);
+      setData(profileData);
+      setBoards(boardData);
+      setBoardOrder(boardData.settings);
     } catch (e) {
-      setErr(e.message);
-    } finally {
       setLoading(false);
     }
-  }, [username]);
+    setLoading(false);
+  }, [username, token]);
 
   useEffect(() => { load(); }, [load]);
 
-  async function postOnWall(e) {
-    e.preventDefault();
-    if (!wallInput.trim()) return;
-    setPosting(true);
-    try {
-      const wp = await api.postOnWall(username, { content: wallInput.trim() }, token);
-      setData(d => ({ ...d, wall: [wp, ...d.wall] }));
-      setWallInput('');
-    } catch (e) { alert(e.message); }
-    finally { setPosting(false); }
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } })
+  );
+
+  async function handleDragEnd(event) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = boardOrder.findIndex(b => b.board_type === active.id);
+    const newIndex = boardOrder.findIndex(b => b.board_type === over.id);
+    const newOrder = arrayMove(boardOrder, oldIndex, newIndex).map((b, i) => ({ ...b, position: i }));
+    setBoardOrder(newOrder);
+    try { await api.saveBoardSettings(newOrder, token); } catch { /* ignore */ }
   }
 
-  async function deleteWallPost(postId) {
-    if (!confirm('Delete this wall post?')) return;
-    try {
-      await api.deleteWallPost(username, postId, token);
-      setData(d => ({ ...d, wall: d.wall.filter(p => p.id !== postId) }));
-    } catch (e) { alert(e.message); }
+  async function handleBoardSettingChange(boardType, changes) {
+    const newOrder = boardOrder.map(b => b.board_type === boardType ? { ...b, ...changes } : b);
+    setBoardOrder(newOrder);
+    try { await api.saveBoardSettings(newOrder, token); } catch { /* ignore */ }
   }
 
   if (loading) return <div className="page"><div className="container"><div className="spinner" style={{ marginTop: '4rem' }} /></div></div>;
-  if (err)     return <div className="page"><div className="container"><p className="error-msg">{err}</p></div></div>;
+  if (!data)   return <div className="page"><div className="container"><p className="error-msg">Profile not found.</p></div></div>;
 
   const { user: u, posts, circles, events, copart, photos, albums, wall } = data;
-  const isDark   = u.profile_theme === 'dark';
-  const pStyle   = profileStyle(u);
-  const hasPhotos = photos.length > 0;
+  const isDark = u.profile_theme === 'dark';
+  const pStyle = profileStyle(u);
 
   const albumMap = {};
   photos.forEach(p => {
@@ -131,85 +132,63 @@ export default function Profile() {
     albumMap[p.album_name].push(p);
   });
 
+  const visibleBoards = (boardOrder || []).filter(b => isOwn || b.is_visible);
+
   return (
-    <div
-      className={'profile-page' + (isDark ? ' profile-dark' : '')}
-      style={{ ...pStyle, fontFamily: pStyle['--profile-font'] || undefined }}
-    >
+    <div className={'profile-page' + (isDark ? ' profile-dark' : '')}
+      style={{ ...pStyle, fontFamily: pStyle['--profile-font'] || undefined }}>
+
       {/* Banner */}
       <div className="profile-banner" style={
         u.banner_image_url
           ? { backgroundImage: `url(${u.banner_image_url})` }
-          : u.accent_color
-            ? { background: `linear-gradient(135deg, ${u.accent_color}44, ${u.accent_color}22)` }
-            : {}
+          : u.accent_color ? { background: `linear-gradient(135deg, ${u.accent_color}44, ${u.accent_color}22)` } : {}
       }>
-        {isOwn && (
-          <div className="profile-banner-upload-hint">
-            <BannerUpload token={token} onUploaded={url => setData(d => ({ ...d, user: { ...d.user, banner_image_url: url } }))} />
-          </div>
-        )}
+        {isOwn && <BannerUpload token={token} onUploaded={url => setData(d => ({ ...d, user: { ...d.user, banner_image_url: url } }))} />}
       </div>
 
       <div className="profile-main-container">
         {/* Header row */}
         <div className="profile-header-row">
-          {/* Avatar with mood emoji */}
-          <div className="profile-avatar-wrap" style={{ position: 'relative' }}>
-            <AvatarBlock user={u} isOwn={isOwn} token={token} onUpdated={newUrl => setData(d => ({ ...d, user: { ...d.user, avatar_url: newUrl } }))} />
-            {u.mood_emoji && (
-              <span className="profile-mood-emoji-badge" title={u.mood || ''}>
-                {u.mood_emoji}
-              </span>
-            )}
+          <div style={{ position: 'relative' }}>
+            <AvatarBlock user={u} isOwn={isOwn} token={token}
+              onUpdated={url => setData(d => ({ ...d, user: { ...d.user, avatar_url: url } }))} />
+            {u.mood_emoji && <span className="profile-mood-emoji-badge" title={u.mood}>{u.mood_emoji}</span>}
           </div>
 
-          {/* Identity */}
           <div className="profile-identity">
             <div className="profile-name-row">
-              <h1 className="profile-display-name" style={{ fontFamily: pStyle['--profile-font'] }}>
-                {u.username}
-              </h1>
-              {u.founding_member && (
-                <span className="founding-badge" title="Founding member">⬡ Founding</span>
-              )}
-              {u.verified && !u.founding_member && (
-                <span className="verified-badge">✓ Verified</span>
-              )}
-              {u.is_veteran && u.veteran_confirmed && (
-                <span className="veteran-badge-sm" title="Confirmed veteran">⬡ Veteran</span>
-              )}
+              <h1 className="profile-display-name" style={{ fontFamily: pStyle['--profile-font'] }}>{u.username}</h1>
+              {u.founding_member && <span className="founding-badge">⬡ Founding</span>}
+              {u.verified && !u.founding_member && <span className="verified-badge">✓ Verified</span>}
+              {u.is_veteran && u.veteran_confirmed && <span className="veteran-badge-sm">⬡ Veteran</span>}
             </div>
-
-            {u.mood && (
-              <div className="profile-mood-line">
-                {u.mood_emoji} <span>{u.mood}</span>
-              </div>
-            )}
-            {u.status_text && (
-              <p className="profile-status-text">{u.status_text}</p>
-            )}
+            {u.mood && <div className="profile-mood-line">{u.mood_emoji} <span>{u.mood}</span></div>}
+            {u.status_text && <p className="profile-status-text">{u.status_text}</p>}
             {u.location && <p className="profile-meta-item">📍 {u.location}</p>}
             {u.website && (
-              <p className="profile-meta-item">
-                🔗 <a href={u.website.startsWith('http') ? u.website : `https://${u.website}`}
-                  target="_blank" rel="noopener noreferrer">{u.website}</a>
-              </p>
+              <p className="profile-meta-item">🔗 <a href={u.website.startsWith('http') ? u.website : `https://${u.website}`}
+                target="_blank" rel="noopener noreferrer">{u.website}</a></p>
             )}
           </div>
 
-          {/* Actions */}
           <div className="profile-actions">
             {isOwn ? (
-              <button className="btn btn-primary btn-sm" onClick={() => setShowEditor(true)}>
-                Edit Profile
-              </button>
-            ) : authUser && (
-              <button className="btn btn-outline btn-sm"
-                onClick={() => navigate(`/messages?with=${u.id}`)}>
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-primary btn-sm" onClick={() => setShowEditor(true)}>Edit Profile</button>
+                <button
+                  className={`btn btn-sm ${dragMode ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setDragMode(v => !v)}
+                  title="Toggle drag-to-reorder mode"
+                >
+                  {dragMode ? '✓ Done' : '⠿ Edit Layout'}
+                </button>
+              </div>
+            ) : authUser ? (
+              <button className="btn btn-outline btn-sm" onClick={() => navigate(`/messages?with=${u.id}`)}>
                 ✉ Message
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -218,211 +197,63 @@ export default function Profile() {
           <div className="profile-music-bar" style={{ '--pa': u.accent_color || 'var(--green)' }}>
             <span className="profile-music-icon">♪</span>
             <span className="profile-music-label">{u.music_label || 'Now playing'}</span>
-            <a href={u.music_url} target="_blank" rel="noopener noreferrer" className="profile-music-link">
-              Open ↗
-            </a>
+            <a href={u.music_url} target="_blank" rel="noopener noreferrer" className="profile-music-link">Open ↗</a>
           </div>
         )}
 
-        {/* Main content */}
-        <div className={'profile-content-grid profile-layout-' + (u.layout || 'standard')}>
-
-          {/* Left column / sidebar */}
-          <div className="profile-sidebar-col">
-            {/* About Me */}
-            {u.bio && (
-              <div className="profile-board">
-                <h3 className="profile-board-title" style={{ '--pa': u.accent_color }}>About Me</h3>
-                <p className="profile-bio-text">{u.bio}</p>
-              </div>
-            )}
-
-            {/* My Interests */}
-            {u.interests?.length > 0 && (
-              <div className="profile-board">
-                <h3 className="profile-board-title" style={{ '--pa': u.accent_color }}>My Interests</h3>
-                <div className="profile-interests-cloud">
-                  {u.interests.map((tag, i) => (
-                    <span key={i} className="profile-interest-tag"
-                      style={{ borderColor: u.accent_color, color: u.accent_color }}>
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* People I Have Shown Up With */}
-            {copart.length > 0 && (
-              <div className="profile-board">
-                <h3 className="profile-board-title" style={{ '--pa': u.accent_color }}>
-                  People I Have Shown Up With
-                </h3>
-                <div className="profile-copart-row">
-                  {copart.map(c => (
-                    <Link key={c.id} to={`/profile/${c.username}`} className="profile-copart-item" title={c.username}>
-                      <div className="profile-copart-avatar">
-                        {c.avatar_url
-                          ? <img src={resolveAvatar(c.avatar_url)} alt={c.username} />
-                          : c.username[0].toUpperCase()
-                        }
-                      </div>
-                      <span className="profile-copart-name">{c.username}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* My Circles */}
-            {circles.length > 0 && (
-              <div className="profile-board">
-                <h3 className="profile-board-title" style={{ '--pa': u.accent_color }}>My Circles</h3>
-                <ul className="profile-circles-list">
-                  {circles.map(c => (
-                    <li key={c.id}>
-                      <Link to={`/commons/${c.id}`} className="profile-circle-item">
-                        <span className="profile-circle-name">{c.name}</span>
-                        <span className="profile-circle-count">{c.member_count} members</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+        {/* Bio (shown above boards if set) */}
+        {u.bio && (
+          <div className="profile-bio-strip">
+            <p>{u.bio}</p>
           </div>
+        )}
 
-          {/* Main column */}
-          <div className="profile-main-col">
-            {/* Tab bar */}
-            <div className="tab-bar" style={{ marginBottom: '1rem' }}>
-              <button className={'tab-btn' + (activeTab === 'board' ? ' active' : '')} onClick={() => setActiveTab('board')}>Board</button>
-              <button className={'tab-btn' + (activeTab === 'posts' ? ' active' : '')} onClick={() => setActiveTab('posts')}>My Posts ({posts.length})</button>
-              <button className={'tab-btn' + (activeTab === 'events' ? ' active' : '')} onClick={() => setActiveTab('events')}>Events</button>
-              <button className={'tab-btn' + (activeTab === 'photos' ? ' active' : '')} onClick={() => setActiveTab('photos')}>Photos</button>
-              {isOwn && (
-                <button className={'tab-btn' + (activeTab === 'invitations' ? ' active' : '')} onClick={() => setActiveTab('invitations')}>Invitations</button>
-              )}
+        {/* Interests */}
+        {u.interests?.length > 0 && (
+          <div className="profile-interests-cloud" style={{ padding: '0 0 .75rem' }}>
+            {u.interests.map((tag, i) => (
+              <span key={i} className="profile-interest-tag"
+                style={{ borderColor: u.accent_color, color: u.accent_color }}>{tag}</span>
+            ))}
+          </div>
+        )}
+
+        {/* Board grid */}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={visibleBoards.map(b => b.board_type)} strategy={rectSortingStrategy}>
+            <div className="profile-board-grid">
+              {visibleBoards.map(board => (
+                <SortableBoard
+                  key={board.board_type}
+                  board={board}
+                  isOwn={isOwn}
+                  dragMode={dragMode}
+                  accentColor={u.accent_color}
+                  onSettingChange={handleBoardSettingChange}
+                >
+                  <BoardContent
+                    board={board}
+                    user={u}
+                    profileData={data}
+                    boardsData={boards}
+                    albumMap={albumMap}
+                    isOwn={isOwn}
+                    token={token}
+                    authUser={authUser}
+                    pStyle={pStyle}
+                    onWallPost={wp => setData(d => ({ ...d, wall: [wp, ...d.wall] }))}
+                    onWallDelete={id => setData(d => ({ ...d, wall: d.wall.filter(p => p.id !== id) }))}
+                    onPhotoUpload={photo => setData(d => ({ ...d, photos: [photo, ...d.photos] }))}
+                    onPhotoDelete={id => setData(d => ({ ...d, photos: d.photos.filter(p => p.id !== id) }))}
+                    username={username}
+                  />
+                </SortableBoard>
+              ))}
             </div>
-
-            {/* Board = Bulletin + Wall */}
-            {activeTab === 'board' && (
-              <div>
-                {/* Pinned Bulletin */}
-                {u.pinned_bulletin && (
-                  <div className="profile-bulletin-board">
-                    <div className="profile-bulletin-title">
-                      📌 Bulletin
-                      {u.bulletin_updated_at && (
-                        <span style={{ fontSize: '.72rem', fontWeight: 400, marginLeft: '.5rem', color: 'var(--muted)' }}>
-                          {new Date(u.bulletin_updated_at).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                    <p className="profile-bulletin-text">{u.pinned_bulletin}</p>
-                  </div>
-                )}
-
-                {/* Wall compose */}
-                {authUser && !isOwn && (
-                  <form onSubmit={postOnWall} style={{ marginBottom: '1rem' }}>
-                    <textarea
-                      className="form-textarea"
-                      placeholder={`Post on ${u.username}'s wall…`}
-                      value={wallInput}
-                      onChange={e => setWallInput(e.target.value)}
-                      rows={2}
-                      style={{ marginBottom: '.4rem' }}
-                    />
-                    <button className="btn btn-primary btn-sm" disabled={posting || !wallInput.trim()}>
-                      {posting ? '…' : 'Post on Wall'}
-                    </button>
-                  </form>
-                )}
-
-                {/* Wall posts */}
-                {wall.length === 0 && !u.pinned_bulletin ? (
-                  <p className="empty">Nothing on the board yet.</p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
-                    {wall.map(wp => (
-                      <div key={wp.id} className="profile-wall-post">
-                        <div className="profile-wall-post-header">
-                          <Link to={`/profile/${wp.author_username}`} className="profile-wall-author">
-                            {wp.author_username}
-                            {wp.author_verified && <span className="profile-verified-sm">✓</span>}
-                          </Link>
-                          <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>
-                            {new Date(wp.created_at).toLocaleDateString()}
-                          </span>
-                          {(isOwn || authUser?.id === wp.author_id) && (
-                            <button className="btn btn-ghost btn-sm" style={{ padding: '0 .3rem', color: 'var(--danger)', fontSize: '.72rem' }}
-                              onClick={() => deleteWallPost(wp.id)}>✕</button>
-                          )}
-                        </div>
-                        <p className="profile-wall-post-content">{wp.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* My Posts */}
-            {activeTab === 'posts' && (
-              posts.length === 0 ? (
-                <p className="empty">No posts yet.</p>
-              ) : (
-                <div className="profile-posts-grid">
-                  {posts.map(p => <PostCard key={p.id} post={p} compact />)}
-                </div>
-              )
-            )}
-
-            {/* Events */}
-            {activeTab === 'events' && (
-              events.length === 0 ? (
-                <p className="empty">No events yet.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
-                  {events.map(e => (
-                    <Link key={e.id} to={`/posts/${e.id}`} className="profile-event-item">
-                      <div>
-                        <strong>{e.title}</strong>
-                        {e.location && <span style={{ fontSize: '.8rem', color: 'var(--muted)', marginLeft: '.5rem' }}>📍 {e.location}</span>}
-                      </div>
-                      {e.starts_at && (
-                        <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>
-                          {new Date(e.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                      )}
-                    </Link>
-                  ))}
-                </div>
-              )
-            )}
-
-            {/* Photos */}
-            {activeTab === 'photos' && (
-              <PhotoGallery
-                photos={photos}
-                albums={albumMap}
-                isOwn={isOwn}
-                token={token}
-                onUploadComplete={photo => setData(d => ({ ...d, photos: [photo, ...d.photos] }))}
-                onDelete={id => setData(d => ({ ...d, photos: d.photos.filter(p => p.id !== id) }))}
-              />
-            )}
-
-            {/* Invitations */}
-            {activeTab === 'invitations' && isOwn && (
-              <InvitationsTab token={token} />
-            )}
-          </div>
-        </div>
+          </SortableContext>
+        </DndContext>
       </div>
 
-      {/* Profile Editor */}
       {showEditor && (
         <ProfileEditor
           user={u}
@@ -436,6 +267,485 @@ export default function Profile() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ── Sortable Board Wrapper ────────────────────────────────────────────────────
+
+function SortableBoard({ board, children, isOwn, dragMode, accentColor, onSettingChange }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: board.board_type,
+    disabled: !dragMode,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 100 : undefined,
+    opacity: isDragging ? 0.6 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <BoardCard
+        board={board}
+        isOwn={isOwn}
+        dragMode={dragMode}
+        dragListeners={listeners}
+        accentColor={accentColor}
+        onSettingChange={onSettingChange}
+      >
+        {children}
+      </BoardCard>
+    </div>
+  );
+}
+
+// ── Board Card Shell ──────────────────────────────────────────────────────────
+
+function BoardCard({ board, children, isOwn, dragMode, dragListeners, accentColor, onSettingChange }) {
+  const [showSettings, setShowSettings] = useState(false);
+  const [expanded,     setExpanded]     = useState(false);
+
+  const cardStyle = {};
+  if (board.background_color) cardStyle.background = board.background_color;
+  if (board.font_color) cardStyle.color = board.font_color;
+
+  const headerStyle = { background: accentColor || 'var(--green)' };
+
+  return (
+    <div className={'profile-board-card' + (!board.is_visible && isOwn ? ' board-card-hidden' : '')} style={cardStyle}
+      data-board={board.board_type}>
+      <div className="profile-board-card-header" style={headerStyle}>
+        {dragMode && (
+          <span className="profile-drag-handle" {...dragListeners} title="Drag to reorder">⠿</span>
+        )}
+        <span className="profile-board-card-title">{BOARD_TITLES[board.board_type]}</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '.3rem', alignItems: 'center' }}>
+          {!board.is_visible && isOwn && (
+            <span style={{ fontSize: '.7rem', opacity: .7 }}>Hidden</span>
+          )}
+          {isOwn && (
+            <button className="profile-board-gear-btn" onClick={() => setShowSettings(v => !v)} title="Board settings">⚙</button>
+          )}
+        </div>
+      </div>
+
+      {showSettings && isOwn && (
+        <BoardSettings board={board} onChange={onSettingChange} accentColor={accentColor} />
+      )}
+
+      <div className={'profile-board-card-body' + (expanded ? ' expanded' : '')}>
+        {children}
+      </div>
+
+      <div className="profile-board-card-footer">
+        <button className="profile-board-view-all" onClick={() => setExpanded(v => !v)}>
+          {expanded ? 'Show Less ↑' : 'View All ↓'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Board Settings Panel ──────────────────────────────────────────────────────
+
+function BoardSettings({ board, onChange, accentColor }) {
+  return (
+    <div className="profile-board-settings-panel">
+      <div className="profile-board-settings-row">
+        <label>Background</label>
+        <input type="color" value={board.background_color || (accentColor || '#2a5f0a') + '22'}
+          onChange={e => onChange(board.board_type, { background_color: e.target.value })} />
+      </div>
+      <div className="profile-board-settings-row">
+        <label>Text Color</label>
+        <input type="color" value={board.font_color || '#1a1a1a'}
+          onChange={e => onChange(board.board_type, { font_color: e.target.value })} />
+      </div>
+      <div className="profile-board-settings-row">
+        <label>Visible to visitors</label>
+        <input type="checkbox" checked={board.is_visible}
+          onChange={e => onChange(board.board_type, { is_visible: e.target.checked })} />
+      </div>
+    </div>
+  );
+}
+
+// ── Board Content Router ──────────────────────────────────────────────────────
+
+function BoardContent({ board, user: u, profileData, boardsData, albumMap, isOwn, token, authUser, pStyle, onWallPost, onWallDelete, onPhotoUpload, onPhotoDelete, username }) {
+  const { posts, circles, copart, photos, wall } = profileData;
+  const rsvpEvents  = boardsData?.rsvp_events     || [];
+  const timeline    = boardsData?.timeline         || [];
+  const recentMsgs  = boardsData?.recent_messages  || [];
+  const recentChats = boardsData?.recent_chats     || [];
+
+  switch (board.board_type) {
+    case 'bulletin':
+      return <BulletinBoard user={u} wall={wall} isOwn={isOwn} token={token} authUser={authUser}
+                onWallPost={onWallPost} onWallDelete={onWallDelete} username={username} />;
+    case 'timeline':
+      return <TimelineBoard timeline={timeline} />;
+    case 'posts':
+      return <PostsBoard posts={posts} />;
+    case 'events':
+      return <EventsBoard rsvpEvents={rsvpEvents} profileEvents={profileData.events} isOwn={isOwn} />;
+    case 'photos':
+      return <PhotosBoard photos={photos} albumMap={albumMap} isOwn={isOwn} token={token}
+                onUpload={onPhotoUpload} onDelete={onPhotoDelete} />;
+    case 'circles':
+      return <CirclesBoard circles={circles} />;
+    case 'people':
+      return <PeopleBoard copart={copart} />;
+    case 'invitations':
+      return isOwn ? <InvitationsBoard token={token} /> : null;
+    case 'messages':
+      return isOwn ? <MessagesBoard conversations={recentMsgs} /> : null;
+    case 'chats':
+      return isOwn ? <ChatsBoard chats={recentChats} /> : null;
+    default:
+      return null;
+  }
+}
+
+// ── Board: Bulletin ───────────────────────────────────────────────────────────
+
+function BulletinBoard({ user: u, wall, isOwn, token, authUser, onWallPost, onWallDelete, username }) {
+  const [input, setInput] = useState('');
+  const [posting, setPosting] = useState(false);
+
+  async function handlePost(e) {
+    e.preventDefault();
+    if (!input.trim()) return;
+    setPosting(true);
+    try {
+      const wp = await api.postOnWall(username, { content: input.trim() }, token);
+      onWallPost(wp);
+      setInput('');
+    } catch (e) { alert(e.message); }
+    finally { setPosting(false); }
+  }
+
+  return (
+    <div className="bulletin-board-content">
+      {u.pinned_bulletin && (
+        <div className="profile-bulletin-pinned">
+          <span className="profile-bulletin-pin">📌</span>
+          <p>{u.pinned_bulletin}</p>
+          {u.bulletin_updated_at && (
+            <span className="profile-bulletin-date">{new Date(u.bulletin_updated_at).toLocaleDateString()}</span>
+          )}
+        </div>
+      )}
+      {authUser && !isOwn && (
+        <form onSubmit={handlePost} className="wall-compose">
+          <textarea className="form-textarea wall-compose-input" rows={2}
+            placeholder={`Leave a note on ${u.username}'s board…`}
+            value={input} onChange={e => setInput(e.target.value)} />
+          <button className="btn btn-primary btn-sm" disabled={posting || !input.trim()}>
+            {posting ? '…' : 'Post'}
+          </button>
+        </form>
+      )}
+      <div className="wall-posts-list">
+        {wall.slice(0, 5).map(wp => (
+          <div key={wp.id} className="profile-wall-post">
+            <div className="profile-wall-post-header">
+              <Link to={`/profile/${wp.author_username}`} className="profile-wall-author">
+                {wp.author_username}{wp.author_verified && <span className="profile-verified-sm">✓</span>}
+              </Link>
+              <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>{new Date(wp.created_at).toLocaleDateString()}</span>
+              {(isOwn || authUser?.id === wp.author_id) && (
+                <button className="btn btn-ghost" style={{ padding: '0 .25rem', fontSize: '.7rem', color: 'var(--danger)', marginLeft: 'auto' }}
+                  onClick={() => { if (confirm('Delete?')) onWallDelete(wp.id); }}>✕</button>
+              )}
+            </div>
+            <p className="profile-wall-post-content">{wp.content}</p>
+          </div>
+        ))}
+        {wall.length === 0 && !u.pinned_bulletin && (
+          <p className="empty" style={{ fontSize: '.85rem' }}>No posts yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Board: Timeline ───────────────────────────────────────────────────────────
+
+const TIMELINE_LABELS = {
+  post:        (item) => `Posted "${item.label}" (${item.sub_type})`,
+  circle_join: (item) => `Joined circle: ${item.label}`,
+  rsvp:        (item) => `RSVP'd ${item.sub_type} → "${item.label}"`,
+};
+
+function TimelineBoard({ timeline }) {
+  if (!timeline.length) return <p className="empty board-empty">No activity yet.</p>;
+  return (
+    <div className="timeline-list">
+      {timeline.slice(0, 8).map((item, i) => (
+        <div key={i} className="timeline-item">
+          <div className="timeline-dot" />
+          <div className="timeline-item-body">
+            <p className="timeline-item-label">
+              {TIMELINE_LABELS[item.activity_type]?.(item) || item.label}
+            </p>
+            <span className="timeline-item-date">
+              {new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Board: My Posts ───────────────────────────────────────────────────────────
+
+function PostsBoard({ posts }) {
+  if (!posts.length) return <p className="empty board-empty">No posts yet.</p>;
+  return (
+    <div className="board-posts-list">
+      {posts.slice(0, 4).map(p => (
+        <Link key={p.id} to={`/posts/${p.id}`} className="board-post-row">
+          <span className={`badge badge-${p.type} badge-xs`}>{p.type}</span>
+          {(p.auto_urgent || p.is_urgent) && <span className="urgency-dot dot-auto" style={{ width: 7, height: 7 }} />}
+          <span className="board-post-title">{p.title}</span>
+          <span className="board-post-date" style={{ marginLeft: 'auto', fontSize: '.72rem', color: 'var(--muted)', flexShrink: 0 }}>
+            {new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// ── Board: Events ─────────────────────────────────────────────────────────────
+
+function EventsBoard({ rsvpEvents, profileEvents }) {
+  const going      = rsvpEvents.filter(e => e.rsvp_status === 'going');
+  const interested = rsvpEvents.filter(e => e.rsvp_status === 'interested');
+  const saved      = rsvpEvents.filter(e => e.rsvp_status === 'saved');
+
+  const allEmpty = !going.length && !interested.length && !saved.length && !profileEvents.length;
+  if (allEmpty) return <p className="empty board-empty">No events yet.</p>;
+
+  function EventRow({ e }) {
+    return (
+      <Link to={`/posts/${e.id}`} className="board-event-row">
+        <span className="board-event-title">{e.title}</span>
+        {e.location && <span className="board-event-meta">📍 {e.location}</span>}
+        {e.starts_at && <span className="board-event-meta">
+          {new Date(e.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </span>}
+        {e.rsvp_going_count > 0 && <span className="board-event-going">{e.rsvp_going_count} going</span>}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="events-board-content">
+      {going.length > 0 && (
+        <div className="events-group">
+          <div className="events-group-label going">Going ({going.length})</div>
+          {going.slice(0, 3).map(e => <EventRow key={e.id} e={e} />)}
+        </div>
+      )}
+      {interested.length > 0 && (
+        <div className="events-group">
+          <div className="events-group-label interested">Interested ({interested.length})</div>
+          {interested.slice(0, 3).map(e => <EventRow key={e.id} e={e} />)}
+        </div>
+      )}
+      {saved.length > 0 && (
+        <div className="events-group">
+          <div className="events-group-label saved">Saved ({saved.length})</div>
+          {saved.slice(0, 3).map(e => <EventRow key={e.id} e={e} />)}
+        </div>
+      )}
+      {profileEvents.length > 0 && (going.length + interested.length + saved.length === 0) && (
+        <div>
+          {profileEvents.slice(0, 4).map(e => <EventRow key={e.id} e={e} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Board: Photos ─────────────────────────────────────────────────────────────
+
+function PhotosBoard({ photos, albumMap, isOwn, token, onUpload, onDelete }) {
+  const [lightbox, setLightbox] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [activeAlbum, setActiveAlbum] = useState('all');
+  const fileRef = useRef(null);
+  const albumNames = Object.keys(albumMap);
+  const display = activeAlbum === 'all' ? photos : (albumMap[activeAlbum] || []);
+
+  async function handleUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await api.uploadProfilePhoto(file, { album_name: 'General' }, token);
+      onUpload(res.photo);
+    } catch (e) { alert(e.message); }
+    finally { setUploading(false); e.target.value = ''; }
+  }
+
+  if (!photos.length && !isOwn) {
+    return <p className="empty board-empty">No photos yet.</p>;
+  }
+
+  return (
+    <div>
+      {isOwn && (
+        <div style={{ marginBottom: '.6rem', display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+          <button className="btn btn-outline btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? 'Uploading…' : '+ Upload Photo'}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleUpload} />
+        </div>
+      )}
+      {albumNames.length > 1 && (
+        <div className="tab-bar" style={{ marginBottom: '.5rem', flexWrap: 'wrap' }}>
+          <button className={'tab-btn' + (activeAlbum === 'all' ? ' active' : '')} onClick={() => setActiveAlbum('all')}>
+            All ({photos.length})
+          </button>
+          {albumNames.map(n => (
+            <button key={n} className={'tab-btn' + (activeAlbum === n ? ' active' : '')} onClick={() => setActiveAlbum(n)}>
+              {n} ({albumMap[n].length})
+            </button>
+          ))}
+        </div>
+      )}
+      {display.length === 0 ? (
+        <p className="empty board-empty">No photos in this album.</p>
+      ) : (
+        <div className="profile-photo-grid">
+          {display.map(photo => (
+            <div key={photo.id} className="profile-photo-item" onClick={() => setLightbox(photo.url)}>
+              <img src={photo.url} alt={photo.caption || ''} loading="lazy" />
+              {photo.caption && <div className="profile-photo-caption">{photo.caption}</div>}
+              {isOwn && (
+                <button className="profile-photo-delete" onClick={async e => {
+                  e.stopPropagation();
+                  if (!confirm('Delete this photo?')) return;
+                  await api.deleteProfilePhoto(photo.id, token);
+                  onDelete(photo.id);
+                }}>✕</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {lightbox && (
+        <div className="lightbox-overlay" onClick={() => setLightbox(null)}>
+          <button className="lightbox-close" onClick={() => setLightbox(null)}>✕</button>
+          <img src={lightbox} alt="" onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain' }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Board: Circles ────────────────────────────────────────────────────────────
+
+function CirclesBoard({ circles }) {
+  if (!circles.length) return <p className="empty board-empty">No circles yet.</p>;
+  return (
+    <ul className="profile-circles-list">
+      {circles.slice(0, 6).map(c => (
+        <li key={c.id}>
+          <Link to={`/commons/${c.id}`} className="profile-circle-item">
+            <span className="profile-circle-name">{c.name}</span>
+            {c.circle_type && <span className="badge badge-gray" style={{ fontSize: '.65rem' }}>{c.circle_type.replace('_',' ')}</span>}
+            <span className="profile-circle-count" style={{ marginLeft: 'auto' }}>{c.member_count} members</span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// ── Board: People ─────────────────────────────────────────────────────────────
+
+function PeopleBoard({ copart }) {
+  if (!copart.length) return <p className="empty board-empty">No connections yet.</p>;
+  return (
+    <div className="profile-copart-row">
+      {copart.slice(0, 12).map(c => (
+        <Link key={c.id} to={`/profile/${c.username}`} className="profile-copart-item" title={`${c.username} — ${c.shared_circles} shared circles`}>
+          <div className="profile-copart-avatar">
+            {c.avatar_url ? <img src={resolveUrl(c.avatar_url)} alt={c.username} /> : c.username[0].toUpperCase()}
+          </div>
+          <span className="profile-copart-name">{c.username}</span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// ── Board: Invitations ────────────────────────────────────────────────────────
+
+function InvitationsBoard({ token }) {
+  const [invitations, setInvitations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const STATUS_CLASS = { pending: 'badge-gray', accepted: 'badge-green', expired: 'badge-red' };
+
+  useEffect(() => {
+    api.getMyInvitations(token).then(setInvitations).catch(() => {}).finally(() => setLoading(false));
+  }, [token]);
+
+  if (loading) return <div className="spinner" style={{ margin: '.5rem auto', width: 20, height: 20 }} />;
+  if (!invitations.length) return <p className="empty board-empty">No invitations sent yet.</p>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+      {invitations.slice(0, 5).map(inv => (
+        <div key={inv.id} className="board-invite-row">
+          <span className="board-invite-email">{inv.email}</span>
+          <span className={`badge ${STATUS_CLASS[inv.status]}`} style={{ fontSize: '.65rem' }}>{inv.status}</span>
+          {inv.status === 'accepted' && inv.accepted_by_username && (
+            <Link to={`/profile/${inv.accepted_by_username}`} style={{ fontSize: '.75rem', color: 'var(--green)' }}>
+              → {inv.accepted_by_username}
+            </Link>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Board: Messages ───────────────────────────────────────────────────────────
+
+function MessagesBoard({ conversations }) {
+  if (!conversations.length) return <p className="empty board-empty">No messages yet.</p>;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+      {conversations.slice(0, 4).map((c, i) => (
+        <Link key={i} to={`/messages?with=${c.other_id}`} className="board-message-row">
+          <span className="board-message-user">{c.other_username}</span>
+          <span className="board-message-preview">{c.last_message?.slice(0, 50)}</span>
+          {!c.read && <span className="board-unread-dot" />}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// ── Board: Chats ──────────────────────────────────────────────────────────────
+
+function ChatsBoard({ chats }) {
+  if (!chats.length) return <p className="empty board-empty">No recent chat activity.</p>;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+      {chats.slice(0, 4).map((c, i) => (
+        <Link key={i} to={`/chat`} className="board-chat-row">
+          <span className="board-chat-room">{c.room_name}</span>
+          <span className="board-chat-preview">{c.content?.slice(0, 40)}</span>
+        </Link>
+      ))}
     </div>
   );
 }
@@ -458,24 +768,11 @@ function AvatarBlock({ user: u, isOwn, token, onUpdated }) {
   }
 
   return (
-    <div
-      className={'profile-avatar-lg' + (isOwn ? ' clickable' : '')}
-      onClick={isOwn ? () => fileRef.current?.click() : undefined}
-      title={isOwn ? 'Change profile photo' : u.username}
-    >
-      {u.avatar_url
-        ? <img src={resolveAvatar(u.avatar_url)} alt={u.username} />
-        : <span>{u.username[0].toUpperCase()}</span>
-      }
-      {isOwn && (
-        <div className={'profile-avatar-overlay' + (uploading ? ' uploading' : '')}>
-          {uploading ? '…' : '📷'}
-        </div>
-      )}
-      {isOwn && (
-        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif"
-          style={{ display: 'none' }} onChange={handleChange} />
-      )}
+    <div className={'profile-avatar-lg' + (isOwn ? ' clickable' : '')}
+      onClick={isOwn ? () => fileRef.current?.click() : undefined}>
+      {u.avatar_url ? <img src={resolveUrl(u.avatar_url)} alt={u.username} /> : <span>{u.username[0].toUpperCase()}</span>}
+      {isOwn && <div className={'profile-avatar-overlay' + (uploading ? ' uploading' : '')}>{uploading ? '…' : '📷'}</div>}
+      {isOwn && <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleChange} />}
     </div>
   );
 }
@@ -502,117 +799,8 @@ function BannerUpload({ token, onUploaded }) {
       <button className="profile-banner-edit-btn" onClick={() => fileRef.current?.click()} disabled={uploading}>
         {uploading ? '…' : '📷 Change Banner'}
       </button>
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp"
-        style={{ display: 'none' }} onChange={handleChange} />
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={handleChange} />
     </>
-  );
-}
-
-// ── Photo Gallery ─────────────────────────────────────────────────────────────
-
-function PhotoGallery({ photos, albums, isOwn, token, onUploadComplete, onDelete }) {
-  const [uploading, setUploading] = useState(false);
-  const [activeAlbum, setActiveAlbum] = useState('all');
-  const [uploadCaption, setUploadCaption] = useState('');
-  const [uploadAlbum, setUploadAlbum] = useState('General');
-  const [showUpload, setShowUpload] = useState(false);
-  const fileRef = useRef(null);
-
-  const albumNames = Object.keys(albums);
-  const displayPhotos = activeAlbum === 'all' ? photos : (albums[activeAlbum] || []);
-
-  async function handleUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const res = await api.uploadProfilePhoto(file, {
-        caption: uploadCaption || undefined,
-        album_name: uploadAlbum || 'General',
-      }, token);
-      onUploadComplete(res.photo);
-      setShowUpload(false);
-      setUploadCaption('');
-    } catch (e) { alert(e.message); }
-    finally { setUploading(false); e.target.value = ''; }
-  }
-
-  if (photos.length === 0 && !isOwn) {
-    return (
-      <div className="profile-photos-placeholder">
-        <div className="profile-photos-placeholder-icon">📷</div>
-        <p>Your photo gallery lives here — upload your first photo to get started</p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {isOwn && (
-        <div style={{ marginBottom: '1rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowUpload(v => !v)}>
-            {showUpload ? 'Cancel' : '+ Upload Photo'}
-          </button>
-        </div>
-      )}
-
-      {showUpload && isOwn && (
-        <div className="card" style={{ marginBottom: '1rem', padding: '1rem' }}>
-          <div className="form-group" style={{ marginBottom: '.6rem' }}>
-            <label className="form-label">Album</label>
-            <input className="form-input" value={uploadAlbum}
-              onChange={e => setUploadAlbum(e.target.value)} placeholder="General" />
-          </div>
-          <div className="form-group" style={{ marginBottom: '.75rem' }}>
-            <label className="form-label">Caption (optional)</label>
-            <input className="form-input" value={uploadCaption}
-              onChange={e => setUploadCaption(e.target.value)} />
-          </div>
-          <button className="btn btn-primary btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
-            {uploading ? 'Uploading…' : 'Choose Photo'}
-          </button>
-          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif"
-            style={{ display: 'none' }} onChange={handleUpload} />
-        </div>
-      )}
-
-      {albumNames.length > 1 && (
-        <div className="tab-bar" style={{ marginBottom: '.75rem' }}>
-          <button className={'tab-btn' + (activeAlbum === 'all' ? ' active' : '')} onClick={() => setActiveAlbum('all')}>
-            All ({photos.length})
-          </button>
-          {albumNames.map(name => (
-            <button key={name} className={'tab-btn' + (activeAlbum === name ? ' active' : '')} onClick={() => setActiveAlbum(name)}>
-              {name} ({albums[name].length})
-            </button>
-          ))}
-        </div>
-      )}
-
-      {displayPhotos.length === 0 ? (
-        <div className="profile-photos-placeholder">
-          <div className="profile-photos-placeholder-icon">📷</div>
-          <p>Your photo gallery lives here — upload your first photo to get started</p>
-        </div>
-      ) : (
-        <div className="profile-photo-grid">
-          {displayPhotos.map(photo => (
-            <div key={photo.id} className="profile-photo-item">
-              <img src={photo.url} alt={photo.caption || ''} loading="lazy" />
-              {photo.caption && <div className="profile-photo-caption">{photo.caption}</div>}
-              {isOwn && (
-                <button className="profile-photo-delete"
-                  onClick={async () => {
-                    if (!confirm('Delete this photo?')) return;
-                    await api.deleteProfilePhoto(photo.id, token);
-                    onDelete(photo.id);
-                  }}>✕</button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -621,28 +809,17 @@ function PhotoGallery({ photos, albums, isOwn, token, onUploadComplete, onDelete
 function ProfileEditor({ user: u, token, onClose, onSaved }) {
   const [editorTab, setEditorTab] = useState('appearance');
   const [form, setForm] = useState({
-    // Identity
-    username: u.username || '',
-    bio:      u.bio || '',
-    location: u.location || '',
-    website:  u.website || '',
-    interests: (u.interests || []).join(', '),
-    // Mood & status
-    mood:        u.mood || '',
-    mood_emoji:  u.mood_emoji || '',
-    status_text: u.status_text || '',
-    // Music
-    music_url:   u.music_url || '',
-    music_label: u.music_label || '',
-    // Appearance
-    accent_color:        u.accent_color || '#2a5f0a',
-    background_color:    u.background_color || '',
+    username: u.username || '', bio: u.bio || '', location: u.location || '',
+    website: u.website || '', interests: (u.interests || []).join(', '),
+    mood: u.mood || '', mood_emoji: u.mood_emoji || '', status_text: u.status_text || '',
+    music_url: u.music_url || '', music_label: u.music_label || '',
+    accent_color: u.accent_color || '#2a5f0a',
+    background_color: u.background_color || '',
     background_gradient: u.background_gradient || '',
-    use_gradient:        !!u.background_gradient,
-    font_style:          u.font_style || 'modern',
-    layout:              u.layout || 'standard',
-    profile_theme:       u.profile_theme || 'light',
-    // Bulletin
+    use_gradient: !!u.background_gradient,
+    font_style: u.font_style || 'modern',
+    layout: u.layout || 'standard',
+    profile_theme: u.profile_theme || 'light',
     pinned_bulletin: u.pinned_bulletin || '',
   });
   const [saving, setSaving] = useState(false);
@@ -654,38 +831,33 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true); setErr(null);
     try {
-      const payload = {
+      const updated = await api.customizeProfile({
         username:   form.username.trim() || undefined,
         bio:        form.bio || undefined,
         location:   form.location || undefined,
         website:    form.website || undefined,
         interests:  form.interests ? form.interests.split(',').map(t => t.trim()).filter(Boolean) : [],
-        mood:        form.mood || undefined,
-        mood_emoji:  form.mood_emoji || undefined,
+        mood: form.mood || undefined, mood_emoji: form.mood_emoji || undefined,
         status_text: form.status_text || undefined,
-        music_url:   form.music_url || undefined,
-        music_label: form.music_label || undefined,
-        accent_color:        form.accent_color || undefined,
+        music_url: form.music_url || undefined, music_label: form.music_label || undefined,
+        accent_color: form.accent_color || undefined,
         background_color:    !form.use_gradient ? (form.background_color || undefined) : undefined,
-        background_gradient: form.use_gradient ? (form.background_gradient || undefined) : undefined,
-        font_style:    form.font_style || undefined,
-        layout:        form.layout || undefined,
+        background_gradient: form.use_gradient  ? (form.background_gradient || undefined) : undefined,
+        font_style: form.font_style || undefined, layout: form.layout || undefined,
         profile_theme: form.profile_theme || undefined,
         pinned_bulletin: form.pinned_bulletin || undefined,
-      };
-      const updated = await api.customizeProfile(payload, token);
+      }, token);
       onSaved(updated);
       onClose();
     } catch (e) { setErr(e.message); }
     finally { setSaving(false); }
   }
 
-  const EDITOR_TABS = [
+  const TABS = [
     { id: 'appearance', label: 'Appearance' },
     { id: 'identity',   label: 'Identity' },
     { id: 'mood',       label: 'Mood & Status' },
     { id: 'music',      label: 'Music' },
-    { id: 'photos',     label: 'Photos' },
   ];
 
   return (
@@ -695,27 +867,22 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
           <h2 className="profile-editor-title">Edit Profile</h2>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>✕ Close</button>
         </div>
-
         <div className="profile-editor-tabs">
-          {EDITOR_TABS.map(t => (
+          {TABS.map(t => (
             <button key={t.id} className={'profile-editor-tab' + (editorTab === t.id ? ' active' : '')}
-              onClick={() => setEditorTab(t.id)}>
-              {t.label}
-            </button>
+              onClick={() => setEditorTab(t.id)}>{t.label}</button>
           ))}
         </div>
-
         <form onSubmit={handleSave} className="profile-editor-body">
-          {/* Appearance */}
           {editorTab === 'appearance' && (
             <div className="profile-editor-section">
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Accent Color</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                  <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
                     <input type="color" value={form.accent_color}
                       onChange={e => set('accent_color', e.target.value)}
-                      style={{ width: '44px', height: '32px', border: 'none', cursor: 'pointer', borderRadius: '4px' }} />
+                      style={{ width: 44, height: 32, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
                     <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{form.accent_color}</span>
                   </div>
                 </div>
@@ -730,7 +897,6 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
                   </div>
                 </div>
               </div>
-
               <div className="form-group">
                 <label className="form-label">Background</label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.5rem', fontSize: '.85rem', cursor: 'pointer' }}>
@@ -738,96 +904,65 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
                   Use gradient
                 </label>
                 {form.use_gradient ? (
-                  <>
-                    <input className="form-input" value={form.background_gradient}
-                      onChange={e => set('background_gradient', e.target.value)}
-                      placeholder="e.g. linear-gradient(135deg, #1a1a2e, #16213e)" />
-                    <p style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: '.25rem' }}>CSS gradient value</p>
-                  </>
+                  <input className="form-input" value={form.background_gradient}
+                    onChange={e => set('background_gradient', e.target.value)}
+                    placeholder="e.g. linear-gradient(135deg, #1a1a2e, #16213e)" />
                 ) : (
                   <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
                     <input type="color" value={form.background_color || '#f2ede4'}
                       onChange={e => set('background_color', e.target.value)}
-                      style={{ width: '44px', height: '32px', border: 'none', cursor: 'pointer', borderRadius: '4px' }} />
+                      style={{ width: 44, height: 32, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
                     <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{form.background_color || '#f2ede4'}</span>
                   </div>
                 )}
               </div>
-
               <div className="form-group">
                 <label className="form-label">Font Style</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
                   {Object.entries(FONT_STYLES).map(([key, fs]) => (
                     <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', fontSize: '.9rem' }}>
-                      <input type="radio" name="font_style" value={key} checked={form.font_style === key}
-                        onChange={() => set('font_style', key)} />
+                      <input type="radio" name="font_style" value={key} checked={form.font_style === key} onChange={() => set('font_style', key)} />
                       <span style={{ fontFamily: fs.css }}>{fs.label} — The quick brown fox</span>
                     </label>
                   ))}
                 </div>
               </div>
-
-              <div className="form-group">
-                <label className="form-label">Layout</label>
-                <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
-                  {LAYOUT_OPTIONS.map(opt => (
-                    <button key={opt.value} type="button"
-                      className={'tab-btn' + (form.layout === opt.value ? ' active' : '')}
-                      onClick={() => set('layout', opt.value)}>{opt.label}</button>
-                  ))}
-                </div>
-              </div>
-
               <div className="form-group">
                 <label className="form-label">Pinned Bulletin (500 chars)</label>
                 <textarea className="form-textarea" rows={3} value={form.pinned_bulletin}
-                  onChange={e => set('pinned_bulletin', e.target.value)}
-                  placeholder="What do you want your visitors to know right now?"
-                  maxLength={500} />
-                <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: '.2rem' }}>
-                  {form.pinned_bulletin.length}/500
-                </p>
+                  onChange={e => set('pinned_bulletin', e.target.value)} maxLength={500}
+                  placeholder="What do you want visitors to know?" />
+                <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: '.2rem' }}>{form.pinned_bulletin.length}/500</p>
               </div>
             </div>
           )}
-
-          {/* Identity */}
           {editorTab === 'identity' && (
             <div className="profile-editor-section">
               <div className="form-group">
                 <label className="form-label">Username</label>
-                <input className="form-input" value={form.username}
-                  onChange={e => set('username', e.target.value)} />
+                <input className="form-input" value={form.username} onChange={e => set('username', e.target.value)} />
               </div>
               <div className="form-group">
                 <label className="form-label">Bio</label>
-                <textarea className="form-textarea" rows={4} value={form.bio}
-                  onChange={e => set('bio', e.target.value)}
-                  placeholder="Tell people about yourself…" />
+                <textarea className="form-textarea" rows={4} value={form.bio} onChange={e => set('bio', e.target.value)} />
               </div>
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Location</label>
-                  <input className="form-input" value={form.location}
-                    onChange={e => set('location', e.target.value)} />
+                  <input className="form-input" value={form.location} onChange={e => set('location', e.target.value)} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Website</label>
-                  <input className="form-input" value={form.website}
-                    onChange={e => set('website', e.target.value)}
-                    placeholder="https://…" />
+                  <input className="form-input" value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://…" />
                 </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Interests (comma-separated)</label>
-                <input className="form-input" value={form.interests}
-                  onChange={e => set('interests', e.target.value)}
+                <input className="form-input" value={form.interests} onChange={e => set('interests', e.target.value)}
                   placeholder="e.g. gardening, mutual aid, local history" />
               </div>
             </div>
           )}
-
-          {/* Mood & Status */}
           {editorTab === 'mood' && (
             <div className="profile-editor-section">
               <div className="form-group">
@@ -836,17 +971,13 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
                   {MOODS.map(m => (
                     <button key={m.label} type="button"
                       className={'profile-mood-option' + (form.mood === m.label ? ' selected' : '')}
-                      onClick={() => { set('mood', m.label); set('mood_emoji', m.emoji); }}
-                      title={m.label}
-                    >
-                      <span>{m.emoji}</span>
-                      <span>{m.label}</span>
+                      onClick={() => { set('mood', m.label); set('mood_emoji', m.emoji); }}>
+                      <span>{m.emoji}</span><span>{m.label}</span>
                     </button>
                   ))}
                   <button type="button"
                     className={'profile-mood-option' + (!form.mood ? ' selected' : '')}
-                    onClick={() => { set('mood', ''); set('mood_emoji', ''); }}
-                  >
+                    onClick={() => { set('mood', ''); set('mood_emoji', ''); }}>
                     <span>—</span><span>None</span>
                   </button>
                 </div>
@@ -854,160 +985,34 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
               <div className="form-group">
                 <label className="form-label">Status (100 chars)</label>
                 <input className="form-input" value={form.status_text}
-                  onChange={e => set('status_text', e.target.value)}
-                  placeholder="What's on your mind?" maxLength={100} />
+                  onChange={e => set('status_text', e.target.value)} maxLength={100}
+                  placeholder="What's on your mind?" />
               </div>
             </div>
           )}
-
-          {/* Music */}
           {editorTab === 'music' && (
             <div className="profile-editor-section">
               <p style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-                Paste any link from YouTube, SoundCloud, Spotify, Amazon Music, or any other platform. It displays as a music bar on your profile.
+                Paste any music link. It displays as a music bar on your profile.
               </p>
               <div className="form-group">
                 <label className="form-label">Music URL</label>
-                <input className="form-input" value={form.music_url}
-                  onChange={e => set('music_url', e.target.value)}
-                  placeholder="https://open.spotify.com/…" />
+                <input className="form-input" value={form.music_url} onChange={e => set('music_url', e.target.value)} placeholder="https://open.spotify.com/…" />
               </div>
               <div className="form-group">
-                <label className="form-label">Label (song/artist name)</label>
-                <input className="form-input" value={form.music_label}
-                  onChange={e => set('music_label', e.target.value)}
-                  placeholder="e.g. Ain't No Mountain High Enough — Marvin Gaye" />
+                <label className="form-label">Label (song/artist)</label>
+                <input className="form-input" value={form.music_label} onChange={e => set('music_label', e.target.value)}
+                  placeholder="e.g. Ain't No Mountain High Enough" />
               </div>
-              {form.music_url && (
-                <div className="profile-music-bar" style={{ '--pa': form.accent_color || 'var(--green)', marginTop: '.5rem', pointerEvents: 'none' }}>
-                  <span className="profile-music-icon">♪</span>
-                  <span className="profile-music-label">{form.music_label || 'Now playing'}</span>
-                  <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>Preview</span>
-                </div>
-              )}
             </div>
           )}
-
-          {/* Photos */}
-          {editorTab === 'photos' && (
-            <div className="profile-editor-section">
-              <p style={{ fontSize: '.85rem', color: 'var(--muted)' }}>
-                Upload photos and manage your gallery from the Photos tab on your profile page.
-                You can also set your profile photo and banner from there.
-              </p>
-            </div>
-          )}
-
           {err && <p className="form-error" style={{ marginTop: '.5rem' }}>{err}</p>}
-
           <div className="profile-editor-footer">
-            <button className="btn btn-primary" type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Save Changes'}
-            </button>
+            <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button>
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
           </div>
         </form>
       </div>
     </div>
-  );
-}
-
-// ── Invitations Tab ───────────────────────────────────────────────────────────
-
-function InvitationsTab({ token }) {
-  const [invitations, setInvitations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-
-  useEffect(() => {
-    api.getMyInvitations(token)
-      .then(setInvitations)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [token]);
-
-  const STATUS_LABEL = { pending: 'Pending', accepted: 'Accepted', expired: 'Expired' };
-  const STATUS_CLASS = { pending: 'badge-gray', accepted: 'badge-green', expired: 'badge-red' };
-
-  if (loading) return <div className="spinner" />;
-
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-        <p style={{ fontSize: '.85rem', color: 'var(--muted)' }}>
-          {invitations.length} invitation{invitations.length !== 1 ? 's' : ''} sent
-        </p>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Send Invite</button>
-      </div>
-
-      {invitations.length === 0 ? (
-        <p className="empty">No invitations sent yet.</p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-          {invitations.map(inv => (
-            <div key={inv.id} className="invite-list-row">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p className="invite-list-email">{inv.email}</p>
-                {inv.personal_note && <p className="invite-list-note">"{inv.personal_note}"</p>}
-                <p className="invite-list-date">
-                  Sent {new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  {inv.status === 'accepted' && inv.accepted_by_username && (
-                    <> · Joined as{' '}
-                      <Link to={`/profile/${inv.accepted_by_username}`} style={{ color: 'var(--green)' }}>
-                        {inv.accepted_by_username}
-                      </Link>
-                    </>
-                  )}
-                  {inv.status === 'pending' && (
-                    <> · Expires {new Date(inv.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</>
-                  )}
-                </p>
-              </div>
-              <span className={`badge ${STATUS_CLASS[inv.status]}`}>{STATUS_LABEL[inv.status]}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {showForm && (
-        <div style={{ marginTop: '1rem' }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowForm(false)} style={{ marginBottom: '.5rem' }}>Cancel</button>
-          <InviteInline token={token} onSent={() => setShowForm(false)} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function InviteInline({ token, onSent }) {
-  const [form, setForm] = useState({ email: '', personal_note: '' });
-  const [sending, setSending] = useState(false);
-  const [err, setErr] = useState(null);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setSending(true); setErr(null);
-    try {
-      await api.sendInvitation(form, token);
-      onSent();
-    } catch (e) { setErr(e.message); }
-    finally { setSending(false); }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '.6rem', maxWidth: '400px' }}>
-      <div className="form-group">
-        <label className="form-label">Email *</label>
-        <input type="email" className="form-input" required value={form.email}
-          onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-      </div>
-      <div className="form-group">
-        <label className="form-label">Personal note</label>
-        <input className="form-input" value={form.personal_note}
-          onChange={e => setForm(f => ({ ...f, personal_note: e.target.value }))} />
-      </div>
-      {err && <p className="form-error">{err}</p>}
-      <div><button className="btn btn-primary btn-sm" disabled={sending}>{sending ? '…' : 'Send Invite'}</button></div>
-    </form>
   );
 }

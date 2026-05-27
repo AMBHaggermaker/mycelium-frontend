@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../auth';
 import api from '../api';
 import PostCard from '../components/PostCard';
 import NewPostModal from '../components/NewPostModal';
 import UrgentStrip from '../components/UrgentStrip';
+import { getSocket } from '../socket';
 
 const FEED_TABS = [
   { value: '',          label: 'All',               desc: 'Everything from the community' },
@@ -35,6 +36,7 @@ const SORTS = [
 
 export default function Feed({ onRequireAuth }) {
   const { user, token } = useAuth();
+  // token is also used by the Live Network sidebar
   const [posts,           setPosts]           = useState([]);
   const [feedTab,         setFeedTab]         = useState('');
   const [type,            setType]            = useState('');
@@ -102,7 +104,11 @@ export default function Feed({ onRequireAuth }) {
   const activeFeedTab = FEED_TABS.find(t => t.value === feedTab);
 
   return (
-    <div className="page">
+    <div className="page feed-page-layout">
+      {/* Mobile Live button */}
+      <MobileLiveDrawer token={token} />
+
+      <div className="feed-main-col">
       <div className="container">
         <div className="page-header">
           <div>
@@ -260,5 +266,136 @@ export default function Feed({ onRequireAuth }) {
         <NewPostModal onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); load(); }} />
       )}
     </div>
+
+    <aside className="live-network-sidebar">
+      <LiveNetworkPanel token={token} />
+    </aside>
+  </div>
+  );
+}
+
+// ── Live Network Panel ────────────────────────────────────────────────────────
+
+const ACTIVITY_LABELS = {
+  new_post:     (d) => `New ${d.type}: ${d.title?.slice(0, 40)}`,
+  rsvp:         (d) => `Someone marked Going: ${d.event_title?.slice(0, 35)}`,
+  watch_report: (d) => `Watch report: ${d.dashboard || 'submitted'}`,
+  chat_message: (d) => `Chat activity: ${d.room_name || 'room'}`,
+  new_member:   (d) => `New member joined${d.location ? ` · ${d.location}` : ''}`,
+  pattern_report:(d)=> `Pattern flagged: ${d.institution?.slice(0, 35)}`,
+  anomaly:      (d) => `Anomaly detected: ${d.description?.slice(0, 40)}`,
+};
+
+const SEVERITY_STYLES = {
+  urgent:   { background: '#fff3cd', borderLeft: '3px solid #e8a400', color: '#7a4f00' },
+  critical: { background: '#fce8e8', borderLeft: '3px solid #b52424', color: '#b52424' },
+  success:  { background: '#eef8ee', borderLeft: '3px solid #2a5f0a', color: '#2a5f0a' },
+  normal:   { background: 'var(--surface)', borderLeft: '3px solid var(--border)' },
+};
+
+function LiveNetworkPanel({ token }) {
+  const [activities, setActivities] = useState([]);
+  const [activeNow,  setActiveNow]  = useState(0);
+  const [todayStats, setTodayStats] = useState(null);
+  const [newIds,     setNewIds]     = useState(new Set());
+
+  useEffect(() => {
+    api.getTodayActivity().then(setTodayStats).catch(() => {});
+    const iv = setInterval(() => api.getTodayActivity().then(setTodayStats).catch(() => {}), 60000);
+    return () => clearInterval(iv);
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const socket = getSocket(token);
+
+    function onActivity(event) {
+      const item = { ...event, _id: Math.random().toString(36).slice(2) };
+      setActivities(prev => [item, ...prev].slice(0, 20));
+      setNewIds(ids => {
+        const next = new Set([...ids, item._id]);
+        setTimeout(() => setNewIds(s => { const n = new Set(s); n.delete(item._id); return n; }), 1500);
+        return next;
+      });
+    }
+    function onPresence({ active }) { setActiveNow(active); }
+
+    socket.on('network_activity', onActivity);
+    socket.on('presence_update', onPresence);
+    return () => { socket.off('network_activity', onActivity); socket.off('presence_update', onPresence); };
+  }, [token]);
+
+  return (
+    <div className="live-network-panel">
+      <div className="live-network-header">
+        <span className="live-dot" />
+        <span className="live-network-title">Live Network</span>
+        {activeNow > 0 && <span className="live-active-count">{activeNow} online</span>}
+      </div>
+
+      {todayStats && (
+        <div className="live-today-stats">
+          <div className="live-stat"><span className="live-stat-val">{todayStats.posts_today}</span><span>posts</span></div>
+          <div className="live-stat"><span className="live-stat-val">{todayStats.urgent_today}</span><span>urgent</span></div>
+          <div className="live-stat"><span className="live-stat-val">{todayStats.members_today}</span><span>new members</span></div>
+          <div className="live-stat"><span className="live-stat-val">{todayStats.rsvps_today}</span><span>rsvps</span></div>
+        </div>
+      )}
+
+      <div className="live-activity-feed">
+        {activities.length === 0 && (
+          <p style={{ fontSize: '.8rem', color: 'var(--muted)', padding: '.5rem', textAlign: 'center' }}>
+            Waiting for activity…
+          </p>
+        )}
+        {activities.map(item => (
+          <div key={item._id}
+            className={'live-activity-item' + (newIds.has(item._id) ? ' live-item-pulse' : '')}
+            style={SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.normal}
+          >
+            <p className="live-activity-text">
+              {ACTIVITY_LABELS[item.type]?.(item.data || {}) || item.type}
+            </p>
+            <span className="live-activity-time">
+              {new Date(item.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Mobile Live Drawer ────────────────────────────────────────────────────────
+
+function MobileLiveDrawer({ token }) {
+  const [open, setOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!token) return;
+    const socket = getSocket(token);
+    function onActivity() { if (!open) setUnread(n => n + 1); }
+    socket.on('network_activity', onActivity);
+    return () => socket.off('network_activity', onActivity);
+  }, [token, open]);
+
+  function handleOpen() { setOpen(true); setUnread(0); }
+
+  return (
+    <>
+      <button className="live-mobile-btn" onClick={handleOpen}>
+        <span className="live-dot" />
+        Live{unread > 0 && <span className="live-mobile-badge">{unread}</span>}
+      </button>
+      {open && (
+        <div className="live-mobile-drawer-backdrop" onClick={() => setOpen(false)}>
+          <div className="live-mobile-drawer" onClick={e => e.stopPropagation()}>
+            <div className="live-mobile-drawer-handle" onClick={() => setOpen(false)} />
+            <LiveNetworkPanel token={token} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
