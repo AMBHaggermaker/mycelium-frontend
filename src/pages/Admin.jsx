@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
@@ -141,11 +141,13 @@ function ModerationQueue({ token }) {
 
 function UsersTab({ token }) {
   const { user: me } = useAuth();
-  const [users,           setUsers]          = useState([]);
-  const [loading,         setLoading]        = useState(true);
-  const [err,             setErr]            = useState(null);
-  const [actionId,        setActionId]       = useState(null);
-  const [founderOnly,     setFounderOnly]    = useState(false);
+  const [users,        setUsers]       = useState([]);
+  const [loading,      setLoading]     = useState(true);
+  const [err,          setErr]         = useState(null);
+  const [actionId,     setActionId]    = useState(null);
+  const [founderOnly,  setFounderOnly] = useState(false);
+  const [search,       setSearch]      = useState('');
+  const [profilePanel, setProfilePanel] = useState(null); // { userId, data|null, loading, err }
 
   useEffect(() => {
     api.getAdminUsers(token)
@@ -153,6 +155,16 @@ function UsersTab({ token }) {
       .catch(e => setErr(e.message))
       .finally(() => setLoading(false));
   }, [token]);
+
+  async function openProfile(u) {
+    setProfilePanel({ userId: u.id, username: u.username, data: null, loading: true, err: null });
+    try {
+      const data = await api.getAdminUserProfile(u.id, token);
+      setProfilePanel(p => p?.userId === u.id ? { ...p, data, loading: false } : p);
+    } catch (e) {
+      setProfilePanel(p => p?.userId === u.id ? { ...p, loading: false, err: e.message } : p);
+    }
+  }
 
   async function changeRole(userId, role) {
     try {
@@ -239,6 +251,25 @@ function UsersTab({ token }) {
 
   const activeUsers  = users.filter(u => u.is_active !== false);
   const deletedUsers = users.filter(u => u.is_active === false);
+  const foundingMembers = activeUsers.filter(u => u.founding_member);
+
+  const q = search.trim().toLowerCase();
+  const displayed = (founderOnly ? foundingMembers : activeUsers).filter(u => {
+    if (!q) return true;
+    return (
+      u.username?.toLowerCase().includes(q) ||
+      u.location?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q)
+    );
+  });
+
+  const BadgeSmall = ({ color, bg, border, children, title }) => (
+    <span title={title} style={{
+      fontSize: '.62rem', background: bg, color, border: `1px solid ${border}`,
+      padding: '.1rem .3rem', borderRadius: 99, fontWeight: 700,
+      verticalAlign: 'middle', whiteSpace: 'nowrap',
+    }}>{children}</span>
+  );
 
   const UserRow = ({ u }) => {
     const isMe             = u.id === me?.id;
@@ -246,39 +277,61 @@ function UsersTab({ token }) {
     const canDelete        = !isFounder && !isMe;
     const canRevokeFounder = !isFounder;
     const busy             = actionId === u.id;
+    const isSelected       = profilePanel?.userId === u.id;
 
     return (
-      <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
-        <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>
-          {u.username}
-          {u.founding_member && (
-            <span style={{ marginLeft: '.4rem', fontSize: '.65rem', background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid var(--green)', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700, verticalAlign: 'middle' }}>
-              ⬡ Founding
-            </span>
-          )}
-          {u.covenant_agreed ? (
-            <span style={{ marginLeft: '.4rem', fontSize: '.65rem', background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700, verticalAlign: 'middle' }}
-              title={u.covenant_agreed_at ? `Agreed ${new Date(u.covenant_agreed_at).toLocaleDateString()}` : 'Covenant agreed'}>
-              ✓ Covenant
-            </span>
-          ) : (
-            <span style={{ marginLeft: '.4rem', fontSize: '.65rem', background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '.1rem .35rem', borderRadius: 99, verticalAlign: 'middle' }}>
-              No Covenant
-            </span>
-          )}
+      <tr style={{
+        borderBottom: '1px solid var(--border)',
+        background: isSelected ? 'var(--surface)' : undefined,
+      }}>
+        {/* Username + badges */}
+        <td style={{ padding: '.5rem .75rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+          <span>{u.username}</span>
+          <div style={{ display: 'flex', gap: '.25rem', flexWrap: 'wrap', marginTop: '.2rem' }}>
+            {u.founding_member && <BadgeSmall color="var(--green)" bg="var(--green-bg)" border="var(--green)">⬡ Founding</BadgeSmall>}
+            {u.verified && <BadgeSmall color="#1565c0" bg="#e3f2fd" border="#90caf9">✓ Verified</BadgeSmall>}
+            {u.covenant_agreed
+              ? <BadgeSmall color="#2e7d32" bg="#e8f5e9" border="#a5d6a7" title={u.covenant_agreed_at ? `Agreed ${new Date(u.covenant_agreed_at).toLocaleDateString()}` : ''}>✓ Covenant</BadgeSmall>
+              : <BadgeSmall color="var(--muted)" bg="var(--surface)" border="var(--border)">No Covenant</BadgeSmall>
+            }
+          </div>
         </td>
-        <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
+        {/* Location */}
+        <td style={{ padding: '.5rem .75rem', color: 'var(--muted)', fontSize: '.8rem', maxWidth: 120 }}>
+          {u.location || <span style={{ opacity: .4 }}>—</span>}
+        </td>
+        {/* How found */}
+        <td style={{ padding: '.5rem .75rem', color: 'var(--muted)', fontSize: '.8rem', maxWidth: 140 }}>
+          <span title={u.how_found || ''} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>
+            {u.how_found || <span style={{ opacity: .4 }}>—</span>}
+          </span>
+        </td>
+        {/* Joined */}
+        <td style={{ padding: '.5rem .75rem', color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>
           {new Date(u.created_at).toLocaleDateString()}
         </td>
-        <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>{u.post_count}</td>
-        <td style={{ padding: '.5rem .75rem', color: u.flag_count > 0 ? 'var(--red)' : 'var(--muted)' }}>
-          {u.flag_count}
+        {/* Vouched by */}
+        <td style={{ padding: '.5rem .75rem', fontSize: '.8rem', whiteSpace: 'nowrap' }}>
+          {u.inviter_username
+            ? <span style={{ color: 'var(--accent)' }}>@{u.inviter_username}</span>
+            : <span style={{ color: 'var(--muted)', opacity: .4 }}>—</span>
+          }
         </td>
+        {/* Last active */}
+        <td style={{ padding: '.5rem .75rem', color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>
+          {u.last_active ? new Date(u.last_active).toLocaleDateString() : '—'}
+        </td>
+        {/* Posts / Flags */}
+        <td style={{ padding: '.5rem .75rem', fontSize: '.8rem', whiteSpace: 'nowrap' }}>
+          <span style={{ color: 'var(--muted)' }}>{u.post_count}</span>
+          {u.flag_count > 0 && <span style={{ color: 'var(--red)', marginLeft: '.35rem' }}>▲{u.flag_count}</span>}
+        </td>
+        {/* Role */}
         <td style={{ padding: '.5rem .75rem' }}>
           {isFounder || isMe ? (
             <span className={`role-badge role-${u.role}`}>{u.role}</span>
           ) : (
-            <select className="form-select" style={{ padding: '.2rem .5rem', fontSize: '.8rem' }}
+            <select className="form-select" style={{ padding: '.2rem .5rem', fontSize: '.78rem' }}
               value={u.role} onChange={e => changeRole(u.id, e.target.value)}>
               <option value="member">member</option>
               <option value="moderator">moderator</option>
@@ -286,45 +339,49 @@ function UsersTab({ token }) {
             </select>
           )}
         </td>
+        {/* Actions */}
         <td style={{ padding: '.5rem .75rem' }}>
-          <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap' }}>
+            <button className={`btn btn-sm${isSelected ? ' btn-primary' : ' btn-outline'}`}
+              style={{ fontSize: '.72rem' }}
+              onClick={() => isSelected ? setProfilePanel(null) : openProfile(u)}>
+              {isSelected ? 'Close' : 'View'}
+            </button>
             {u.founding_member ? (
               canRevokeFounder && (
                 <button className="btn btn-sm btn-outline" disabled={busy}
                   style={{ fontSize: '.72rem', color: 'var(--muted)', borderColor: 'var(--border)' }}
-                  onClick={() => toggleFoundingMember(u, false)}
-                  title="Revoke founding member status">
-                  {busy ? '…' : 'Revoke Founding'}
+                  onClick={() => toggleFoundingMember(u, false)}>
+                  {busy ? '…' : 'Revoke ⬡'}
                 </button>
               )
             ) : (
               <button className="btn btn-sm btn-outline" disabled={busy}
                 style={{ fontSize: '.72rem', color: 'var(--green)', borderColor: 'var(--green)' }}
-                onClick={() => toggleFoundingMember(u, true)}
-                title="Grant founding member status">
-                {busy ? '…' : '⬡ Grant Founding'}
+                onClick={() => toggleFoundingMember(u, true)}>
+                {busy ? '…' : '⬡ Grant'}
               </button>
             )}
             {!u.covenant_agreed && (
               <button className="btn btn-sm btn-outline" disabled={busy}
                 style={{ fontSize: '.72rem', color: '#2e7d32', borderColor: '#a5d6a7' }}
-                onClick={() => markCovenantAgreed(u)}
-                title="Mark covenant as agreed (for founding accounts)">
-                {busy ? '…' : '✓ Mark Covenant'}
+                onClick={() => markCovenantAgreed(u)}>
+                {busy ? '…' : '✓ Cov.'}
               </button>
             )}
             <button className="btn btn-sm btn-outline" disabled={busy}
-              onClick={() => sendPasswordReset(u)}
-              title="Send password reset email">
+              style={{ fontSize: '.72rem' }}
+              onClick={() => sendPasswordReset(u)}>
               {busy ? '…' : 'Reset PW'}
             </button>
             {canDelete ? (
               <button className="btn btn-sm btn-danger" disabled={busy}
+                style={{ fontSize: '.72rem' }}
                 onClick={() => deleteUser(u)}>
                 {busy ? '…' : 'Delete'}
               </button>
             ) : (
-              <span style={{ fontSize: '.75rem', color: 'var(--muted)', alignSelf: 'center' }}>—</span>
+              <span style={{ fontSize: '.72rem', color: 'var(--muted)', alignSelf: 'center' }}>—</span>
             )}
           </div>
         </td>
@@ -332,96 +389,225 @@ function UsersTab({ token }) {
     );
   };
 
-  const tableHead = (
-    <thead>
-      <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
-        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Username</th>
-        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Joined</th>
-        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Posts</th>
-        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Flags</th>
-        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Role</th>
-        <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Actions</th>
-      </tr>
-    </thead>
-  );
-
-  const foundingMembers = activeUsers.filter(u => u.founding_member);
-  const displayedActive = founderOnly ? foundingMembers : activeUsers;
-
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
+      {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <p style={{ fontSize: '.85rem', color: 'var(--muted)', margin: 0 }}>
           {activeUsers.length} active · {deletedUsers.length} deleted · {foundingMembers.length} founding members
         </p>
+        <input
+          type="search"
+          className="form-input"
+          placeholder="Search username, location, email…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ width: 240, padding: '.35rem .65rem', fontSize: '.85rem' }}
+        />
         <button
           className={`btn btn-sm${founderOnly ? ' btn-primary' : ' btn-outline'}`}
           style={{ fontSize: '.78rem', ...(founderOnly ? {} : { color: 'var(--green)', borderColor: 'var(--green)' }) }}
           onClick={() => setFounderOnly(v => !v)}
         >
-          ⬡ {founderOnly ? 'Showing Founding Members' : 'Filter: Founding Members'}
+          ⬡ {founderOnly ? 'Founding Only' : 'Filter: Founding'}
         </button>
       </div>
 
-      <div className="table-scroll-wrap">
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
-          {tableHead}
-          <tbody>
-            {displayedActive.map(u => <UserRow key={u.id} u={u} />)}
-          </tbody>
-        </table>
-      </div>
-
-      {deletedUsers.length > 0 && (
-        <>
-          <h3 style={{ fontSize: '.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', margin: '1.75rem 0 .75rem' }}>
-            Deleted Accounts
-          </h3>
+      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+        {/* Table */}
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className="table-scroll-wrap">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem', opacity: .8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
-                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Original name</th>
+                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Username</th>
+                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Location</th>
+                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>How Found</th>
                   <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Joined</th>
+                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Vouched By</th>
+                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Last Active</th>
                   <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Posts</th>
-                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Deleted</th>
+                  <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Role</th>
                   <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {deletedUsers.map(u => (
-                  <tr key={u.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
-                    <td style={{ padding: '.5rem .75rem', fontWeight: 600, color: 'var(--muted)' }}>
-                      {u.preserved_display_name || u.original_username
-                        ? <>{u.preserved_display_name || u.original_username}<br /><span style={{ fontStyle: 'italic', fontSize: '.8rem' }}>@{u.original_username || '—'}</span></>
-                        : <span style={{ fontStyle: 'italic' }}>[no data]</span>
-                      }
-                    </td>
-                    <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
-                      {new Date(u.created_at).toLocaleDateString()}
-                    </td>
-                    <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>{u.post_count}</td>
-                    <td style={{ padding: '.5rem .75rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                      {u.deleted_at ? new Date(u.deleted_at).toLocaleDateString() : '—'}
-                    </td>
-                    <td style={{ padding: '.5rem .75rem' }}>
-                      <button className="btn btn-sm btn-outline" disabled={actionId === u.id}
-                        onClick={() => restoreUser(u)}
-                        title={u.original_username
-                          ? `Restore and send welcome-back email`
-                          : 'Restore account (original name was not preserved)'
-                        }>
-                        {actionId === u.id ? '…' : 'Restore'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {displayed.length === 0
+                  ? <tr><td colSpan={9} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--muted)' }}>No users match your search.</td></tr>
+                  : displayed.map(u => <UserRow key={u.id} u={u} />)
+                }
               </tbody>
             </table>
           </div>
-        </>
-      )}
+
+          {deletedUsers.length > 0 && (
+            <>
+              <h3 style={{ fontSize: '.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', margin: '1.75rem 0 .75rem' }}>
+                Deleted Accounts
+              </h3>
+              <div className="table-scroll-wrap">
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem', opacity: .8 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
+                      <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Original name</th>
+                      <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Joined</th>
+                      <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Posts</th>
+                      <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Deleted</th>
+                      <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deletedUsers.map(u => (
+                      <tr key={u.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+                        <td style={{ padding: '.5rem .75rem', fontWeight: 600, color: 'var(--muted)' }}>
+                          {u.preserved_display_name || u.original_username
+                            ? <>{u.preserved_display_name || u.original_username}<br /><span style={{ fontStyle: 'italic', fontSize: '.8rem' }}>@{u.original_username || '—'}</span></>
+                            : <span style={{ fontStyle: 'italic' }}>[no data]</span>
+                          }
+                        </td>
+                        <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
+                          {new Date(u.created_at).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>{u.post_count}</td>
+                        <td style={{ padding: '.5rem .75rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                          {u.deleted_at ? new Date(u.deleted_at).toLocaleDateString() : '—'}
+                        </td>
+                        <td style={{ padding: '.5rem .75rem' }}>
+                          <button className="btn btn-sm btn-outline" disabled={actionId === u.id}
+                            onClick={() => restoreUser(u)}>
+                            {actionId === u.id ? '…' : 'Restore'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Profile side panel */}
+        {profilePanel && (
+          <UserProfilePanel
+            panel={profilePanel}
+            onClose={() => setProfilePanel(null)}
+          />
+        )}
+      </div>
     </div>
+  );
+}
+
+function UserProfilePanel({ panel, onClose }) {
+  const { loading, err, data, username } = panel;
+
+  return (
+    <aside style={{
+      width: 340, flexShrink: 0, border: '1px solid var(--border)', borderRadius: 8,
+      background: 'var(--surface)', padding: '1rem', fontSize: '.85rem',
+      position: 'sticky', top: '1rem', maxHeight: 'calc(100vh - 6rem)',
+      overflowY: 'auto',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem' }}>
+        <strong style={{ fontSize: '.95rem' }}>@{username}</strong>
+        <button className="btn btn-sm btn-ghost" onClick={onClose} style={{ fontSize: '1rem', lineHeight: 1 }}>✕</button>
+      </div>
+
+      {loading && <div className="spinner" />}
+      {err && <p className="error-msg">{err}</p>}
+
+      {data && (() => {
+        const u = data.user;
+        return (
+          <>
+            {u.avatar_url && (
+              <img src={u.avatar_url} alt={u.username}
+                style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', marginBottom: '.75rem' }} />
+            )}
+
+            {/* Identity */}
+            <section style={{ marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', marginBottom: '.5rem' }}>
+                {u.founding_member && <span style={{ fontSize: '.65rem', background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid var(--green)', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700 }}>⬡ Founding</span>}
+                {u.verified && <span style={{ fontSize: '.65rem', background: '#e3f2fd', color: '#1565c0', border: '1px solid #90caf9', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700 }}>✓ Verified</span>}
+                {u.covenant_agreed && <span style={{ fontSize: '.65rem', background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700 }}>✓ Covenant</span>}
+                {u.is_veteran && <span style={{ fontSize: '.65rem', background: '#fce4ec', color: '#c62828', border: '1px solid #ef9a9a', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700 }}>Veteran</span>}
+                <span className={`role-badge role-${u.role}`} style={{ fontSize: '.65rem' }}>{u.role}</span>
+              </div>
+              <div style={{ color: 'var(--muted)', lineHeight: 1.6 }}>
+                {u.location && <div>📍 {u.location}</div>}
+                {u.how_found && <div>🔎 {u.how_found}</div>}
+                <div>📅 Joined {new Date(u.created_at).toLocaleDateString()}</div>
+                <div>⏱ Last active {new Date(u.last_active).toLocaleDateString()}</div>
+                {u.inviter_username && <div>🤝 Vouched by <strong>@{u.inviter_username}</strong></div>}
+              </div>
+            </section>
+
+            {/* Bio */}
+            {u.bio && (
+              <section style={{ marginBottom: '1rem' }}>
+                <h4 style={{ fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', marginBottom: '.35rem' }}>Bio</h4>
+                <p style={{ margin: 0, color: 'var(--text)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{u.bio}</p>
+              </section>
+            )}
+
+            {/* Vouching chain */}
+            {data.vouch_chain.length > 1 && (
+              <section style={{ marginBottom: '1rem' }}>
+                <h4 style={{ fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', marginBottom: '.35rem' }}>Vouching Chain</h4>
+                <ol style={{ margin: 0, padding: '0 0 0 1.1rem', lineHeight: 1.8 }}>
+                  {data.vouch_chain.map((node, i) => (
+                    <li key={node.id} style={{ color: i === 0 ? 'var(--text)' : 'var(--muted)' }}>
+                      <span style={{ fontWeight: i === 0 ? 700 : 400 }}>@{node.username}</span>
+                      {i === 0 && <span style={{ color: 'var(--muted)', fontSize: '.75rem' }}> (this user)</span>}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+
+            {/* Circles */}
+            {data.circles.length > 0 && (
+              <section style={{ marginBottom: '1rem' }}>
+                <h4 style={{ fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', marginBottom: '.35rem' }}>Circles ({data.circles.length})</h4>
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                  {data.circles.map(c => (
+                    <li key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '.2rem 0', borderBottom: '1px solid var(--border)' }}>
+                      <span>{c.name}</span>
+                      <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{c.role}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {/* Recent posts */}
+            {data.posts.length > 0 && (
+              <section>
+                <h4 style={{ fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', marginBottom: '.35rem' }}>Recent Posts ({data.posts.length})</h4>
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                  {data.posts.map(p => (
+                    <li key={p.id} style={{ padding: '.3rem 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ fontWeight: 600, fontSize: '.82rem' }}>
+                        {p.title || <span style={{ fontStyle: 'italic', color: 'var(--muted)' }}>[no title]</span>}
+                      </div>
+                      <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>
+                        {p.type} · {new Date(p.created_at).toLocaleDateString()}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {data.circles.length === 0 && data.posts.length === 0 && (
+              <p style={{ color: 'var(--muted)', fontStyle: 'italic', margin: 0 }}>No circles or posts yet.</p>
+            )}
+          </>
+        );
+      })()}
+    </aside>
   );
 }
 
