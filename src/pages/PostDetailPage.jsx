@@ -364,17 +364,30 @@ export default function PostDetailPage({ onRequireAuth }) {
 
           {/* RSVP (events) */}
           {post.type === 'event' && (
-            <div className="post-rsvp-row" style={{ marginTop: '1rem' }}>
-              <span style={{ fontSize: '.82rem', color: 'var(--muted)', marginRight: '.5rem' }}>RSVP:</span>
-              {['going', 'interested', 'saved'].map(s => (
-                <button key={s}
-                  className={`btn btn-sm post-rsvp-btn rsvp-${s}${rsvp === s ? ' active' : ''}`}
-                  onClick={() => handleRsvp(s)}
-                  disabled={rsvpBusy}
-                >
-                  {s === 'going' ? '✓ Going' : s === 'interested' ? '★ Interested' : '🔖 Save'}
-                </button>
-              ))}
+            <div style={{ marginTop: '1rem' }}>
+              <div className="post-rsvp-row">
+                <span style={{ fontSize: '.82rem', color: 'var(--muted)', marginRight: '.5rem' }}>RSVP:</span>
+                {['going', 'interested', 'saved'].map(s => (
+                  <button key={s}
+                    className={`btn btn-sm post-rsvp-btn rsvp-${s}${rsvp === s ? ' active' : ''}`}
+                    onClick={() => handleRsvp(s)}
+                    disabled={rsvpBusy}
+                  >
+                    {s === 'going' ? '✓ Going' : s === 'interested' ? '★ Interested' : '🔖 Save'}
+                  </button>
+                ))}
+              </div>
+              <div className="post-rsvp-tallies" style={{ marginTop: '.4rem' }}>
+                {(post.rsvp_going_count > 0) && (
+                  <span className="post-rsvp-tally tally-going">{post.rsvp_going_count} going</span>
+                )}
+                {(post.rsvp_interested_count > 0) && (
+                  <span className="post-rsvp-tally tally-interested">{post.rsvp_interested_count} interested</span>
+                )}
+                {(post.rsvp_saved_count > 0) && (
+                  <span className="post-rsvp-tally tally-saved">{post.rsvp_saved_count} saved</span>
+                )}
+              </div>
             </div>
           )}
 

@@ -53,6 +53,16 @@ export default function Messages({ onRequireAuth }) {
         <NewMessageSearch token={token} onSelect={openConversation} onClose={() => setShowNewMsg(false)} />
       )}
 
+      {/* Floating compose button — always visible on mobile */}
+      <button
+        className="messages-compose-fab"
+        onClick={() => setShowNewMsg(true)}
+        aria-label="New Message"
+        title="New Message"
+      >
+        ✏
+      </button>
+
       {showList && (
         <div className="messages-sidebar">
           <div className="messages-sidebar-header">

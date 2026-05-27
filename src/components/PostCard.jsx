@@ -214,9 +214,17 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
               {s === 'going' ? '✓ Going' : s === 'interested' ? '★ Interested' : '🔖 Save'}
             </button>
           ))}
-          {(post.rsvp_going_count > 0 || post.user_id === user?.id) && (
-            <span className="post-rsvp-count">{post.rsvp_going_count || 0} going</span>
-          )}
+          <div className="post-rsvp-tallies">
+            {(post.rsvp_going_count > 0) && (
+              <span className="post-rsvp-tally tally-going">{post.rsvp_going_count} going</span>
+            )}
+            {(post.rsvp_interested_count > 0) && (
+              <span className="post-rsvp-tally tally-interested">{post.rsvp_interested_count} interested</span>
+            )}
+            {(post.rsvp_saved_count > 0) && (
+              <span className="post-rsvp-tally tally-saved">{post.rsvp_saved_count} saved</span>
+            )}
+          </div>
         </div>
       )}
 
