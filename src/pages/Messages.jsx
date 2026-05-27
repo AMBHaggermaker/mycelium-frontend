@@ -49,6 +49,10 @@ export default function Messages({ onRequireAuth }) {
 
   return (
     <div className="messages-layout">
+      {showNewMsg && (
+        <NewMessageSearch token={token} onSelect={openConversation} onClose={() => setShowNewMsg(false)} />
+      )}
+
       {showList && (
         <div className="messages-sidebar">
           <div className="messages-sidebar-header">
@@ -58,13 +62,14 @@ export default function Messages({ onRequireAuth }) {
             </button>
           </div>
 
-          {showNewMsg && (
-            <NewMessageSearch token={token} onSelect={openConversation} onClose={() => setShowNewMsg(false)} />
-          )}
-
           {loading ? <div className="spinner" style={{ margin: '1rem auto' }} /> : (
             conversations.length === 0 ? (
-              <p className="messages-empty">No conversations yet. Start one!</p>
+              <div className="messages-empty-state">
+                <p className="messages-empty">No conversations yet.</p>
+                <button className="btn btn-primary" onClick={() => setShowNewMsg(true)}>
+                  + New Message
+                </button>
+              </div>
             ) : (
               <ul className="messages-convo-list">
                 {conversations.map(c => (
@@ -106,7 +111,12 @@ export default function Messages({ onRequireAuth }) {
             />
           ) : (
             <div className="messages-thread-empty">
-              <p>Select a conversation or start a new one</p>
+              <p style={{ color: 'var(--muted)', marginBottom: '1.25rem' }}>
+                Select a conversation or start a new one
+              </p>
+              <button className="btn btn-primary" onClick={() => setShowNewMsg(true)}>
+                + New Message
+              </button>
             </div>
           )}
         </div>
@@ -288,29 +298,45 @@ function NewMessageSearch({ token, onSelect, onClose }) {
   }, [query]);
 
   return (
-    <div className="messages-new-search">
-      <div style={{ display: 'flex', gap: '.4rem', marginBottom: '.5rem' }}>
-        <input className="form-input" style={{ flex: 1 }} autoFocus
-          placeholder="Search verified members…"
-          value={query} onChange={e => setQuery(e.target.value)} />
-        <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 420 }}>
+        <div className="modal-header">
+          <span className="modal-title">New Message</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+          <p style={{ fontSize: '.85rem', color: 'var(--muted)', margin: 0 }}>
+            Search for a verified member by username or display name.
+          </p>
+          <input className="form-input" autoFocus
+            placeholder="Search verified members…"
+            value={query} onChange={e => setQuery(e.target.value)} />
+          {searching && <div className="spinner" style={{ margin: '.25rem auto', width: '20px', height: '20px' }} />}
+          {results.length > 0 && (
+            <ul className="messages-search-results">
+              {results.map(u => (
+                <li key={u.id} className="messages-search-result" onClick={() => onSelect(u.id)}>
+                  <span style={{ fontWeight: 600 }}>{u.username}</span>
+                  {u.founding_member
+                    ? <span style={{ marginLeft: '.4rem', fontSize: '.75rem', color: 'var(--green)' }}>⬡ Founding</span>
+                    : <span style={{ marginLeft: '.4rem', fontSize: '.75rem', color: 'var(--blue)' }}>✓ Verified</span>
+                  }
+                </li>
+              ))}
+            </ul>
+          )}
+          {!searching && query.trim() && results.length === 0 && (
+            <p style={{ fontSize: '.82rem', color: 'var(--muted)' }}>
+              No verified members found matching that name.
+            </p>
+          )}
+          {!query.trim() && (
+            <p style={{ fontSize: '.82rem', color: 'var(--muted)' }}>
+              Only verified members can receive new messages.
+            </p>
+          )}
+        </div>
       </div>
-      {searching && <div className="spinner" style={{ margin: '.5rem auto', width: '20px', height: '20px' }} />}
-      {results.length > 0 && (
-        <ul className="messages-search-results">
-          {results.map(u => (
-            <li key={u.id} className="messages-search-result" onClick={() => onSelect(u.id)}>
-              <strong>{u.username}</strong>
-              {u.founding_member && <span style={{ marginLeft: '.4rem', fontSize: '.75rem' }}>⬡ Founding</span>}
-            </li>
-          ))}
-        </ul>
-      )}
-      {!searching && query.trim() && results.length === 0 && (
-        <p style={{ fontSize: '.82rem', color: 'var(--text-muted)', padding: '.25rem 0' }}>
-          No verified members found. Only verified members can receive messages.
-        </p>
-      )}
     </div>
   );
 }
