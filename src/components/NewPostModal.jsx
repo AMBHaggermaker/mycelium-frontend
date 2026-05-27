@@ -18,23 +18,25 @@ const SUBCATEGORY_SUGGESTIONS = {
 };
 
 export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
-  const { token } = useAuth();
+  const { user, token } = useAuth();
   const [form, setForm] = useState({
     type: 'offer', title: '', description: '', circle_id: defaultCircleId || '',
     capacity: '', location: '', starts_at: '', ends_at: '', tags: '',
     category: '', subcategory: '', is_urgent: false, expires_at: '',
-    commerce_type: '', price: '',
+    commerce_type: '', price: '', business_id: '',
   });
-  const [circles,  setCircles]  = useState([]);
-  const [files,    setFiles]    = useState([]);
-  const [previews, setPreviews] = useState([]);
+  const [circles,   setCircles]   = useState([]);
+  const [myBizList, setMyBizList] = useState([]);
+  const [files,     setFiles]     = useState([]);
+  const [previews,  setPreviews]  = useState([]);
   const [err,  setErr]  = useState(null);
   const [busy, setBusy] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     api.getCircles({ limit: 100 }).then(setCircles).catch(() => {});
-  }, []);
+    if (user?.id) api.getBusinessesByOwner(user.id).then(setMyBizList).catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     const urls = files.map(f => URL.createObjectURL(f));
@@ -77,7 +79,8 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
         is_urgent:     form.is_urgent || undefined,
         expires_at:    form.expires_at || undefined,
         commerce_type: form.commerce_type || undefined,
-        price:         form.commerce_type === 'commerce' && form.price ? parseFloat(form.price) : undefined,
+        price:       form.commerce_type === 'commerce' && form.price ? parseFloat(form.price) : undefined,
+        business_id: form.business_id || undefined,
       };
       const post = await api.createPost(payload, token);
       if (files.length) await api.uploadPostMedia(post.id, files, token);
@@ -159,6 +162,19 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
               </div>
             )}
           </div>
+
+          {/* Link to a business (Local Commerce only, if user owns businesses) */}
+          {myBizList.length > 0 && (
+            <div className="form-group">
+              <label className="form-label">Link to a Business <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
+              <select className="form-select" value={form.business_id} onChange={e => set('business_id', e.target.value)}>
+                <option value="">No linked business</option>
+                {myBizList.filter(b => b.is_active).map(b => (
+                  <option key={b.id} value={b.id}>{b.business_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Title */}
           <div className="form-group">

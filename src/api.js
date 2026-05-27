@@ -310,6 +310,43 @@ export default {
   getWatchReports:    (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),
   getAllWatchReports:  (params)           => get(`/watch/all-reports${qs(params)}`),
   getWatchAnomalies: (params)            => get(`/watch/anomalies${qs(params)}`),
+  // Businesses
+  getBusinesses:                (params)            => get(`/businesses${qs(params)}`),
+  getRecentlyRecommendedBusinesses: ()              => get('/businesses/recently-recommended'),
+  getBusiness:                  (id)                => get(`/businesses/${id}`),
+  getBusinessesByOwner:         (userId)            => get(`/businesses/owner/${userId}`),
+  createBusiness:               (data, token)       => post('/businesses', data, token),
+  updateBusiness:               (id, data, token)   => patch(`/businesses/${id}`, data, token),
+  deleteBusiness:               (id, token)         => del(`/businesses/${id}`, token),
+  uploadBusinessPhoto:          (id, file, opts, token) => {
+    const form = new FormData();
+    form.append('photo', file);
+    if (opts?.is_cover)   form.append('is_cover', 'true');
+    if (opts?.caption)    form.append('caption', opts.caption);
+    return fetch(`${BASE}/businesses/${id}/photos`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
+    }).then(async res => {
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      return data;
+    });
+  },
+  deleteBusinessPhoto:          (id, photoId, token) => del(`/businesses/${id}/photos/${photoId}`, token),
+  addBusinessService:           (id, data, token)   => post(`/businesses/${id}/services`, data, token),
+  deleteBusinessService:        (id, svcId, token)  => del(`/businesses/${id}/services/${svcId}`, token),
+  getBusinessRecommendations:   (id)                => get(`/businesses/${id}/recommendations`),
+  postRecommendation:           (id, content, token) => post(`/businesses/${id}/recommendations`, { content }, token),
+  replyToRecommendation:        (id, msgId, content, token) => post(`/businesses/${id}/recommendations/${msgId}/reply`, { content }, token),
+  adminDeleteRecommendation:    (id, msgId, token)  => del(`/businesses/${id}/recommendations/${msgId}`, token),
+  adminVerifyBusiness:          (id, verified, token) => patch(`/admin/businesses/${id}/verify`, { verified }, token),
+  getAdminBusinesses:           (token)             => get('/admin/businesses', token),
+
+  // Professional profiles
+  getProfessionalProfile:       (username)          => get(`/profiles/${username}/professional`),
+  updateProfessionalProfile:    (data, token)       => patch('/profiles/professional', data, token),
+  endorseSkill:                 (endorsed_username, skill, token) => post('/profiles/endorse', { endorsed_username, skill }, token),
+  removeEndorsement:            (endorsedId, skill, token) => del(`/profiles/endorse/${endorsedId}/${encodeURIComponent(skill)}`, token),
+
   getAdminWatchAnomalies: (token)        => get('/admin/watch-anomalies', token),
   reviewAnomaly:     (id, token)         => patch(`/admin/watch-anomalies/${id}/review`, {}, token),
   deleteAnomaly:     (id, token)         => del(`/admin/watch-anomalies/${id}`, token),

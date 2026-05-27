@@ -63,6 +63,9 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
             <NavLink to="/watch" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Watch
             </NavLink>
+            <NavLink to="/businesses" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              Businesses
+            </NavLink>
             <NavLink to="/advocate" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Advocate
             </NavLink>

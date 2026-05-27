@@ -2,6 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
+
+const AVAIL_LABELS = {
+  available: '🟢 Available for Work', not_taking_clients: '🔴 Not Taking New Clients',
+  open_to_opportunities: '🟡 Open to Opportunities', not_applicable: null,
+};
 import PostCard from '../components/PostCard';
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors,
@@ -37,16 +42,18 @@ const FONT_STYLES = {
 };
 
 const BOARD_TITLES = {
-  bulletin:    '📌 Bulletin',
-  timeline:    '📅 Timeline',
-  posts:       '📋 My Posts',
-  events:      '🗓 Events',
-  photos:      '📷 Photos',
-  circles:     '⬡ My Circles',
-  people:      '🤝 People I\'ve Shown Up With',
-  invitations: '✉️ Invitations',
-  messages:    '💬 Messages',
-  chats:       '🗨 Chat Rooms',
+  bulletin:      '📌 Bulletin',
+  timeline:      '📅 Timeline',
+  posts:         '📋 My Posts',
+  events:        '🗓 Events',
+  photos:        '📷 Photos',
+  circles:       '⬡ My Circles',
+  people:        '🤝 People I\'ve Shown Up With',
+  professional:  '💼 Professional',
+  my_businesses: '🏪 My Businesses',
+  invitations:   '✉️ Invitations',
+  messages:      '💬 Messages',
+  chats:         '🗨 Chat Rooms',
 };
 
 function resolveUrl(url) {
@@ -433,6 +440,10 @@ function BoardContent({ board, user: u, profileData, boardsData, albumMap, isOwn
       return <CirclesBoard circles={circles} />;
     case 'people':
       return <PeopleBoard copart={copart} />;
+    case 'professional':
+      return <ProfessionalBoard username={username} isOwn={isOwn} token={token} authUser={authUser} />;
+    case 'my_businesses':
+      return <MyBusinessesBoard user={u} isOwn={isOwn} token={token} />;
     case 'invitations':
       return isOwn ? <InvitationsBoard token={token} /> : null;
     case 'messages':
@@ -782,6 +793,240 @@ function ChatsBoard({ chats }) {
           <span className="board-chat-preview">{c.content?.slice(0, 40)}</span>
         </Link>
       ))}
+    </div>
+  );
+}
+
+// ── Board: Professional ───────────────────────────────────────────────────────
+
+const BIZ_TYPE_LABELS_SHORT = {
+  independently_owned: 'Indep.', locally_owned_franchise: 'Franchise',
+  cooperative: 'Co-op', nonprofit: 'Nonprofit', sole_proprietor: 'Sole Prop.',
+};
+
+function ProfessionalBoard({ username, isOwn, token, authUser }) {
+  const [data,    setData]    = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getProfessionalProfile(username).then(setData).catch(() => {}).finally(() => setLoading(false));
+  }, [username]);
+
+  async function handleEndorse(skill) {
+    try {
+      await api.endorseSkill(username, skill, token);
+      setData(d => {
+        const map = { ...d.endorsements_by_skill };
+        if (!map[skill]) map[skill] = [];
+        if (!map[skill].find(e => e.id === authUser.id)) {
+          map[skill] = [...map[skill], { id: authUser.id, username: authUser.username }];
+        }
+        return { ...d, endorsements_by_skill: map };
+      });
+    } catch (e) { alert(e.message); }
+  }
+
+  if (loading) return <div className="spinner" style={{ margin: '.5rem auto', width: 20, height: 20 }} />;
+
+  const prof = data?.profile || {};
+  const skills = prof.skills || [];
+  const isEmpty = !prof.occupation && !skills.length && !prof.professional_bio && !prof.availability;
+
+  if (isEmpty && !isOwn) return <p className="empty board-empty">No professional info yet.</p>;
+
+  return (
+    <div className="prof-board-content">
+      {prof.availability && AVAIL_LABELS[prof.availability] && (
+        <div className="prof-avail-badge">{AVAIL_LABELS[prof.availability]}</div>
+      )}
+      {prof.occupation && <p className="prof-occupation">{prof.occupation}</p>}
+      {prof.professional_bio && <p className="prof-bio">{prof.professional_bio}</p>}
+      {skills.length > 0 && (
+        <div className="prof-skills-section">
+          <p className="prof-section-label">Skills</p>
+          <div className="prof-skill-cloud">
+            {skills.map(skill => {
+              const endorsements = data?.endorsements_by_skill?.[skill] || [];
+              const alreadyEndorsed = authUser && endorsements.some(e => e.id === authUser.id);
+              const canEndorse = authUser && !isOwn && authUser.id !== data?.user?.id;
+              return (
+                <div key={skill} className="prof-skill-tag-wrap">
+                  <span className="prof-skill-tag">{skill}</span>
+                  {endorsements.length > 0 && (
+                    <span className="prof-skill-endorse-count" title={endorsements.map(e => e.username).join(', ')}>
+                      +{endorsements.length}
+                    </span>
+                  )}
+                  {canEndorse && (
+                    <button
+                      className={`prof-endorse-btn${alreadyEndorsed ? ' endorsed' : ''}`}
+                      onClick={() => !alreadyEndorsed && handleEndorse(skill)}
+                      title={alreadyEndorsed ? 'Endorsed' : 'Endorse this skill'}
+                    >
+                      {alreadyEndorsed ? '✓' : '+'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {(data?.affiliations || []).filter(a => a.business).length > 0 && (
+        <div className="prof-affiliations">
+          <p className="prof-section-label">Business Affiliations</p>
+          {data.affiliations.filter(a => a.business).map((a, i) => (
+            <Link key={i} to={`/businesses/${a.business_id}`} className="prof-affiliation-row">
+              <span className="prof-affiliation-name">{a.business.business_name}</span>
+              {a.business.is_verified_local && <span className="biz-verified-badge-sm">✓</span>}
+              <span className="biz-type-pill-xs">{BIZ_TYPE_LABELS_SHORT[a.business.business_type]}</span>
+              {a.role && <span className="prof-affiliation-role">{a.role}</span>}
+            </Link>
+          ))}
+        </div>
+      )}
+      {prof.portfolio_urls?.length > 0 && (
+        <div className="prof-portfolio">
+          <p className="prof-section-label">Portfolio</p>
+          <div className="prof-portfolio-links">
+            {prof.portfolio_urls.map((item, i) => (
+              <a key={i} href={item.url || item} target="_blank" rel="noopener noreferrer" className="prof-portfolio-link">
+                {item.label || item.url || item}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+      {isOwn && (
+        <button className="btn btn-outline btn-sm" style={{ marginTop: '.75rem', fontSize: '.78rem' }}
+          onClick={() => setEditing(true)}>
+          Edit Professional Info
+        </button>
+      )}
+      {editing && (
+        <ProfessionalEditor
+          prof={prof}
+          token={token}
+          onClose={() => setEditing(false)}
+          onSaved={updated => {
+            setData(d => ({ ...d, profile: updated }));
+            setEditing(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProfessionalEditor({ prof, token, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    occupation:      prof.occupation || '',
+    professional_bio:prof.professional_bio || '',
+    availability:    prof.availability || 'not_applicable',
+    skillsInput:     (prof.skills || []).join(', '),
+  });
+  const [busy, setBusy] = useState(false);
+  const [err,  setErr]  = useState(null);
+
+  async function save(e) {
+    e.preventDefault();
+    setBusy(true); setErr(null);
+    try {
+      const updated = await api.updateProfessionalProfile({
+        occupation:       form.occupation || null,
+        professional_bio: form.professional_bio || null,
+        availability:     form.availability,
+        skills:           form.skillsInput ? form.skillsInput.split(',').map(s => s.trim()).filter(Boolean) : [],
+      }, token);
+      onSaved(updated);
+    } catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 480 }}>
+        <div className="modal-header">
+          <span className="modal-title">Professional Info</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <form className="modal-body" onSubmit={save}>
+          <div className="form-group">
+            <label className="form-label">Occupation / Role</label>
+            <input className="form-input" value={form.occupation} onChange={e => setForm(f => ({ ...f, occupation: e.target.value }))} placeholder="e.g. Electrician, Graphic Designer, Nurse…" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Skills (comma-separated)</label>
+            <input className="form-input" value={form.skillsInput} onChange={e => setForm(f => ({ ...f, skillsInput: e.target.value }))} placeholder="e.g. wiring, AutoCAD, patient care" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Availability</label>
+            <select className="form-select" value={form.availability} onChange={e => setForm(f => ({ ...f, availability: e.target.value }))}>
+              <option value="not_applicable">Not Applicable</option>
+              <option value="available">Available for Work</option>
+              <option value="open_to_opportunities">Open to Opportunities</option>
+              <option value="not_taking_clients">Not Taking New Clients</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Professional Bio</label>
+            <textarea className="form-textarea" rows={3} value={form.professional_bio} onChange={e => setForm(f => ({ ...f, professional_bio: e.target.value }))} placeholder="Work-focused bio…" />
+          </div>
+          {err && <p className="form-error">{err}</p>}
+          <button className="btn btn-primary btn-full" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Board: My Businesses ──────────────────────────────────────────────────────
+
+function MyBusinessesBoard({ user: u, isOwn, token }) {
+  const [businesses, setBusinesses] = useState([]);
+  const [loading, setLoading]       = useState(true);
+
+  useEffect(() => {
+    api.getBusinessesByOwner(u.id).then(setBusinesses).catch(() => {}).finally(() => setLoading(false));
+  }, [u.id]);
+
+  if (loading) return <div className="spinner" style={{ margin: '.5rem auto', width: 20, height: 20 }} />;
+  if (!businesses.length) return (
+    <div>
+      <p className="empty board-empty">No businesses listed yet.</p>
+      {isOwn && <Link to="/businesses" className="btn btn-outline btn-sm" style={{ marginTop: '.5rem', display: 'inline-block', fontSize: '.8rem' }}>+ List a Business</Link>}
+    </div>
+  );
+
+  const BIZ_TYPE_LABELS = {
+    independently_owned: 'Independently Owned', locally_owned_franchise: 'Locally Owned Franchise',
+    cooperative: 'Cooperative', nonprofit: 'Nonprofit', sole_proprietor: 'Sole Proprietor',
+  };
+  const BASE_URL = 'https://mycelium.unprecedentedtimes.org';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+      {businesses.map(biz => (
+        <Link key={biz.id} to={`/businesses/${biz.id}`} className="prof-affiliation-row" style={{ opacity: biz.is_active ? 1 : 0.5 }}>
+          {biz.cover_photo && (
+            <img src={biz.cover_photo.startsWith('http') ? biz.cover_photo : `${BASE_URL}${biz.cover_photo}`}
+              alt={biz.business_name}
+              style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span className="prof-affiliation-name">{biz.business_name}</span>
+            {biz.is_verified_local && <span className="biz-verified-badge-sm" style={{ marginLeft: '.3rem' }}>✓</span>}
+            {!biz.is_active && <span style={{ marginLeft: '.3rem', fontSize: '.65rem', color: 'var(--muted)' }}>(inactive)</span>}
+            <span className="biz-type-pill-xs" style={{ display: 'block', marginTop: '.1rem' }}>{BIZ_TYPE_LABELS[biz.business_type]}</span>
+          </div>
+        </Link>
+      ))}
+      {isOwn && (
+        <Link to="/businesses" className="btn btn-outline btn-sm" style={{ marginTop: '.25rem', fontSize: '.78rem', textAlign: 'center' }}>
+          + Add Business
+        </Link>
+      )}
     </div>
   );
 }

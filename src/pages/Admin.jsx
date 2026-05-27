@@ -48,12 +48,19 @@ export default function Admin() {
               Anomalies
             </button>
           )}
+          {user.role === 'admin' && (
+            <button className={`tab-btn${tab === 'businesses' ? ' active' : ''}`}
+              onClick={() => setTab('businesses')}>
+              Businesses
+            </button>
+          )}
         </div>
 
         {tab === 'moderation' && <ModerationQueue token={token} />}
         {tab === 'chatrooms' && <ChatRoomsTab token={token} userRole={user.role} />}
         {tab === 'users' && user.role === 'admin' && <UsersTab token={token} />}
         {tab === 'anomalies' && user.role === 'admin' && <AnomaliesTab token={token} />}
+        {tab === 'businesses' && user.role === 'admin' && <BusinessesTab token={token} />}
       </div>
     </div>
   );
@@ -679,6 +686,117 @@ function AnomaliesTab({ token }) {
           <div className="watch-report-list">{reviewed.map(renderAnomaly)}</div>
         </>
       )}
+    </div>
+  );
+}
+
+// ── Businesses Tab ─────────────────────────────────────────────────────────────
+
+function BusinessesTab({ token }) {
+  const [businesses, setBusinesses] = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [err,        setErr]        = useState(null);
+  const [actionId,   setActionId]   = useState(null);
+
+  useEffect(() => {
+    api.getAdminBusinesses(token)
+      .then(setBusinesses)
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  async function toggleVerify(biz) {
+    const next = !biz.is_verified_local;
+    if (!next && !confirm(`Revoke "Verified Local" from "${biz.business_name}"?`)) return;
+    setActionId(biz.id);
+    try {
+      const updated = await api.adminVerifyBusiness(biz.id, next, token);
+      setBusinesses(prev => prev.map(b => b.id === biz.id
+        ? { ...b, is_verified_local: updated.is_verified_local }
+        : b
+      ));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  if (loading) return <div className="spinner" />;
+  if (err) return <p className="error-msg">{err}</p>;
+
+  const verified   = businesses.filter(b => b.is_verified_local);
+  const unverified = businesses.filter(b => !b.is_verified_local);
+
+  return (
+    <div>
+      <p style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
+        {businesses.length} total · {verified.length} verified local
+      </p>
+      <div className="table-scroll-wrap">
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Business</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Owner</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Type</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Category</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Recs</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Verified</th>
+              <th style={{ padding: '.5rem .75rem', fontWeight: 700 }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {businesses.map(biz => {
+              const busy = actionId === biz.id;
+              return (
+                <tr key={biz.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '.5rem .75rem', fontWeight: 600 }}>
+                    {biz.business_name}
+                    {biz.is_verified_local && (
+                      <span style={{ marginLeft: '.4rem', fontSize: '.65rem', background: '#e3f2fd', color: '#1565c0', border: '1px solid #90caf9', padding: '.1rem .35rem', borderRadius: 99, fontWeight: 700 }}>
+                        ✓ Verified Local
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
+                    {biz.owner_username}
+                  </td>
+                  <td style={{ padding: '.5rem .75rem', color: 'var(--muted)', textTransform: 'capitalize' }}>
+                    {biz.business_type?.replace(/_/g, ' ')}
+                  </td>
+                  <td style={{ padding: '.5rem .75rem', color: 'var(--muted)', textTransform: 'capitalize' }}>
+                    {biz.category?.replace(/_/g, ' ')}
+                  </td>
+                  <td style={{ padding: '.5rem .75rem', color: 'var(--muted)' }}>
+                    {biz.recommendation_count ?? 0}
+                  </td>
+                  <td style={{ padding: '.5rem .75rem' }}>
+                    {biz.is_verified_local
+                      ? <span style={{ color: '#1565c0', fontWeight: 600, fontSize: '.8rem' }}>✓ Yes</span>
+                      : <span style={{ color: 'var(--muted)', fontSize: '.8rem' }}>No</span>
+                    }
+                  </td>
+                  <td style={{ padding: '.5rem .75rem' }}>
+                    <button
+                      className="btn btn-sm btn-outline"
+                      disabled={busy}
+                      style={biz.is_verified_local
+                        ? { fontSize: '.72rem', color: 'var(--muted)', borderColor: 'var(--border)' }
+                        : { fontSize: '.72rem', color: '#1565c0', borderColor: '#90caf9' }
+                      }
+                      onClick={() => toggleVerify(biz)}
+                    >
+                      {busy ? '…' : biz.is_verified_local ? 'Revoke Verified' : '✓ Verify Local'}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {businesses.length === 0 && <p className="empty">No businesses registered yet.</p>}
     </div>
   );
 }

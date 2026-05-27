@@ -4445,3 +4445,510 @@ a { color: inherit; text-decoration: none; }
   .watch-map-filters { padding: .4rem .5rem; }
   .watch-view-toggle, .lf-view-toggle { font-size: .8rem; }
 }
+
+/* ── Business Directory ──────────────────────────────────────────────────── */
+
+.biz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.biz-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow .15s;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+}
+.biz-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+
+.biz-card-cover {
+  height: 140px;
+  background: var(--surface-2, #f0f0f0);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.biz-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.biz-card-cover-placeholder {
+  font-size: 2.5rem;
+  opacity: .35;
+}
+
+.biz-card-body {
+  padding: .85rem 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+
+.biz-card-name {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.biz-card-meta {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-wrap: wrap;
+}
+
+.biz-type-pill {
+  font-size: .7rem;
+  font-weight: 600;
+  padding: .15rem .5rem;
+  border-radius: 99px;
+  background: var(--surface-2, #f0f0f0);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  text-transform: capitalize;
+}
+
+.biz-type-pill-xs {
+  font-size: .65rem;
+  font-weight: 600;
+  padding: .1rem .4rem;
+  border-radius: 99px;
+  background: var(--surface-2, #f0f0f0);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  text-transform: capitalize;
+}
+
+.biz-cat-pill {
+  font-size: .7rem;
+  padding: .15rem .5rem;
+  border-radius: 99px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.biz-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .72rem;
+  font-weight: 700;
+  padding: .2rem .6rem;
+  border-radius: 99px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #90caf9;
+}
+
+.biz-verified-badge-sm {
+  font-size: .65rem;
+  font-weight: 700;
+  padding: .1rem .4rem;
+  border-radius: 99px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #90caf9;
+}
+
+.biz-card-location {
+  font-size: .8rem;
+  color: var(--muted);
+}
+
+.biz-card-recs {
+  font-size: .78rem;
+  color: var(--muted);
+  margin-top: auto;
+}
+
+/* ── Business Profile Page ───────────────────────────────────────────────── */
+
+.biz-profile-page { padding-bottom: 3rem; }
+
+.biz-cover-banner {
+  width: 100%;
+  height: 220px;
+  background: var(--surface-2, #f0f0f0);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.biz-cover-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.biz-cover-placeholder {
+  font-size: 4rem;
+  opacity: .25;
+}
+.biz-cover-upload-btn {
+  position: absolute;
+  bottom: .75rem;
+  right: .75rem;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: .35rem .7rem;
+  font-size: .78rem;
+  cursor: pointer;
+}
+.biz-cover-upload-btn:hover { background: rgba(0,0,0,.75); }
+
+.biz-profile-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1.25rem 0 .75rem;
+}
+.biz-profile-name-row {
+  flex: 1;
+}
+.biz-profile-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0 0 .4rem;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+.biz-profile-meta {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+  font-size: .85rem;
+  color: var(--muted);
+}
+.biz-profile-actions {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.biz-profile-tabs {
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+}
+.biz-tab-btn {
+  padding: .6rem 1.1rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  font-size: .88rem;
+  font-family: inherit;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+}
+.biz-tab-btn:hover { color: var(--text); }
+.biz-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+.biz-about-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+@media (max-width: 640px) {
+  .biz-about-grid { grid-template-columns: 1fr; }
+}
+
+.biz-about-section { display: flex; flex-direction: column; gap: .5rem; }
+.biz-about-label {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+.biz-about-value { font-size: .9rem; line-height: 1.5; }
+
+.biz-hours-table { font-size: .85rem; border-collapse: collapse; }
+.biz-hours-table td { padding: .2rem .5rem; }
+.biz-hours-table td:first-child { font-weight: 600; color: var(--muted); width: 90px; }
+
+.biz-services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: .75rem;
+  margin-top: .75rem;
+}
+
+.biz-service-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .85rem 1rem;
+}
+.biz-service-name { font-weight: 700; font-size: .95rem; margin: 0 0 .25rem; }
+.biz-service-desc { font-size: .83rem; color: var(--muted); margin: 0 0 .4rem; }
+.biz-service-price { font-size: .8rem; color: var(--accent); font-weight: 600; }
+
+.biz-add-service-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  margin-top: .75rem;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+
+.biz-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: .6rem;
+  margin-top: .75rem;
+}
+.biz-photo-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2, #f0f0f0);
+  cursor: pointer;
+}
+.biz-photo-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.biz-photo-delete {
+  position: absolute;
+  top: .3rem;
+  right: .3rem;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: .7rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.biz-recs-list { display: flex; flex-direction: column; gap: .85rem; margin-top: .75rem; }
+
+.biz-rec-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .85rem 1rem;
+}
+.biz-rec-header {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .4rem;
+  font-size: .82rem;
+}
+.biz-rec-author { font-weight: 600; }
+.biz-rec-date { color: var(--muted); margin-left: auto; }
+.biz-rec-body { font-size: .88rem; line-height: 1.55; }
+
+.biz-rec-reply {
+  margin-top: .6rem;
+  padding: .6rem .85rem;
+  background: var(--surface-2, #f5f5f5);
+  border-left: 3px solid var(--border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: .83rem;
+}
+.biz-rec-reply-label { font-weight: 700; font-size: .75rem; color: var(--muted); margin-bottom: .2rem; }
+
+.biz-rec-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  margin-top: .75rem;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+
+/* Post business link */
+.post-business-link {
+  margin: .25rem 0 .35rem;
+  font-size: .82rem;
+}
+.post-business-link-inner {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+.post-business-link-inner:hover { text-decoration: underline; }
+
+/* ── Professional Board ──────────────────────────────────────────────────── */
+
+.prof-board-content { display: flex; flex-direction: column; gap: .9rem; }
+
+.prof-section-label {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  margin-bottom: .2rem;
+}
+
+.prof-avail-badge {
+  display: inline-block;
+  font-size: .76rem;
+  font-weight: 600;
+  padding: .2rem .6rem;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+}
+.prof-avail-badge.avail-open {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-color: #a5d6a7;
+}
+.prof-avail-badge.avail-limited {
+  background: #fff8e1;
+  color: #e65100;
+  border-color: #ffcc80;
+}
+.prof-avail-badge.avail-unavailable {
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.prof-occupation {
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.prof-bio {
+  font-size: .88rem;
+  color: var(--muted);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.prof-skill-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+
+.prof-skill-tag-wrap {
+  display: flex;
+  align-items: center;
+  gap: .2rem;
+}
+
+.prof-skill-tag {
+  font-size: .78rem;
+  padding: .2rem .6rem;
+  border-radius: 99px;
+  background: var(--surface-2, #f0f0f0);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.prof-endorse-btn {
+  font-size: .68rem;
+  padding: .1rem .35rem;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.prof-endorse-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.prof-endorse-btn.endorsed { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.prof-affiliation-row {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  font-size: .85rem;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.prof-affiliation-row:last-child { border-bottom: none; }
+
+.prof-portfolio {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+.prof-portfolio a {
+  font-size: .82rem;
+  color: var(--accent);
+  word-break: break-all;
+}
+.prof-portfolio a:hover { text-decoration: underline; }
+
+/* My Businesses board */
+.my-biz-list { display: flex; flex-direction: column; gap: .6rem; }
+.my-biz-item {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .5rem .75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: box-shadow .12s;
+}
+.my-biz-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.my-biz-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--surface-2, #f0f0f0);
+  flex-shrink: 0;
+}
+.my-biz-thumb-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2, #f0f0f0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+.my-biz-info { flex: 1; min-width: 0; }
+.my-biz-name { font-weight: 700; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.my-biz-type { font-size: .75rem; color: var(--muted); text-transform: capitalize; }

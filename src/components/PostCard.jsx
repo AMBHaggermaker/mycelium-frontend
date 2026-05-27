@@ -173,6 +173,14 @@ export default function PostCard({ post, onRequireAuth, onReserved }) {
         )}
       </div>
 
+      {post.business_id && post.business_name && (
+        <div className="post-business-link" onClick={e => e.stopPropagation()}>
+          <Link to={`/businesses/${post.business_id}`} className="post-business-link-inner">
+            🏪 {post.business_name}
+          </Link>
+        </div>
+      )}
+
       {post.description && <p className="post-description">{post.description}</p>}
 
       <div onClick={e => e.stopPropagation()}>
