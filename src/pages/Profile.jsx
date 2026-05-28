@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
@@ -144,8 +145,6 @@ export default function Profile() {
   const [showEditor,        setShowEditor]        = useState(false);
   const [stickers,          setStickers]          = useState([]);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
-  const bannerTriggerRef = useRef(null);
-
   const isOwn = data && authUser && data.user.id === authUser.id;
 
   const load = useCallback(async () => {
@@ -265,11 +264,11 @@ export default function Profile() {
       }>
         {isOwn && (
           <>
-            <button type="button" className="banner-camera-btn" onClick={() => bannerTriggerRef.current?.()} title="Change banner photo">📷 Change banner</button>
+            <label htmlFor="banner-upload-input" className="banner-camera-btn" title="Change banner photo">📷 Change banner</label>
             <p className="banner-upload-hint">1200×400px · 3:1 landscape</p>
           </>
         )}
-        {isOwn && <BannerUpload triggerRef={bannerTriggerRef} token={token} onUploaded={url => setData(d => ({ ...d, user: { ...d.user, banner_image_url: url } }))} />}
+        {isOwn && <BannerUpload token={token} onUploaded={url => setData(d => ({ ...d, user: { ...d.user, banner_image_url: url } }))} />}
       </div>
 
       <div className="profile-layout-wrap">
@@ -1489,18 +1488,13 @@ function AvatarBlock({ user: u, isOwn, token, onUpdated }) {
 
 // ── Banner Upload ─────────────────────────────────────────────────────────────
 
-function BannerUpload({ token, onUploaded, triggerRef }) {
+function BannerUpload({ token, onUploaded }) {
   const [src, setSrc] = useState(null);
   const [filename, setFilename] = useState('');
   const [crop, setCrop] = useState();
   const [completedCrop, setCompletedCrop] = useState();
   const [uploading, setUploading] = useState(false);
   const imgRef = useRef(null);
-  const fileRef = useRef(null);
-
-  useEffect(() => {
-    if (triggerRef) triggerRef.current = () => fileRef.current?.click();
-  });
 
   function onFileChange(e) {
     const file = e.target.files?.[0];
@@ -1532,8 +1526,8 @@ function BannerUpload({ token, onUploaded, triggerRef }) {
 
   return (
     <>
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={onFileChange} />
-      {src && (
+      <input id="banner-upload-input" type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={onFileChange} />
+      {src && createPortal(
         <div className="img-crop-overlay" onClick={e => e.target === e.currentTarget && setSrc(null)}>
           <div className="img-crop-dialog">
             <div className="img-crop-dialog-header"><span>Crop Banner</span><button type="button" className="img-crop-close" onClick={() => setSrc(null)}>✕</button></div>
@@ -1548,7 +1542,8 @@ function BannerUpload({ token, onUploaded, triggerRef }) {
               <button type="button" className="btn btn-ghost" onClick={() => setSrc(null)}>Cancel</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
