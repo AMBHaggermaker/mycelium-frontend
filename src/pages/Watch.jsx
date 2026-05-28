@@ -408,6 +408,45 @@ function WatchReportCard({ report, highlighted }) {
 const LAB_COMPOUNDS = ['aluminum','barium','strontium','silver','PFAS','lead','nitrates','coliform','other'];
 const LAB_DASHBOARDS = new Set(['environment','food']);
 
+function GpsButton({ onCapture }) {
+  const [status, setStatus] = useState('idle'); // idle|loading|denied|unavailable
+  function capture() {
+    if (!navigator.geolocation) { setStatus('unavailable'); return; }
+    setStatus('loading');
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        onCapture(
+          pos.coords.latitude.toFixed(6),
+          pos.coords.longitude.toFixed(6)
+        );
+        setStatus('idle');
+      },
+      err => setStatus(err.code === 1 ? 'denied' : 'unavailable'),
+      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
+    );
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.2rem', alignItems: 'flex-end' }}>
+      <button type="button" className="btn btn-sm btn-outline"
+        style={{ fontSize: '.75rem', padding: '.2rem .55rem' }}
+        disabled={status === 'loading'}
+        onClick={capture}>
+        {status === 'loading' ? '⏳ Getting location…' : '◎ Use My Location'}
+      </button>
+      {status === 'denied' && (
+        <p style={{ fontSize: '.72rem', color: '#b52424', margin: 0, lineHeight: 1.4, textAlign: 'right', maxWidth: 260 }}>
+          Location access denied — please enter your location manually or type your address in the location label field.
+        </p>
+      )}
+      {status === 'unavailable' && (
+        <p style={{ fontSize: '.72rem', color: '#b52424', margin: 0, lineHeight: 1.4, textAlign: 'right', maxWidth: 260 }}>
+          Location unavailable — please enter coordinates manually.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function WatchReportModal({ dashboard, token, onClose, onCreated }) {
   const [title,         setTitle]         = useState('');
   const [description,   setDescription]   = useState('');
@@ -418,7 +457,6 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
   const [photos,        setPhotos]        = useState([]);
   const [locationLat,   setLocationLat]   = useState('');
   const [locationLng,   setLocationLng]   = useState('');
-  const [locating,      setLocating]      = useState(false);
   const [err,           setErr]           = useState(null);
   const [busy,          setBusy]          = useState(false);
 
@@ -570,18 +608,7 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
           <div className="form-group">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.3rem' }}>
               <label className="form-label" style={{ margin: 0 }}>GPS Coordinates <span style={{ fontSize: '.72rem', color: 'var(--muted)', fontWeight: 400 }}>(enables map pin)</span></label>
-              <button type="button" className="btn btn-sm btn-outline" style={{ fontSize: '.75rem', padding: '.2rem .55rem' }}
-                disabled={locating}
-                onClick={() => {
-                  setLocating(true);
-                  navigator.geolocation?.getCurrentPosition(pos => {
-                    setLocationLat(pos.coords.latitude.toFixed(6));
-                    setLocationLng(pos.coords.longitude.toFixed(6));
-                    setLocating(false);
-                  }, () => setLocating(false));
-                }}>
-                {locating ? '…' : '◎ Use My Location'}
-              </button>
+              <GpsButton onCapture={(lat, lng) => { setLocationLat(lat); setLocationLng(lng); }} />
             </div>
             <div className="form-row" style={{ marginBottom: 0 }}>
               <input className="form-input" type="number" step="any" placeholder="Latitude (e.g. 34.7304)"
@@ -589,11 +616,15 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
               <input className="form-input" type="number" step="any" placeholder="Longitude (e.g. -86.5861)"
                 value={locationLng} onChange={e => setLocationLng(e.target.value)} />
             </div>
-            {!locationLat && locationLabel && (
-              <p style={{ fontSize: '.74rem', color: 'var(--muted)', margin: '.2rem 0 0' }}>
-                No GPS — your location label will be geocoded automatically after submission.
+            {locationLat && locationLng ? (
+              <p style={{ fontSize: '.74rem', color: '#15803d', margin: '.2rem 0 0' }}>
+                ✓ {parseFloat(locationLat).toFixed(5)}°N, {Math.abs(parseFloat(locationLng)).toFixed(5)}°W
               </p>
-            )}
+            ) : !locationLat && locationLabel ? (
+              <p style={{ fontSize: '.74rem', color: 'var(--muted)', margin: '.2rem 0 0' }}>
+                No GPS — your location label will be used for the report.
+              </p>
+            ) : null}
           </div>
           <div className="form-group">
             <label className="form-label">Photos (up to 5)</label>
@@ -1920,19 +1951,25 @@ function SubmitAtmosphericObsModal({ token, onClose, onCreated }) {
               <label className="form-label">Location</label>
               <input className="form-input" placeholder="Neighborhood, street, or landmark" value={form.location_label} onChange={set('location_label')} />
             </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">GPS Latitude</label>
-                <input className="form-input" type="number" step="any" placeholder="34.7304" value={form.location_lat} onChange={set('location_lat')} />
+            <div className="form-group">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.3rem' }}>
+                <label className="form-label" style={{ margin: 0 }}>GPS Coordinates</label>
+                <GpsButton onCapture={(lat, lng) => setForm(f => ({ ...f, location_lat: lat, location_lng: lng }))} />
               </div>
-              <div className="form-group">
-                <label className="form-label">GPS Longitude</label>
-                <input className="form-input" type="number" step="any" placeholder="-86.5861" value={form.location_lng} onChange={set('location_lng')} />
+              <div className="form-row" style={{ marginBottom: 0 }}>
+                <input className="form-input" type="number" step="any" placeholder="Latitude (34.7304)" value={form.location_lat} onChange={set('location_lat')} />
+                <input className="form-input" type="number" step="any" placeholder="Longitude (-86.5861)" value={form.location_lng} onChange={set('location_lng')} />
               </div>
+              {form.location_lat && form.location_lng ? (
+                <p style={{ fontSize: '.74rem', color: '#15803d', margin: '.2rem 0 0' }}>
+                  ✓ {parseFloat(form.location_lat).toFixed(5)}°N, {Math.abs(parseFloat(form.location_lng)).toFixed(5)}°W — flight cross-reference will run automatically
+                </p>
+              ) : (
+                <p style={{ fontSize: '.75rem', color: '#c2410c', margin: '.2rem 0 0', padding: '.3rem .5rem', background: '#fff7ed', borderRadius: 4, lineHeight: 1.45 }}>
+                  ⚠ Precise location required for flight cross-reference — use the location button or enter coordinates manually.
+                </p>
+              )}
             </div>
-            <p style={{ fontSize: '.75rem', color: 'var(--green)', margin: '-.5rem 0 0', padding: '.3rem .5rem', background: 'var(--green-bg)', borderRadius: 4 }}>
-              GPS coordinates enable automatic flight cross-referencing and drift corridor calculation.
-            </p>
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Duration (minutes)</label>
@@ -2161,9 +2198,20 @@ function SoilSamplesPanel({ isAdmin, token, onRequireAuth, currentUser }) {
                   <div className="form-group"><label className="form-label">Collection Date</label><input className="form-input" type="date" value={form.collection_date} onChange={set('collection_date')} /></div>
                 </div>
                 <div className="form-group"><label className="form-label">Location</label><input className="form-input" placeholder="Neighborhood, address, or landmark" value={form.location_label} onChange={set('location_label')} /></div>
-                <div className="form-row">
-                  <div className="form-group"><label className="form-label">GPS Latitude</label><input className="form-input" type="number" step="any" placeholder="34.7304" value={form.location_lat} onChange={set('location_lat')} /></div>
-                  <div className="form-group"><label className="form-label">GPS Longitude</label><input className="form-input" type="number" step="any" placeholder="-86.5861" value={form.location_lng} onChange={set('location_lng')} /></div>
+                <div className="form-group">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.3rem' }}>
+                    <label className="form-label" style={{ margin: 0 }}>GPS Coordinates</label>
+                    <GpsButton onCapture={(lat, lng) => setForm(f => ({ ...f, location_lat: lat, location_lng: lng }))} />
+                  </div>
+                  <div className="form-row" style={{ marginBottom: 0 }}>
+                    <input className="form-input" type="number" step="any" placeholder="Latitude (34.7304)" value={form.location_lat} onChange={set('location_lat')} />
+                    <input className="form-input" type="number" step="any" placeholder="Longitude (-86.5861)" value={form.location_lng} onChange={set('location_lng')} />
+                  </div>
+                  {form.location_lat && form.location_lng && (
+                    <p style={{ fontSize: '.74rem', color: '#15803d', margin: '.2rem 0 0' }}>
+                      ✓ {parseFloat(form.location_lat).toFixed(5)}°N, {Math.abs(parseFloat(form.location_lng)).toFixed(5)}°W
+                    </p>
+                  )}
                 </div>
                 <div className="form-row">
                   <div className="form-group"><label className="form-label">Distance from obs (mi)</label><input className="form-input" type="number" step="any" value={form.distance_from_obs_miles} onChange={set('distance_from_obs_miles')} /></div>
