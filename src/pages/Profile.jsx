@@ -265,8 +265,8 @@ export default function Profile() {
       }>
         {isOwn && (
           <>
-            <button type="button" className="banner-camera-btn" onClick={() => bannerTriggerRef.current?.()} title="Change banner photo">📷</button>
-            <p className="banner-upload-hint">1200×400px landscape (3:1 ratio)</p>
+            <button type="button" className="banner-camera-btn" onClick={() => bannerTriggerRef.current?.()} title="Change banner photo">📷 Change banner</button>
+            <p className="banner-upload-hint">1200×400px · 3:1 landscape</p>
           </>
         )}
         {isOwn && <BannerUpload triggerRef={bannerTriggerRef} token={token} onUploaded={url => setData(d => ({ ...d, user: { ...d.user, banner_image_url: url } }))} />}
