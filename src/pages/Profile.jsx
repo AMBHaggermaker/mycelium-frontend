@@ -496,9 +496,13 @@ function BoardCard({ board, children, isOwn, dragMode, dragListeners, accentColo
 
   const cardStyle = {};
   if (board.background_color) cardStyle.background = board.background_color;
-  if (board.font_color) cardStyle.color = board.font_color;
+  const bodyColor = board.body_font_color || board.font_color || null;
+  if (bodyColor) cardStyle.color = bodyColor;
 
-  const headerStyle = { background: accentColor || 'var(--green)' };
+  const headerStyle = {
+    background: accentColor || 'var(--green)',
+    color: board.header_font_color || '#ffffff',
+  };
 
   return (
     <div className={'profile-board-card' + (!board.is_visible && isOwn ? ' board-card-hidden' : '')} style={cardStyle}
@@ -538,22 +542,42 @@ function BoardCard({ board, children, isOwn, dragMode, dragListeners, accentColo
 // ── Board Settings Panel ──────────────────────────────────────────────────────
 
 function BoardSettings({ board, onChange, accentColor }) {
+  const headerBg   = accentColor || '#2a5f0a';
+  const headerFg   = board.header_font_color || '#ffffff';
+  const cardBg     = board.background_color  || '#ffffff';
+  const bodyFg     = board.body_font_color   || board.font_color || '#1a1a1a';
+
   return (
     <div className="profile-board-settings-panel">
       <div className="profile-board-settings-row">
         <label>Background</label>
-        <input type="color" value={board.background_color || (accentColor || '#2a5f0a') + '22'}
+        <input type="color" value={board.background_color || '#ffffff'}
           onChange={e => onChange(board.board_type, { background_color: e.target.value })} />
       </div>
       <div className="profile-board-settings-row">
-        <label>Text Color</label>
-        <input type="color" value={board.font_color || '#1a1a1a'}
-          onChange={e => onChange(board.board_type, { font_color: e.target.value })} />
+        <label>Header text</label>
+        <input type="color" value={headerFg}
+          onChange={e => onChange(board.board_type, { header_font_color: e.target.value })} />
+      </div>
+      <div className="profile-board-settings-row">
+        <label>Body text</label>
+        <input type="color" value={bodyFg}
+          onChange={e => onChange(board.board_type, { body_font_color: e.target.value })} />
       </div>
       <div className="profile-board-settings-row">
         <label>Visible to visitors</label>
         <input type="checkbox" checked={board.is_visible}
           onChange={e => onChange(board.board_type, { is_visible: e.target.checked })} />
+      </div>
+      <div className="profile-board-settings-preview">
+        <div className="profile-board-settings-preview-header"
+          style={{ background: headerBg, color: headerFg }}>
+          {BOARD_TITLES[board.board_type] || 'Board'}
+        </div>
+        <div className="profile-board-settings-preview-body"
+          style={{ background: cardBg, color: bodyFg }}>
+          Body text preview
+        </div>
       </div>
     </div>
   );
@@ -1830,6 +1854,7 @@ function StickerItem({ sticker: s, isEditMode, layerRef, onUpdate, onSave, accen
     cursor: isEditMode ? 'grab' : 'default',
     userSelect: 'none',
     zIndex: 10,
+    pointerEvents: isEditMode ? 'auto' : 'none',
   };
 
   const renderContent = () => {
