@@ -444,6 +444,8 @@ export default function Profile() {
         <ProfileEditor
           user={u}
           token={token}
+          boardOrder={boardOrder}
+          onBoardsUpdated={newBoards => setBoardOrder(newBoards)}
           onClose={() => setShowEditor(false)}
           onSaved={updated => {
             setData(d => ({ ...d, user: { ...d.user, ...updated } }));
@@ -2037,7 +2039,7 @@ const PATTERN_NAMES = {
   waves: 'Waves', triangles: 'Triangles', stars: 'Stars', mycelium: 'Mycelium',
 };
 
-function ProfileEditor({ user: u, token, onClose, onSaved }) {
+function ProfileEditor({ user: u, token, onClose, onSaved, boardOrder, onBoardsUpdated }) {
   const [editorTab, setEditorTab] = useState('appearance');
   const [bgMode, setBgMode] = useState(u.background_photo_url ? 'photo' : u.pattern_type && u.pattern_type !== 'solid' ? 'pattern' : 'color');
   const [bgPhotoUrl, setBgPhotoUrl] = useState(u.background_photo_url || null);
@@ -2061,6 +2063,9 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
     pattern_scale: u.pattern_scale || 'medium',
     pattern_opacity: u.pattern_opacity ?? 0.8,
     wall_privacy: u.wall_privacy || 'everyone',
+    apply_board_colors: false,
+    board_header_font_color: '#ffffff',
+    board_body_font_color: '#1a1a1a',
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
@@ -2096,6 +2101,17 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
       };
       if (bgMode !== 'photo') payload.background_photo_url = null;
       const updated = await api.customizeProfile(payload, token);
+
+      if (form.apply_board_colors && boardOrder?.length) {
+        const updatedBoards = boardOrder.map(b => ({
+          ...b,
+          header_font_color: form.board_header_font_color,
+          body_font_color:   form.board_body_font_color,
+        }));
+        await api.saveBoardSettings(updatedBoards, token);
+        onBoardsUpdated?.(updatedBoards);
+      }
+
       onSaved({ ...updated, background_photo_url: bgMode === 'photo' ? bgPhotoUrl : null });
       onClose();
     } catch (e) { setErr(e.message); }
@@ -2269,6 +2285,49 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
                   <option value="disabled">Nobody (wall disabled)</option>
                 </select>
                 <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: '.2rem' }}>Who can post on your Wall board</p>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Board Colors</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.6rem', fontSize: '.85rem', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.apply_board_colors}
+                    onChange={e => set('apply_board_colors', e.target.checked)} />
+                  Apply to all boards on save
+                </label>
+                {form.apply_board_colors && (
+                  <>
+                    <div className="form-row" style={{ marginBottom: '.6rem' }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '.78rem' }}>Header text</label>
+                        <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+                          <input type="color" value={form.board_header_font_color}
+                            onChange={e => set('board_header_font_color', e.target.value)}
+                            style={{ width: 44, height: 32, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
+                          <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{form.board_header_font_color}</span>
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '.78rem' }}>Body text</label>
+                        <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+                          <input type="color" value={form.board_body_font_color}
+                            onChange={e => set('board_body_font_color', e.target.value)}
+                            style={{ width: 44, height: 32, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
+                          <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{form.board_body_font_color}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="profile-board-settings-preview">
+                      <div className="profile-board-settings-preview-header"
+                        style={{ background: form.accent_color || '#2a5f0a', color: form.board_header_font_color }}>
+                        Board Title
+                      </div>
+                      <div className="profile-board-settings-preview-body"
+                        style={{ color: form.board_body_font_color }}>
+                        Body text preview
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
