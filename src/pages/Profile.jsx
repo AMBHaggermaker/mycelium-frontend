@@ -199,6 +199,19 @@ export default function Profile() {
     try { await api.saveBoardSettings(newOrder, token); } catch { /* ignore */ }
   }
 
+  async function handleApplyBoardToAll(boardType) {
+    const src = boardOrder.find(b => b.board_type === boardType);
+    if (!src) return;
+    const newOrder = boardOrder.map(b => ({
+      ...b,
+      background_color:  src.background_color,
+      header_font_color: src.header_font_color,
+      body_font_color:   src.body_font_color,
+    }));
+    setBoardOrder(newOrder);
+    try { await api.saveBoardSettings(newOrder, token); } catch { /* ignore */ }
+  }
+
   if (loading) return <div className="page"><div className="container"><div className="spinner" style={{ marginTop: '4rem' }} /></div></div>;
   if (!data)   return <div className="page"><div className="container"><p className="error-msg">Profile not found.</p></div></div>;
 
@@ -389,6 +402,7 @@ export default function Profile() {
                   dragMode={dragMode}
                   accentColor={u.accent_color}
                   onSettingChange={handleBoardSettingChange}
+                  onApplyToAll={handleApplyBoardToAll}
                 >
                   <BoardContent
                     board={board}
@@ -461,7 +475,7 @@ export default function Profile() {
 
 // ── Sortable Board Wrapper ────────────────────────────────────────────────────
 
-function SortableBoard({ board, children, isOwn, dragMode, accentColor, onSettingChange }) {
+function SortableBoard({ board, children, isOwn, dragMode, accentColor, onSettingChange, onApplyToAll }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: board.board_type,
     disabled: !dragMode,
@@ -483,6 +497,7 @@ function SortableBoard({ board, children, isOwn, dragMode, accentColor, onSettin
         dragListeners={listeners}
         accentColor={accentColor}
         onSettingChange={onSettingChange}
+        onApplyToAll={onApplyToAll}
       >
         {children}
       </BoardCard>
@@ -492,7 +507,7 @@ function SortableBoard({ board, children, isOwn, dragMode, accentColor, onSettin
 
 // ── Board Card Shell ──────────────────────────────────────────────────────────
 
-function BoardCard({ board, children, isOwn, dragMode, dragListeners, accentColor, onSettingChange }) {
+function BoardCard({ board, children, isOwn, dragMode, dragListeners, accentColor, onSettingChange, onApplyToAll }) {
   const [showSettings, setShowSettings] = useState(false);
   const [expanded,     setExpanded]     = useState(false);
 
@@ -525,7 +540,7 @@ function BoardCard({ board, children, isOwn, dragMode, dragListeners, accentColo
       </div>
 
       {showSettings && isOwn && (
-        <BoardSettings board={board} onChange={onSettingChange} accentColor={accentColor} />
+        <BoardSettings board={board} onChange={onSettingChange} accentColor={accentColor} onApplyToAll={onApplyToAll} />
       )}
 
       <div className={'profile-board-card-body' + (expanded ? ' expanded' : '')}>
@@ -543,17 +558,24 @@ function BoardCard({ board, children, isOwn, dragMode, dragListeners, accentColo
 
 // ── Board Settings Panel ──────────────────────────────────────────────────────
 
-function BoardSettings({ board, onChange, accentColor }) {
-  const headerBg   = accentColor || '#2a5f0a';
-  const headerFg   = board.header_font_color || '#ffffff';
-  const cardBg     = board.background_color  || '#ffffff';
-  const bodyFg     = board.body_font_color   || board.font_color || '#1a1a1a';
+function BoardSettings({ board, onChange, accentColor, onApplyToAll }) {
+  const [copied, setCopied] = useState(false);
+  const headerBg = accentColor || '#2a5f0a';
+  const headerFg = board.header_font_color || '#ffffff';
+  const cardBg   = board.background_color  || '#ffffff';
+  const bodyFg   = board.body_font_color   || board.font_color || '#1a1a1a';
+
+  function handleApplyToAll() {
+    onApplyToAll?.(board.board_type);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   return (
     <div className="profile-board-settings-panel">
       <div className="profile-board-settings-row">
         <label>Background</label>
-        <input type="color" value={board.background_color || '#ffffff'}
+        <input type="color" value={cardBg}
           onChange={e => onChange(board.board_type, { background_color: e.target.value })} />
       </div>
       <div className="profile-board-settings-row">
@@ -567,7 +589,7 @@ function BoardSettings({ board, onChange, accentColor }) {
           onChange={e => onChange(board.board_type, { body_font_color: e.target.value })} />
       </div>
       <div className="profile-board-settings-row">
-        <label>Visible to visitors</label>
+        <label>Visible</label>
         <input type="checkbox" checked={board.is_visible}
           onChange={e => onChange(board.board_type, { is_visible: e.target.checked })} />
       </div>
@@ -580,6 +602,13 @@ function BoardSettings({ board, onChange, accentColor }) {
           style={{ background: cardBg, color: bodyFg }}>
           Body text preview
         </div>
+      </div>
+      <div style={{ flex: '0 0 100%', paddingTop: '.25rem' }}>
+        <button type="button" className="btn btn-outline btn-sm"
+          style={{ fontSize: '.75rem', width: '100%' }}
+          onClick={handleApplyToAll}>
+          {copied ? '✓ Applied to all boards' : 'Copy colors to all boards'}
+        </button>
       </div>
     </div>
   );
@@ -2063,14 +2092,31 @@ function ProfileEditor({ user: u, token, onClose, onSaved, boardOrder, onBoardsU
     pattern_scale: u.pattern_scale || 'medium',
     pattern_opacity: u.pattern_opacity ?? 0.8,
     wall_privacy: u.wall_privacy || 'everyone',
-    apply_board_colors: false,
+    board_background_color:  '#ffffff',
     board_header_font_color: '#ffffff',
-    board_body_font_color: '#1a1a1a',
+    board_body_font_color:   '#1a1a1a',
   });
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState(null);
+  const [saving,            setSaving]            = useState(false);
+  const [err,               setErr]               = useState(null);
+  const [boardThemeApplied, setBoardThemeApplied] = useState(false);
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function handleApplyBoardTheme() {
+    if (!boardOrder?.length) return;
+    const updatedBoards = boardOrder.map(b => ({
+      ...b,
+      background_color:  form.board_background_color,
+      header_font_color: form.board_header_font_color,
+      body_font_color:   form.board_body_font_color,
+    }));
+    try {
+      await api.saveBoardSettings(updatedBoards, token);
+      onBoardsUpdated?.(updatedBoards);
+      setBoardThemeApplied(true);
+      setTimeout(() => setBoardThemeApplied(false), 2500);
+    } catch (e) { setErr(e.message); }
+  }
 
   async function handleSave(e) {
     e.preventDefault();
@@ -2101,17 +2147,6 @@ function ProfileEditor({ user: u, token, onClose, onSaved, boardOrder, onBoardsU
       };
       if (bgMode !== 'photo') payload.background_photo_url = null;
       const updated = await api.customizeProfile(payload, token);
-
-      if (form.apply_board_colors && boardOrder?.length) {
-        const updatedBoards = boardOrder.map(b => ({
-          ...b,
-          header_font_color: form.board_header_font_color,
-          body_font_color:   form.board_body_font_color,
-        }));
-        await api.saveBoardSettings(updatedBoards, token);
-        onBoardsUpdated?.(updatedBoards);
-      }
-
       onSaved({ ...updated, background_photo_url: bgMode === 'photo' ? bgPhotoUrl : null });
       onClose();
     } catch (e) { setErr(e.message); }
@@ -2288,46 +2323,53 @@ function ProfileEditor({ user: u, token, onClose, onSaved, boardOrder, onBoardsU
               </div>
 
               <div className="form-group">
-                <label className="form-label">Board Colors</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.6rem', fontSize: '.85rem', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={form.apply_board_colors}
-                    onChange={e => set('apply_board_colors', e.target.checked)} />
-                  Apply to all boards on save
-                </label>
-                {form.apply_board_colors && (
-                  <>
-                    <div className="form-row" style={{ marginBottom: '.6rem' }}>
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '.78rem' }}>Header text</label>
-                        <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
-                          <input type="color" value={form.board_header_font_color}
-                            onChange={e => set('board_header_font_color', e.target.value)}
-                            style={{ width: 44, height: 32, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
-                          <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{form.board_header_font_color}</span>
-                        </div>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '.78rem' }}>Body text</label>
-                        <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
-                          <input type="color" value={form.board_body_font_color}
-                            onChange={e => set('board_body_font_color', e.target.value)}
-                            style={{ width: 44, height: 32, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
-                          <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{form.board_body_font_color}</span>
-                        </div>
-                      </div>
+                <label className="form-label">Board Theme</label>
+                <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: '.6rem' }}>
+                  Set a consistent color scheme across all boards at once. Individual boards can still be customized via the ⚙ icon.
+                </p>
+                <div className="form-row" style={{ marginBottom: '.5rem' }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: '.78rem' }}>Background</label>
+                    <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+                      <input type="color" value={form.board_background_color}
+                        onChange={e => set('board_background_color', e.target.value)}
+                        style={{ width: 44, height: 32, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
+                      <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{form.board_background_color}</span>
                     </div>
-                    <div className="profile-board-settings-preview">
-                      <div className="profile-board-settings-preview-header"
-                        style={{ background: form.accent_color || '#2a5f0a', color: form.board_header_font_color }}>
-                        Board Title
-                      </div>
-                      <div className="profile-board-settings-preview-body"
-                        style={{ color: form.board_body_font_color }}>
-                        Body text preview
-                      </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: '.78rem' }}>Header text</label>
+                    <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+                      <input type="color" value={form.board_header_font_color}
+                        onChange={e => set('board_header_font_color', e.target.value)}
+                        style={{ width: 44, height: 32, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
+                      <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{form.board_header_font_color}</span>
                     </div>
-                  </>
-                )}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: '.78rem' }}>Body text</label>
+                    <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+                      <input type="color" value={form.board_body_font_color}
+                        onChange={e => set('board_body_font_color', e.target.value)}
+                        style={{ width: 44, height: 32, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
+                      <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{form.board_body_font_color}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="profile-board-settings-preview" style={{ marginBottom: '.6rem' }}>
+                  <div className="profile-board-settings-preview-header"
+                    style={{ background: form.accent_color || '#2a5f0a', color: form.board_header_font_color }}>
+                    Board Title
+                  </div>
+                  <div className="profile-board-settings-preview-body"
+                    style={{ background: form.board_background_color, color: form.board_body_font_color }}>
+                    Body text preview
+                  </div>
+                </div>
+                <button type="button" className="btn btn-outline btn-sm" onClick={handleApplyBoardTheme}
+                  disabled={!boardOrder?.length}>
+                  {boardThemeApplied ? '✓ Applied to all boards' : 'Apply to All Boards'}
+                </button>
               </div>
             </div>
           )}
