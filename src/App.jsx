@@ -20,8 +20,11 @@ import Covenant from './pages/Covenant';
 import MyPosts from './pages/MyPosts';
 import Businesses from './pages/Businesses';
 import BusinessProfile from './pages/BusinessProfile';
+import Legislature from './pages/Legislature';
 import AuthModal from './components/AuthModal';
 import InviteModal from './components/InviteModal';
+import FeedbackButton from './components/FeedbackButton';
+import DidYouKnow from './components/DidYouKnow';
 import { useAuth } from './auth';
 import api from './api';
 
@@ -90,6 +93,8 @@ export default function App() {
     <>
       <CriticalAnomalyBanner />
       <Nav onAuthOpen={() => setAuthOpen(true)} onInviteOpen={() => setInviteOpen(true)} />
+      <FeedbackButton />
+      <DidYouKnow />
       <Routes>
         <Route path="/"            element={<Feed onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/commons"     element={<Commons onRequireAuth={() => setAuthOpen(true)} />} />
@@ -110,6 +115,7 @@ export default function App() {
         <Route path="/my-posts"        element={<MyPosts />} />
         <Route path="/businesses"      element={<Businesses onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/businesses/:id"  element={<BusinessProfile />} />
+        <Route path="/legislature"     element={<Legislature onRequireAuth={() => setAuthOpen(true)} />} />
       </Routes>
       {authOpen   && <AuthModal onClose={() => setAuthOpen(false)} />}
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
@@ -54,6 +54,9 @@ export default function Admin() {
               Businesses
             </button>
           )}
+          {user.role === 'admin' && (
+            <FeedbackTabButton active={tab === 'feedback'} onClick={() => setTab('feedback')} token={token} />
+          )}
         </div>
 
         {tab === 'moderation' && <ModerationQueue token={token} />}
@@ -61,6 +64,7 @@ export default function Admin() {
         {tab === 'users' && user.role === 'admin' && <UsersTab token={token} />}
         {tab === 'anomalies' && user.role === 'admin' && <AnomaliesTab token={token} />}
         {tab === 'businesses' && user.role === 'admin' && <BusinessesTab token={token} />}
+        {tab === 'feedback' && user.role === 'admin' && <FeedbackTab token={token} />}
       </div>
     </div>
   );
@@ -1032,6 +1036,257 @@ function BusinessesTab({ token }) {
         </table>
       </div>
       {businesses.length === 0 && <p className="empty">No businesses registered yet.</p>}
+    </div>
+  );
+}
+
+// ── Feedback tab button with new-count badge ──────────────────────────────────
+
+function FeedbackTabButton({ active, onClick, token }) {
+  const [newCount, setNewCount] = useState(0);
+
+  useEffect(() => {
+    api.getAdminFeedback(token)
+      .then(items => setNewCount(items.filter(i => i.status === 'new').length))
+      .catch(() => {});
+  }, [token]);
+
+  return (
+    <button className={`tab-btn${active ? ' active' : ''}`} onClick={onClick} style={{ position: 'relative' }}>
+      Feedback
+      {newCount > 0 && (
+        <span style={{
+          marginLeft: '.35rem',
+          fontSize: '.65rem', fontWeight: 700,
+          background: 'var(--red)', color: '#fff',
+          borderRadius: 99, padding: '.1rem .38rem',
+          verticalAlign: 'middle',
+        }}>{newCount}</span>
+      )}
+    </button>
+  );
+}
+
+// ── Feedback Tab ──────────────────────────────────────────────────────────────
+
+const FEEDBACK_TYPE_LABELS = {
+  bug_report:         'Bug Report',
+  feature_suggestion: 'Feature Suggestion',
+  content_issue:      'Content Issue',
+  general_feedback:   'General Feedback',
+  other:              'Other',
+};
+
+const FEEDBACK_TYPE_COLORS = {
+  bug_report:         { bg: '#fce8e8', color: '#b52424', border: '#b52424' },
+  feature_suggestion: { bg: '#e4edf8', color: '#1a52a0', border: '#1a52a0' },
+  content_issue:      { bg: '#fdf2e3', color: '#b86b10', border: '#b86b10' },
+  general_feedback:   { bg: 'var(--green-bg)', color: 'var(--green)', border: 'var(--green)' },
+  other:              { bg: 'var(--surface)', color: 'var(--muted)', border: 'var(--border)' },
+};
+
+const STATUS_OPTIONS = ['new', 'reviewing', 'in_progress', 'completed', 'wont_fix'];
+const STATUS_LABELS  = {
+  new:         'New',
+  reviewing:   'Reviewing',
+  in_progress: 'In Progress',
+  completed:   'Completed',
+  wont_fix:    "Won't Fix",
+};
+
+function FeedbackTab({ token }) {
+  const [items,    setItems]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [err,      setErr]      = useState(null);
+  const [notes,    setNotes]    = useState({});   // id -> string
+  const [saving,   setSaving]   = useState({});   // id -> bool
+  const [deleting, setDeleting] = useState({});   // id -> bool
+
+  useEffect(() => {
+    api.getAdminFeedback(token)
+      .then(data => {
+        setItems(data);
+        // Pre-populate notes state from existing admin_notes
+        const n = {};
+        data.forEach(i => { n[i.id] = i.admin_notes || ''; });
+        setNotes(n);
+      })
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  async function updateStatus(id, status) {
+    try {
+      const updated = await api.updateFeedback(id, { status }, token);
+      setItems(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i));
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function saveNotes(id) {
+    setSaving(s => ({ ...s, [id]: true }));
+    try {
+      const updated = await api.updateFeedback(id, { admin_notes: notes[id] }, token);
+      setItems(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSaving(s => ({ ...s, [id]: false }));
+    }
+  }
+
+  async function handleDelete(id) {
+    if (!confirm('Delete this feedback submission?')) return;
+    setDeleting(s => ({ ...s, [id]: true }));
+    try {
+      await api.deleteFeedback(id, token);
+      setItems(prev => prev.filter(i => i.id !== id));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setDeleting(s => ({ ...s, [id]: false }));
+    }
+  }
+
+  if (loading) return <div className="spinner" />;
+  if (err)     return <p className="error-msg">{err}</p>;
+
+  const newCount = items.filter(i => i.status === 'new').length;
+
+  return (
+    <div>
+      <p style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '1.25rem' }}>
+        {items.length} submission{items.length !== 1 ? 's' : ''}
+        {newCount > 0 && (
+          <span style={{ marginLeft: '.5rem', color: 'var(--red)', fontWeight: 700 }}>
+            · {newCount} new
+          </span>
+        )}
+      </p>
+
+      {items.length === 0 && <p className="empty">No feedback submissions yet.</p>}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {items.map(item => {
+          const typeStyle = FEEDBACK_TYPE_COLORS[item.type] || FEEDBACK_TYPE_COLORS.other;
+          const typeLabel = FEEDBACK_TYPE_LABELS[item.type] || item.type;
+          const noteVal   = notes[item.id] ?? item.admin_notes ?? '';
+          const isSaving  = saving[item.id];
+          const isDeleting = deleting[item.id];
+
+          return (
+            <div key={item.id} style={{
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              padding: '1rem 1.1rem',
+            }}>
+              {/* Header row */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', flexWrap: 'wrap', marginBottom: '.6rem' }}>
+                <span style={{
+                  fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em',
+                  background: typeStyle.bg, color: typeStyle.color, border: `1px solid ${typeStyle.border}`,
+                  padding: '.15rem .55rem', borderRadius: 99, whiteSpace: 'nowrap',
+                }}>{typeLabel}</span>
+
+                <span style={{ fontSize: '.8rem', color: 'var(--muted)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                  {new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+
+                {/* Status badge */}
+                <span style={{
+                  fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em',
+                  background: item.status === 'new' ? 'var(--green-bg)' : 'var(--surface)',
+                  color: item.status === 'new' ? 'var(--green)' : 'var(--muted)',
+                  border: `1px solid ${item.status === 'new' ? 'var(--green)' : 'var(--border)'}`,
+                  padding: '.15rem .5rem', borderRadius: 99,
+                }}>{STATUS_LABELS[item.status] || item.status}</span>
+              </div>
+
+              {/* Submitter */}
+              <p style={{ fontSize: '.8rem', color: 'var(--muted)', marginBottom: '.5rem' }}>
+                {item.is_anonymous
+                  ? <em>Anonymous</em>
+                  : item.submitter_username
+                    ? <>Submitted by <strong>@{item.submitter_username}</strong></>
+                    : <em>Unknown user</em>
+                }
+              </p>
+
+              {/* Description */}
+              <p style={{ fontSize: '.9rem', color: 'var(--text)', lineHeight: 1.55, marginBottom: '.65rem', whiteSpace: 'pre-wrap' }}>
+                {item.description}
+              </p>
+
+              {/* Screenshot link */}
+              {item.screenshot_url && (
+                <p style={{ marginBottom: '.65rem', fontSize: '.82rem' }}>
+                  <a href={item.screenshot_url} target="_blank" rel="noopener noreferrer"
+                    style={{ color: 'var(--green)', textDecoration: 'underline' }}>
+                    View screenshot
+                  </a>
+                </p>
+              )}
+
+              {/* Controls row */}
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start', borderTop: '1px solid var(--border)', paddingTop: '.75rem', marginTop: '.5rem' }}>
+                {/* Status dropdown */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
+                  <label style={{ fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)' }}>
+                    Status
+                  </label>
+                  <select
+                    className="form-select"
+                    value={item.status}
+                    onChange={e => updateStatus(item.id, e.target.value)}
+                    style={{ fontSize: '.82rem', padding: '.25rem .5rem' }}
+                  >
+                    {STATUS_OPTIONS.map(s => (
+                      <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Admin notes */}
+                <div style={{ flex: 1, minWidth: 200, display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
+                  <label style={{ fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)' }}>
+                    Admin Notes
+                  </label>
+                  <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
+                    <textarea
+                      className="form-textarea"
+                      value={noteVal}
+                      onChange={e => setNotes(n => ({ ...n, [item.id]: e.target.value }))}
+                      rows={2}
+                      placeholder="Internal notes or user-facing update…"
+                      style={{ flex: 1, fontSize: '.82rem', padding: '.3rem .5rem', resize: 'vertical' }}
+                    />
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() => saveNotes(item.id)}
+                      disabled={isSaving}
+                      style={{ whiteSpace: 'nowrap', marginTop: '2px' }}
+                    >
+                      {isSaving ? '…' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Delete */}
+                <button
+                  className="btn btn-sm btn-danger"
+                  onClick={() => handleDelete(item.id)}
+                  disabled={isDeleting}
+                  style={{ alignSelf: 'flex-end' }}
+                >
+                  {isDeleting ? '…' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

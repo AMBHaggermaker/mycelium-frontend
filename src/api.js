@@ -350,11 +350,55 @@ export default {
   adminDeactivateBusiness:      (id, token)          => patch(`/admin/businesses/${id}/deactivate`, {}, token),
   getAdminBusinesses:           (token, showDeleted) => get(`/admin/businesses${showDeleted ? '?show_deleted=true' : ''}`, token),
 
+  // Legislature
+  getLegislationBills:          (p)           => get(`/legislature/bills${qs(p)}`),
+  getLegislationReps:           (p)           => get(`/legislature/representatives${qs(p)}`),
+  getLegislationRepDetail:      (id)          => get(`/legislature/representatives/${id}`),
+  rateLegislationRep:           (id, data, token) => post(`/legislature/representatives/${id}/rate`, data, token),
+  getLegislationAlerts:         (token)       => get('/legislature/alerts', token),
+  addLegislationAlert:          (data, token) => post('/legislature/alerts', data, token),
+  deleteLegislationAlert:       (id, token)   => del(`/legislature/alerts/${id}`, token),
+  getLegislationCommunityRecords: (p)         => get(`/legislature/community-records${qs(p)}`),
+  submitCommunityVoteRecord:    (data, token) => post('/legislature/community-records', data, token),
+  createLegislationBill:        (data, token) => post('/legislature/bills', data, token),
+  triggerBillAiSummary:         (id, token)   => post(`/legislature/bills/${id}/ai-summary`, {}, token),
+  createLegislationRep:         (data, token) => post('/legislature/representatives', data, token),
+
   // Professional profiles
   getProfessionalProfile:       (username)          => get(`/profiles/${username}/professional`),
   updateProfessionalProfile:    (data, token)       => patch('/profiles/professional', data, token),
   endorseSkill:                 (endorsed_username, skill, token) => post('/profiles/endorse', { endorsed_username, skill }, token),
   removeEndorsement:            (endorsedId, skill, token) => del(`/profiles/endorse/${endorsedId}/${encodeURIComponent(skill)}`, token),
+
+  // Feedback
+  submitFeedback: (formData, token) => fetch(`${BASE}/feedback`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  }).then(async res => {
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || 'Failed');
+    return d;
+  }),
+  getAdminFeedback:  (token)           => get('/feedback', token),
+  updateFeedback:    (id, data, token) => patch(`/feedback/${id}`, data, token),
+  deleteFeedback:    (id, token)       => del(`/feedback/${id}`, token),
+  uploadProfileBackground: (file, token) => {
+    const fd = new FormData(); fd.append('background', file);
+    return fetch(`${BASE}/profiles/upload-background`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    }).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; });
+  },
+  uploadProfileSticker: (file, token) => {
+    const fd = new FormData(); fd.append('sticker', file);
+    return fetch(`${BASE}/profiles/upload-sticker`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    }).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; });
+  },
 
   getAdminWatchAnomalies: (token)        => get('/admin/watch-anomalies', token),
   reviewAnomaly:     (id, token)         => patch(`/admin/watch-anomalies/${id}/review`, {}, token),

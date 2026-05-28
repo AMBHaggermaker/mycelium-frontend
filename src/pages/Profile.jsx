@@ -1,8 +1,19 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 import ImageCropUploader from '../components/ImageCropUploader';
+import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
+
+async function cropToBlob(img, crop, targetW, targetH) {
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW; canvas.height = targetH;
+  const ctx = canvas.getContext('2d');
+  const scaleX = img.naturalWidth / img.width;
+  const scaleY = img.naturalHeight / img.height;
+  ctx.drawImage(img, crop.x * scaleX, crop.y * scaleY, crop.width * scaleX, crop.height * scaleY, 0, 0, targetW, targetH);
+  return new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('Canvas empty')), 'image/jpeg', 0.92));
+}
 
 const AVAIL_LABELS = {
   available: '🟢 Available for Work', not_taking_clients: '🔴 Not Taking New Clients',
@@ -63,13 +74,57 @@ function resolveUrl(url) {
   return `${BASE_URL}${url}`;
 }
 
+const PATTERN_SCALE_PX = { small: 16, medium: 32, large: 64 };
+
+function getPatternCSS(type, c1, c2, scale) {
+  const sz = PATTERN_SCALE_PX[scale] || 32;
+  const a = c1 || '#2a5f0a', b = c2 || '#1a3b07';
+  switch (type) {
+    case 'diagonal_stripes':
+      return { background: `repeating-linear-gradient(45deg, ${a}, ${a} ${sz/4}px, ${b} ${sz/4}px, ${b} ${sz/2}px)` };
+    case 'horizontal_stripes':
+      return { background: `repeating-linear-gradient(0deg, ${a}, ${a} ${sz/2}px, ${b} ${sz/2}px, ${b} ${sz}px)` };
+    case 'vertical_stripes':
+      return { background: `repeating-linear-gradient(90deg, ${a}, ${a} ${sz/2}px, ${b} ${sz/2}px, ${b} ${sz}px)` };
+    case 'grid':
+      return { background: b, backgroundImage: `linear-gradient(${a} 1px, transparent 1px), linear-gradient(90deg, ${a} 1px, transparent 1px)`, backgroundSize: `${sz}px ${sz}px` };
+    case 'dots':
+      return { background: b, backgroundImage: `radial-gradient(circle, ${a} ${sz/8}px, transparent ${sz/8}px)`, backgroundSize: `${sz}px ${sz}px` };
+    case 'checkerboard':
+      return { background: b, backgroundImage: `repeating-conic-gradient(${a} 0% 25%, ${b} 0% 50%)`, backgroundSize: `${sz}px ${sz}px` };
+    case 'zigzag':
+      return { backgroundColor: b, backgroundImage: `linear-gradient(135deg, ${a} 25%, transparent 25%) -${sz/2}px 0, linear-gradient(225deg, ${a} 25%, transparent 25%) -${sz/2}px 0, linear-gradient(315deg, ${a} 25%, transparent 25%), linear-gradient(45deg, ${a} 25%, transparent 25%)`, backgroundSize: `${sz}px ${sz}px` };
+    case 'diamonds':
+      return { backgroundColor: b, backgroundImage: `linear-gradient(45deg, ${a} 25%, transparent 25%), linear-gradient(-45deg, ${a} 25%, transparent 25%), linear-gradient(45deg, transparent 75%, ${a} 75%), linear-gradient(-45deg, transparent 75%, ${a} 75%)`, backgroundSize: `${sz}px ${sz}px`, backgroundPosition: `0 0, 0 ${sz/2}px, ${sz/2}px -${sz/2}px, -${sz/2}px 0px` };
+    case 'honeycomb':
+      return { background: b, backgroundImage: `radial-gradient(circle, ${a} 2px, transparent ${sz/5}px)`, backgroundSize: `${sz}px ${sz*0.866}px` };
+    case 'crosshatch':
+      return { background: b, backgroundImage: `repeating-linear-gradient(45deg, ${a}, ${a} 1px, transparent 1px, transparent ${sz/2}px), repeating-linear-gradient(-45deg, ${a}, ${a} 1px, transparent 1px, transparent ${sz/2}px)` };
+    case 'waves':
+      return { background: b, backgroundImage: `repeating-radial-gradient(ellipse at 50% 50%, transparent 0, transparent ${sz/3}px, ${a} ${sz/3}px, ${a} ${sz/3+2}px, transparent ${sz/3+2}px)` };
+    case 'triangles':
+      return { background: b, backgroundImage: `linear-gradient(120deg, ${a} 25%, transparent 25%), linear-gradient(240deg, ${a} 25%, transparent 25%)`, backgroundSize: `${sz}px ${sz*0.866}px` };
+    case 'stars':
+      return { background: b, backgroundImage: `radial-gradient(2px 2px at ${sz/4}px ${sz/4}px, ${a}, transparent), radial-gradient(2px 2px at ${sz*3/4}px ${sz*3/4}px, ${a}, transparent)`, backgroundSize: `${sz}px ${sz}px` };
+    case 'mycelium': {
+      const sv = sz * 2;
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${sv}' height='${sv}'><g stroke='${encodeURIComponent(a)}' stroke-width='0.8' fill='none' opacity='0.7'><path d='M${sv/2},${sv/2} L${sv*.2},${sv*.1} M${sv/2},${sv/2} L${sv*.8},${sv*.15} M${sv/2},${sv/2} L${sv*.05},${sv*.6} M${sv/2},${sv/2} L${sv*.9},${sv*.7} M${sv/2},${sv/2} L${sv*.3},${sv*.95} M${sv*.2},${sv*.1} L${sv*.05},${sv*.35} M${sv*.8},${sv*.15} L${sv*.95},${sv*.4}'/><circle cx='${sv/2}' cy='${sv/2}' r='2' fill='${encodeURIComponent(a)}'/><circle cx='${sv*.2}' cy='${sv*.1}' r='1.5' fill='${encodeURIComponent(a)}'/><circle cx='${sv*.8}' cy='${sv*.15}' r='1.5' fill='${encodeURIComponent(a)}'/></g></svg>`;
+      return { background: b, backgroundImage: `url("data:image/svg+xml,${svg}")`, backgroundSize: `${sv}px ${sv}px` };
+    }
+    default:
+      return { background: a };
+  }
+}
+
 function profileStyle(u) {
   if (!u) return {};
   const s = {};
   if (u.font_style && FONT_STYLES[u.font_style]) s['--profile-font'] = FONT_STYLES[u.font_style].css;
   if (u.accent_color) s['--profile-accent'] = u.accent_color;
-  if (u.background_gradient) s.background = u.background_gradient;
-  else if (u.background_color) s.background = u.background_color;
+  if (!u.background_photo_url && !u.pattern_type) {
+    if (u.background_gradient) s.background = u.background_gradient;
+    else if (u.background_color) s.background = u.background_color;
+  }
   return s;
 }
 
@@ -141,6 +196,11 @@ export default function Profile() {
   const isDark = u.profile_theme === 'dark';
   const pStyle = profileStyle(u);
 
+  const [stickers, setStickers] = useState(() => {
+    try { return Array.isArray(u.profile_stickers) ? u.profile_stickers : (JSON.parse(u.profile_stickers || '[]') || []); } catch { return []; }
+  });
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+
   const albumMap = {};
   photos.forEach(p => {
     if (!albumMap[p.album_name]) albumMap[p.album_name] = [];
@@ -149,9 +209,47 @@ export default function Profile() {
 
   const visibleBoards = (boardOrder || []).filter(b => isOwn || b.is_visible);
 
+  async function saveStickers(updated) {
+    setStickers(updated);
+    try { await api.customizeProfile({ profile_stickers: updated }, token); } catch { /* ignore */ }
+  }
+
+  const patternBg = u.pattern_type && u.pattern_type !== 'solid'
+    ? getPatternCSS(u.pattern_type, u.pattern_color_primary, u.pattern_color_secondary, u.pattern_scale || 'medium')
+    : null;
+
   return (
     <div className={'profile-page' + (isDark ? ' profile-dark' : '')}
-      style={{ ...pStyle, fontFamily: pStyle['--profile-font'] || undefined }}>
+      style={{ ...pStyle, fontFamily: pStyle['--profile-font'] || undefined, position: 'relative', overflow: 'hidden' }}>
+
+      {/* Background photo layer */}
+      {u.background_photo_url && (
+        <div className="profile-bg-photo-layer" style={{ backgroundImage: `url(${resolveUrl(u.background_photo_url)})` }}>
+          <div className="profile-bg-overlay" style={{ background: u.accent_color || '#000', opacity: u.background_overlay_opacity ?? 0.5 }} />
+        </div>
+      )}
+
+      {/* Pattern background layer */}
+      {!u.background_photo_url && patternBg && (
+        <div className="profile-pattern-layer" style={{ ...patternBg, opacity: u.pattern_opacity ?? 0.8 }} />
+      )}
+
+      {/* Sticker overlay */}
+      <StickerLayer
+        stickers={stickers}
+        isEditMode={dragMode}
+        onUpdate={(id, changes) => {
+          if (changes === null) {
+            const updated = stickers.filter(s => s.id !== id);
+            saveStickers(updated);
+          } else {
+            const updated = stickers.map(s => s.id === id ? { ...s, ...changes } : s);
+            setStickers(updated);
+          }
+        }}
+        onSave={() => saveStickers(stickers)}
+        accentColor={u.accent_color}
+      />
 
       {/* Banner */}
       <div className="profile-banner" style={
@@ -161,6 +259,19 @@ export default function Profile() {
       }>
         {isOwn && <BannerUpload token={token} onUploaded={url => setData(d => ({ ...d, user: { ...d.user, banner_image_url: url } }))} />}
       </div>
+
+      <div className="profile-layout-wrap">
+        {/* Left network sidebar */}
+        {copart.length > 0 && (
+          <ProfileNetworkSidebar
+            copart={copart}
+            networkSettings={u.profile_network_settings}
+            isOwn={isOwn}
+            token={token}
+            accentColor={u.accent_color}
+            onSettingsUpdate={settings => setData(d => ({ ...d, user: { ...d.user, profile_network_settings: settings } }))}
+          />
+        )}
 
       <div className="profile-main-container">
         {/* Header row */}
@@ -204,6 +315,11 @@ export default function Profile() {
                 >
                   {dragMode ? '✓ Done' : '⠿ Edit Layout'}
                 </button>
+                {dragMode && (
+                  <button className="btn btn-sm btn-outline" onClick={() => setShowStickerPicker(v => !v)}>
+                    🎨 Stickers
+                  </button>
+                )}
               </div>
             ) : authUser ? (
               <button className="btn btn-outline btn-sm" onClick={() => navigate(`/messages?with=${u.id}`)}>
@@ -294,7 +410,23 @@ export default function Profile() {
             ) : null}
           </DragOverlay>
         </DndContext>
+
+        {showStickerPicker && dragMode && (
+          <StickerPicker
+            onPlace={sticker => {
+              const newSticker = { ...sticker, id: Date.now().toString(), x_percent: 20, y_percent: 30, size: 60, rotation: 0, opacity: 1 };
+              const updated = [...stickers, newSticker];
+              saveStickers(updated);
+            }}
+            onClose={() => setShowStickerPicker(false)}
+            onClearAll={() => {
+              if (confirm('Remove all stickers?')) saveStickers([]);
+            }}
+            token={token}
+          />
+        )}
       </div>
+      </div> {/* close profile-layout-wrap */}
 
       {showEditor && (
         <ProfileEditor
@@ -1078,49 +1210,555 @@ function AvatarBlock({ user: u, isOwn, token, onUpdated }) {
 // ── Banner Upload ─────────────────────────────────────────────────────────────
 
 function BannerUpload({ token, onUploaded }) {
+  const [src, setSrc] = useState(null);
+  const [filename, setFilename] = useState('');
+  const [crop, setCrop] = useState();
+  const [completedCrop, setCompletedCrop] = useState();
   const [uploading, setUploading] = useState(false);
+  const imgRef = useRef(null);
+  const fileRef = useRef(null);
 
-  async function handleFile(blob, filename) {
+  function onFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFilename(file.name);
+    const reader = new FileReader();
+    reader.onload = () => { setSrc(reader.result); setCrop(undefined); setCompletedCrop(undefined); };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  function onImageLoad(e) {
+    const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+    setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, 3, w, h), w, h));
+  }
+
+  async function confirm() {
+    if (!completedCrop || !imgRef.current) return;
     setUploading(true);
     try {
-      const file = new File([blob], filename, { type: 'image/jpeg' });
+      const blob = await cropToBlob(imgRef.current, completedCrop, 1200, 400);
+      const file = new File([blob], filename.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
       const res = await api.uploadProfileBanner(file, token);
       onUploaded(res.url);
+      setSrc(null);
     } catch (e) { alert(e.message); }
     finally { setUploading(false); }
   }
 
   return (
-    <ImageCropUploader
-      aspect={3}
-      targetWidth={1200}
-      targetHeight={400}
-      label={uploading ? '…' : '📷 Change Banner'}
-      hint="1200×400px · 3:1"
-      onFile={handleFile}
-      disabled={uploading}
-      btnClassName="profile-banner-edit-btn"
-    />
+    <>
+      <button type="button" className="banner-camera-btn" onClick={() => fileRef.current?.click()} title="Change banner photo">
+        {uploading ? '…' : '📷'}
+      </button>
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={onFileChange} />
+      {src && (
+        <div className="img-crop-overlay" onClick={e => e.target === e.currentTarget && setSrc(null)}>
+          <div className="img-crop-dialog">
+            <div className="img-crop-dialog-header"><span>Crop Banner</span><button type="button" className="img-crop-close" onClick={() => setSrc(null)}>✕</button></div>
+            <div className="img-crop-dialog-body">
+              <ReactCrop crop={crop} onChange={(_, p) => setCrop(p)} onComplete={px => setCompletedCrop(px)} aspect={3} minWidth={40}>
+                <img ref={imgRef} src={src} alt="crop" onLoad={onImageLoad} style={{ maxWidth: '80vw', maxHeight: '60vh', display: 'block' }} />
+              </ReactCrop>
+              <p className="img-crop-size-hint">Output: 1200×400px</p>
+            </div>
+            <div className="img-crop-dialog-footer">
+              <button type="button" className="btn btn-primary" onClick={confirm} disabled={uploading || !completedCrop}>{uploading ? '…' : 'Use Photo'}</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setSrc(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Background Upload ─────────────────────────────────────────────────────────
+
+function BackgroundUpload({ token, onUploaded }) {
+  const [uploading, setUploading] = useState(false);
+  async function handleFile(blob, filename) {
+    setUploading(true);
+    try {
+      const file = new File([blob], filename, { type: 'image/jpeg' });
+      const res = await api.uploadProfileBackground(file, token);
+      onUploaded(res.url);
+    } catch (e) { alert(e.message); }
+    finally { setUploading(false); }
+  }
+  return (
+    <ImageCropUploader aspect={16/9} targetWidth={1920} targetHeight={1080}
+      label={uploading ? '…' : '📷 Set Background Photo'} hint="1920×1080px · 16:9"
+      onFile={handleFile} disabled={uploading} btnClassName="btn btn-outline btn-sm" />
+  );
+}
+
+// ── Profile Network Sidebar ───────────────────────────────────────────────────
+
+function ProfileNetworkSidebar({ copart, networkSettings, isOwn, token, accentColor, onSettingsUpdate }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [fadeIn, setFadeIn] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const settings = networkSettings || {};
+  const visibleCount = Math.min(Math.max(1, settings.count || 1), 6);
+  const rotationOn = settings.rotation !== false;
+
+  const filteredPeople = useMemo(() => {
+    let p = [...copart];
+    if (settings.hidden?.length) p = p.filter(person => !settings.hidden.includes(String(person.id)));
+    if (settings.order?.length) {
+      const orderMap = {};
+      settings.order.forEach((id, i) => { orderMap[String(id)] = i; });
+      p.sort((a, b) => (orderMap[String(a.id)] ?? 999) - (orderMap[String(b.id)] ?? 999));
+    }
+    return p;
+  }, [copart, settings]);
+
+  useEffect(() => {
+    if (!rotationOn || filteredPeople.length <= visibleCount) return;
+    const id = setInterval(() => {
+      setFadeIn(false);
+      setTimeout(() => {
+        setCurrentIndex(i => (i + visibleCount) % filteredPeople.length);
+        setFadeIn(true);
+      }, 300);
+    }, 4000);
+    return () => clearInterval(id);
+  }, [filteredPeople.length, visibleCount, rotationOn]);
+
+  const total = filteredPeople.length;
+  if (total === 0) return null;
+
+  let displayPeople = filteredPeople.slice(currentIndex, currentIndex + visibleCount);
+  if (displayPeople.length < visibleCount && total > visibleCount) {
+    displayPeople = [...displayPeople, ...filteredPeople.slice(0, visibleCount - displayPeople.length)];
+  }
+
+  return (
+    <aside className="profile-network-sidebar">
+      <div className="pns-header">
+        <span className="pns-title">My Network</span>
+        {isOwn && <button className="pns-gear" onClick={() => setShowSettings(true)} title="Customize">⚙</button>}
+      </div>
+      <div className={`pns-carousel${fadeIn ? '' : ' pns-fading'}`}>
+        {displayPeople.map(p => <PersonNetCard key={p.id} person={p} accentColor={accentColor} />)}
+      </div>
+      {rotationOn && total > visibleCount && (
+        <div className="pns-dots">
+          {Array.from({ length: Math.ceil(total / visibleCount) }).map((_, i) => (
+            <span key={i} className={`pns-dot${Math.floor(currentIndex / visibleCount) === i ? ' active' : ''}`}
+              onClick={() => setCurrentIndex(i * visibleCount)} />
+          ))}
+        </div>
+      )}
+      {showSettings && (
+        <NetworkSettingsModal
+          people={copart} settings={settings}
+          onClose={() => setShowSettings(false)}
+          onSave={async ns => {
+            try { await api.customizeProfile({ profile_network_settings: ns }, token); onSettingsUpdate(ns); } catch { /* ignore */ }
+            setShowSettings(false);
+          }}
+        />
+      )}
+    </aside>
+  );
+}
+
+function PersonNetCard({ person: p, accentColor }) {
+  const preview = p.status_text || p.pinned_bulletin || '';
+  return (
+    <div className="pns-person-card">
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        <div className="pns-avatar" style={{ background: p.accent_color || accentColor || 'var(--green)' }}>
+          {p.avatar_url ? <img src={resolveUrl(p.avatar_url)} alt={p.username} /> : <span>{p.username[0].toUpperCase()}</span>}
+        </div>
+        {p.mood_emoji && <span className="pns-mood-badge">{p.mood_emoji}</span>}
+      </div>
+      <div className="pns-person-info">
+        <span className="pns-display-name">{p.username}</span>
+        {p.mood && <span className="pns-mood-label">{p.mood}</span>}
+        {preview && <p className="pns-status-line">{preview.slice(0, 60)}</p>}
+        <Link to={`/profile/${p.username}`} className="pns-view-link">View Profile →</Link>
+      </div>
+    </div>
+  );
+}
+
+function NetworkSettingsModal({ people, settings, onClose, onSave }) {
+  const [hidden, setHidden] = useState(new Set((settings.hidden || []).map(String)));
+  const [count, setCount] = useState(settings.count || 1);
+  const [rotation, setRotation] = useState(settings.rotation !== false);
+  const [order, setOrder] = useState(() => {
+    if (settings.order?.length) {
+      const ordered = [];
+      const idMap = {};
+      people.forEach(p => { idMap[String(p.id)] = p; });
+      settings.order.forEach(id => { if (idMap[String(id)]) ordered.push(idMap[String(id)]); });
+      people.forEach(p => { if (!settings.order.includes(String(p.id)) && !settings.order.includes(p.id)) ordered.push(p); });
+      return ordered;
+    }
+    return [...people];
+  });
+
+  function toggleHide(id) {
+    const s = new Set(hidden);
+    if (s.has(String(id))) s.delete(String(id)); else s.add(String(id));
+    setHidden(s);
+  }
+
+  function save() {
+    onSave({ hidden: [...hidden], count, rotation, order: order.map(p => String(p.id)) });
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 420 }}>
+        <div className="modal-header"><span className="modal-title">Network Sidebar Settings</span><button className="modal-close" onClick={onClose}>✕</button></div>
+        <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          <div className="form-group">
+            <label className="form-label">People to show at once</label>
+            <input type="range" min={1} max={6} value={count} onChange={e => setCount(+e.target.value)} style={{ width: '100%' }} />
+            <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{count} {count === 1 ? 'person' : 'people'}</span>
+          </div>
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer', fontSize: '.9rem' }}>
+              <input type="checkbox" checked={rotation} onChange={e => setRotation(e.target.checked)} /> Auto-rotate every 4 seconds
+            </label>
+          </div>
+          <div className="form-group">
+            <label className="form-label">People (toggle to hide)</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem', maxHeight: 240, overflowY: 'auto' }}>
+              {order.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.3rem .5rem', background: 'var(--surface)', borderRadius: 6 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: p.accent_color || 'var(--green)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.8rem' }}>
+                    {p.avatar_url ? <img src={resolveUrl(p.avatar_url)} alt={p.username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : p.username[0].toUpperCase()}
+                  </div>
+                  <span style={{ flex: 1, fontSize: '.85rem' }}>{p.username}</span>
+                  <button type="button" className={`btn btn-sm ${hidden.has(String(p.id)) ? 'btn-outline' : 'btn-primary'}`}
+                    style={{ fontSize: '.7rem', padding: '.15rem .4rem' }} onClick={() => toggleHide(p.id)}>
+                    {hidden.has(String(p.id)) ? 'Show' : 'Hide'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-primary" onClick={save}>Save</button>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Sticker Layer ─────────────────────────────────────────────────────────────
+
+const EMOJI_CATEGORIES = {
+  'Faces':     ['😊','😂','🥲','😤','😴','🤔','😎','🤯','😏','🫠','🥳','😈','🤩','😬','🥺','😇','😅','🫡'],
+  'Nature':    ['🌱','🌻','🌊','🔥','⚡','🌀','🌸','🍀','🦋','🐝','🌿','🌙','🦅','🌺','🍄','🌾','🐉','🦎'],
+  'Food':      ['🍕','🍵','🌮','🍓','🥑','🧃','☕','🌽','🍇','🧁','🍞','🧀','🍎','🥕','🫐','🍋','🥜','🌶️'],
+  'Activities':['🎸','📚','🏃','🎨','⚽','🧩','🎤','💻','📷','🎭','🛠️','🎯','🎪','🏋️','🚴','🧘','🎲','✍️'],
+  'Objects':   ['💡','🔑','📌','🗂️','📜','🔭','🧪','🪴','🎁','🧲','🔮','📯','🪁','🗝️','⚙️','🪞','📦','🪬'],
+  'Symbols':   ['❤️','✨','⭐','🌈','💫','♾️','💥','🏆','☀️','🌙','💜','💚','💛','🔴','⚡','🌟','💎','🔶'],
+  'Community': ['🦠','🤝','🏘️','⬡','🌐','📣','🗳️','🌍','💬','🤲','🕊️','🏡','🧑‍🤝‍🧑','📢','🌱','⚖️','🏛️','🤜'],
+};
+
+const COMMUNITY_BADGES = [
+  { id: 'founding',    label: 'Founding Member',        icon: '⬡', color: '#2a5f0a', bg: '#d1fae5' },
+  { id: 'verified',    label: 'Verified',               icon: '✓', color: '#2563eb', bg: '#dbeafe' },
+  { id: 'covenant',    label: 'Covenant Agreed',        icon: '✦', color: '#7c3aed', bg: '#ede9fe' },
+  { id: 'veteran',     label: 'Veteran',                icon: '★', color: '#ea580c', bg: '#ffedd5' },
+  { id: 'first_resp',  label: 'First Responder',        icon: '🚨', color: '#dc2626', bg: '#fee2e2' },
+  { id: 'nbhd_2024',   label: 'Neighborhood Fave 2024', icon: '🏆', color: '#ca8a04', bg: '#fef9c3' },
+  { id: 'nbhd_2025',   label: 'Neighborhood Fave 2025', icon: '🏆', color: '#ca8a04', bg: '#fef9c3' },
+];
+
+function StickerLayer({ stickers, isEditMode, onUpdate, onSave, accentColor }) {
+  const layerRef = useRef(null);
+
+  if (!stickers.length && !isEditMode) return null;
+
+  return (
+    <div ref={layerRef} className={`profile-sticker-layer${isEditMode ? ' sticker-edit-mode' : ''}`}>
+      {stickers.map(s => (
+        <StickerItem key={s.id} sticker={s} isEditMode={isEditMode} layerRef={layerRef}
+          onUpdate={(id, changes) => onUpdate(id, changes)}
+          onSave={onSave} accentColor={accentColor} />
+      ))}
+    </div>
+  );
+}
+
+function StickerItem({ sticker: s, isEditMode, layerRef, onUpdate, onSave, accentColor }) {
+  const moveDrag = useRef(null);
+  const resizeDrag = useRef(null);
+  const rotateDrag = useRef(null);
+
+  function onMoveDown(e) {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = layerRef.current?.getBoundingClientRect();
+    moveDrag.current = { startX: e.clientX, startY: e.clientY, startXPct: s.x_percent, startYPct: s.y_percent, rect };
+  }
+  function onMoveMove(e) {
+    if (!moveDrag.current) return;
+    const { startX, startY, startXPct, startYPct, rect } = moveDrag.current;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    onUpdate(s.id, {
+      x_percent: Math.max(0, Math.min(95, startXPct + (dx / rect.width) * 100)),
+      y_percent: Math.max(0, Math.min(95, startYPct + (dy / rect.height) * 100)),
+    });
+  }
+  function onMoveUp() { if (moveDrag.current) { moveDrag.current = null; onSave(); } }
+
+  function onResizeDown(e) {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    resizeDrag.current = { startX: e.clientX, startY: e.clientY, startSize: s.size || 60 };
+  }
+  function onResizeMove(e) {
+    if (!resizeDrag.current) return;
+    const { startX, startY, startSize } = resizeDrag.current;
+    const delta = (e.clientX - startX + e.clientY - startY) / 2;
+    onUpdate(s.id, { size: Math.max(20, Math.min(300, startSize + delta)) });
+  }
+  function onResizeUp() { if (resizeDrag.current) { resizeDrag.current = null; onSave(); } }
+
+  function onRotateDown(e) {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = layerRef.current?.getBoundingClientRect();
+    const cx = rect.left + (s.x_percent / 100) * rect.width + (s.size || 60) / 2;
+    const cy = rect.top + (s.y_percent / 100) * rect.height + (s.size || 60) / 2;
+    rotateDrag.current = { cx, cy, startAngle: Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI, startRot: s.rotation || 0 };
+  }
+  function onRotateMove(e) {
+    if (!rotateDrag.current) return;
+    const { cx, cy, startAngle, startRot } = rotateDrag.current;
+    const angle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
+    onUpdate(s.id, { rotation: startRot + (angle - startAngle) });
+  }
+  function onRotateUp() { if (rotateDrag.current) { rotateDrag.current = null; onSave(); } }
+
+  const sz = s.size || 60;
+  const style = {
+    position: 'absolute',
+    left: `${s.x_percent}%`,
+    top: `${s.y_percent}%`,
+    width: sz,
+    opacity: s.opacity ?? 1,
+    transform: `rotate(${s.rotation || 0}deg)`,
+    cursor: isEditMode ? 'grab' : 'default',
+    userSelect: 'none',
+    zIndex: 10,
+  };
+
+  const renderContent = () => {
+    if (s.type === 'emoji') return <span style={{ fontSize: sz * 0.9, lineHeight: 1 }}>{s.value}</span>;
+    if (s.type === 'badge') {
+      const badge = COMMUNITY_BADGES.find(b => b.id === s.value) || {};
+      const customBadge = s.customBadge;
+      const label = customBadge?.label || badge.label || s.value;
+      const color = customBadge?.color || badge.color || accentColor || '#2a5f0a';
+      const bg = customBadge?.bg || badge.bg || color + '22';
+      return (
+        <div style={{ background: bg, border: `2px solid ${color}`, borderRadius: 8, padding: '4px 10px', fontSize: sz * 0.2, fontWeight: 700, color, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: sz * 0.3 }}>{badge.icon || customBadge?.icon || '⬡'}</span>
+          <span>{label}</span>
+        </div>
+      );
+    }
+    if (s.type === 'upload') return <img src={s.value} alt="sticker" style={{ width: sz, height: sz, objectFit: 'contain' }} />;
+    if (s.type === 'text') {
+      const fontMap = { classic: "'Georgia', serif", modern: 'sans-serif', typewriter: 'monospace', editorial: "'Palatino Linotype', serif" };
+      return (
+        <div style={{ fontSize: sz * 0.25, fontFamily: fontMap[s.font] || 'sans-serif', color: s.color || '#000', fontWeight: 700, whiteSpace: 'nowrap', padding: '4px 8px' }}>
+          {s.value}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div style={style}>
+      {isEditMode && (
+        <div className="sticker-rotate-handle"
+          onPointerDown={onRotateDown} onPointerMove={onRotateMove} onPointerUp={onRotateUp}>↻</div>
+      )}
+      <div className={isEditMode ? 'sticker-move-handle' : ''}
+        onPointerDown={isEditMode ? onMoveDown : undefined}
+        onPointerMove={isEditMode ? onMoveMove : undefined}
+        onPointerUp={isEditMode ? onMoveUp : undefined}>
+        {renderContent()}
+      </div>
+      {isEditMode && (
+        <>
+          <button className="sticker-delete-btn" onClick={() => onUpdate(s.id, null)} type="button">✕</button>
+          <div className="sticker-resize-handle"
+            onPointerDown={onResizeDown} onPointerMove={onResizeMove} onPointerUp={onResizeUp} />
+          <div className="sticker-opacity-bar">
+            <input type="range" min={0} max={100} value={Math.round((s.opacity ?? 1) * 100)}
+              onChange={e => onUpdate(s.id, { opacity: +e.target.value / 100 })}
+              onPointerUp={onSave} style={{ width: 60, height: 12 }} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function StickerPicker({ onPlace, onClose, onClearAll, token }) {
+  const [tab, setTab] = useState('emojis');
+  const [search, setSearch] = useState('');
+  const [emojiCat, setEmojiCat] = useState('Faces');
+  const [textVal, setTextVal] = useState('');
+  const [textColor, setTextColor] = useState('#000000');
+  const [textFont, setTextFont] = useState('modern');
+  const [customBadgeText, setCustomBadgeText] = useState('');
+  const [customBadgeColor, setCustomBadgeColor] = useState('#2a5f0a');
+  const fileRef = useRef(null);
+
+  const allEmojis = Object.values(EMOJI_CATEGORIES).flat();
+  const catEmojis = EMOJI_CATEGORIES[emojiCat] || [];
+  const filtered = search ? allEmojis.filter(e => e.includes(search)) : catEmojis;
+
+  return (
+    <div className="sticker-picker-panel">
+      <div className="sticker-picker-header">
+        <span style={{ fontWeight: 700, fontSize: '.9rem' }}>🎨 Stickers</span>
+        <div style={{ display: 'flex', gap: '.4rem' }}>
+          <button className="btn btn-sm btn-outline" style={{ fontSize: '.72rem', color: 'var(--danger)' }} onClick={onClearAll}>Clear All</button>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+      </div>
+      <div className="sticker-picker-tabs">
+        {['emojis','badges','upload','text'].map(t => (
+          <button key={t} className={`sticker-tab-btn${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
+            {t === 'emojis' ? '😊 Emojis' : t === 'badges' ? '⬡ Badges' : t === 'upload' ? '📎 Upload' : '✍ Text'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'emojis' && (
+        <div style={{ padding: '.5rem' }}>
+          <input className="form-input" style={{ marginBottom: '.5rem', fontSize: '.82rem' }}
+            placeholder="Search emojis…" value={search} onChange={e => setSearch(e.target.value)} />
+          {!search && (
+            <div className="sticker-cat-bar">
+              {Object.keys(EMOJI_CATEGORIES).map(cat => (
+                <button key={cat} className={`sticker-cat-btn${emojiCat === cat ? ' active' : ''}`} onClick={() => setEmojiCat(cat)}>{cat}</button>
+              ))}
+            </div>
+          )}
+          <div className="sticker-emoji-grid">
+            {filtered.slice(0, 60).map((em, i) => (
+              <button key={i} className="sticker-emoji-btn" onClick={() => onPlace({ type: 'emoji', value: em })} title={em}>
+                {em}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'badges' && (
+        <div style={{ padding: '.5rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          {COMMUNITY_BADGES.map(badge => (
+            <button key={badge.id} className="sticker-badge-btn" onClick={() => onPlace({ type: 'badge', value: badge.id })}
+              style={{ background: badge.bg, border: `2px solid ${badge.color}`, color: badge.color }}>
+              <span>{badge.icon}</span> {badge.label}
+            </button>
+          ))}
+          <div style={{ marginTop: '.5rem', borderTop: '1px solid var(--border)', paddingTop: '.5rem' }}>
+            <p style={{ fontSize: '.78rem', fontWeight: 600, marginBottom: '.4rem' }}>Custom Badge</p>
+            <input className="form-input" style={{ fontSize: '.82rem', marginBottom: '.3rem' }}
+              placeholder="Badge text" value={customBadgeText} onChange={e => setCustomBadgeText(e.target.value)} />
+            <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', marginBottom: '.3rem' }}>
+              <input type="color" value={customBadgeColor} onChange={e => setCustomBadgeColor(e.target.value)} style={{ width: 32, height: 28 }} />
+              <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>Color</span>
+            </div>
+            <button className="btn btn-primary btn-sm" disabled={!customBadgeText.trim()}
+              onClick={() => onPlace({ type: 'badge', value: 'custom', customBadge: { label: customBadgeText, color: customBadgeColor, bg: customBadgeColor + '22', icon: '★' } })}>
+              Add Custom Badge
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tab === 'upload' && (
+        <div style={{ padding: '.75rem', textAlign: 'center' }}>
+          <p style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: '.75rem' }}>Upload a PNG or transparent image (max 500KB)</p>
+          <button className="btn btn-outline btn-sm" onClick={() => fileRef.current?.click()}>Choose Image</button>
+          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" style={{ display: 'none' }}
+            onChange={async e => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              try {
+                const res = await api.uploadProfileSticker(file, token);
+                onPlace({ type: 'upload', value: res.url });
+              } catch (err) { alert(err.message); }
+              e.target.value = '';
+            }} />
+        </div>
+      )}
+
+      {tab === 'text' && (
+        <div style={{ padding: '.75rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          <input className="form-input" placeholder="Enter text" value={textVal} onChange={e => setTextVal(e.target.value)} />
+          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+            <input type="color" value={textColor} onChange={e => setTextColor(e.target.value)} style={{ width: 32, height: 28 }} />
+            <select className="form-select" value={textFont} onChange={e => setTextFont(e.target.value)} style={{ flex: 1, fontSize: '.82rem' }}>
+              <option value="modern">Modern</option>
+              <option value="classic">Classic</option>
+              <option value="typewriter">Typewriter</option>
+              <option value="editorial">Editorial</option>
+            </select>
+          </div>
+          <button className="btn btn-primary btn-sm" disabled={!textVal.trim()}
+            onClick={() => onPlace({ type: 'text', value: textVal, color: textColor, font: textFont })}>
+            Add Text Sticker
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
 // ── Profile Editor ────────────────────────────────────────────────────────────
 
+const PATTERN_NAMES = {
+  solid: 'Solid Color', diagonal_stripes: 'Diagonal Stripes', horizontal_stripes: 'Horizontal Stripes',
+  vertical_stripes: 'Vertical Stripes', grid: 'Grid', dots: 'Dots', checkerboard: 'Checkerboard',
+  zigzag: 'Zigzag', diamonds: 'Diamonds', honeycomb: 'Honeycomb', crosshatch: 'Crosshatch',
+  waves: 'Waves', triangles: 'Triangles', stars: 'Stars', mycelium: 'Mycelium',
+};
+
 function ProfileEditor({ user: u, token, onClose, onSaved }) {
   const [editorTab, setEditorTab] = useState('appearance');
+  const [bgMode, setBgMode] = useState(u.background_photo_url ? 'photo' : u.pattern_type && u.pattern_type !== 'solid' ? 'pattern' : 'color');
+  const [bgPhotoUrl, setBgPhotoUrl] = useState(u.background_photo_url || null);
   const [form, setForm] = useState({
     username: u.username || '', bio: u.bio || '', location: u.location || '',
     website: u.website || '', interests: (u.interests || []).join(', '),
     mood: u.mood || '', mood_emoji: u.mood_emoji || '', status_text: u.status_text || '',
     music_url: u.music_url || '', music_label: u.music_label || '',
     accent_color: u.accent_color || '#2a5f0a',
-    background_color: u.background_color || '',
+    background_color: u.background_color || '#f2ede4',
     background_gradient: u.background_gradient || '',
     use_gradient: !!u.background_gradient,
     font_style: u.font_style || 'modern',
     layout: u.layout || 'standard',
     profile_theme: u.profile_theme || 'light',
     pinned_bulletin: u.pinned_bulletin || '',
+    background_overlay_opacity: u.background_overlay_opacity ?? 0.5,
+    pattern_type: u.pattern_type || 'solid',
+    pattern_color_primary: u.pattern_color_primary || u.accent_color || '#2a5f0a',
+    pattern_color_secondary: u.pattern_color_secondary || '#1a3b07',
+    pattern_scale: u.pattern_scale || 'medium',
+    pattern_opacity: u.pattern_opacity ?? 0.8,
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
@@ -1131,7 +1769,7 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true); setErr(null);
     try {
-      const updated = await api.customizeProfile({
+      const payload = {
         username:   form.username.trim() || undefined,
         bio:        form.bio || undefined,
         location:   form.location || undefined,
@@ -1146,8 +1784,16 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
         font_style: form.font_style || undefined, layout: form.layout || undefined,
         profile_theme: form.profile_theme || undefined,
         pinned_bulletin: form.pinned_bulletin || undefined,
-      }, token);
-      onSaved(updated);
+        background_overlay_opacity: form.background_overlay_opacity,
+        pattern_type: bgMode === 'pattern' ? form.pattern_type : 'solid',
+        pattern_color_primary: form.pattern_color_primary,
+        pattern_color_secondary: form.pattern_color_secondary,
+        pattern_scale: form.pattern_scale,
+        pattern_opacity: form.pattern_opacity,
+      };
+      if (bgMode !== 'photo') payload.background_photo_url = null;
+      const updated = await api.customizeProfile(payload, token);
+      onSaved({ ...updated, background_photo_url: bgMode === 'photo' ? bgPhotoUrl : null });
       onClose();
     } catch (e) { setErr(e.message); }
     finally { setSaving(false); }
@@ -1197,25 +1843,103 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
                   </div>
                 </div>
               </div>
+
+              {/* Background mode selector */}
               <div className="form-group">
                 <label className="form-label">Background</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.5rem', fontSize: '.85rem', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={form.use_gradient} onChange={e => set('use_gradient', e.target.checked)} />
-                  Use gradient
-                </label>
-                {form.use_gradient ? (
-                  <input className="form-input" value={form.background_gradient}
-                    onChange={e => set('background_gradient', e.target.value)}
-                    placeholder="e.g. linear-gradient(135deg, #1a1a2e, #16213e)" />
-                ) : (
-                  <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-                    <input type="color" value={form.background_color || '#f2ede4'}
-                      onChange={e => set('background_color', e.target.value)}
-                      style={{ width: 44, height: 32, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
-                    <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{form.background_color || '#f2ede4'}</span>
+                <div style={{ display: 'flex', gap: '.4rem', marginBottom: '.75rem' }}>
+                  {[['color','🎨 Color/Gradient'], ['photo','📷 Photo'], ['pattern','⬡ Pattern']].map(([mode, label]) => (
+                    <button key={mode} type="button" className={`tab-btn${bgMode === mode ? ' active' : ''}`}
+                      style={{ fontSize: '.8rem' }} onClick={() => setBgMode(mode)}>{label}</button>
+                  ))}
+                </div>
+
+                {bgMode === 'color' && (
+                  <>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.5rem', fontSize: '.85rem', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={form.use_gradient} onChange={e => set('use_gradient', e.target.checked)} />
+                      Use gradient
+                    </label>
+                    {form.use_gradient ? (
+                      <input className="form-input" value={form.background_gradient}
+                        onChange={e => set('background_gradient', e.target.value)}
+                        placeholder="e.g. linear-gradient(135deg, #1a1a2e, #16213e)" />
+                    ) : (
+                      <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+                        <input type="color" value={form.background_color || '#f2ede4'}
+                          onChange={e => set('background_color', e.target.value)}
+                          style={{ width: 44, height: 32, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
+                        <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{form.background_color || '#f2ede4'}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {bgMode === 'photo' && (
+                  <div>
+                    {bgPhotoUrl && (
+                      <div style={{ position: 'relative', marginBottom: '.6rem' }}>
+                        <img src={resolveUrl(bgPhotoUrl)} alt="background" style={{ width: '100%', maxHeight: 100, objectFit: 'cover', borderRadius: 6 }} />
+                        <button type="button" className="btn btn-sm btn-outline" style={{ position: 'absolute', top: 4, right: 4, fontSize: '.72rem', background: 'rgba(0,0,0,.5)', color: '#fff', border: 'none' }}
+                          onClick={() => setBgPhotoUrl(null)}>Remove</button>
+                      </div>
+                    )}
+                    <BackgroundUpload token={token} onUploaded={url => setBgPhotoUrl(url)} />
+                    <div style={{ marginTop: '.75rem' }}>
+                      <label className="form-label" style={{ fontSize: '.82rem' }}>
+                        Overlay Opacity: {Math.round(form.background_overlay_opacity * 100)}%
+                        <span style={{ fontSize: '.72rem', color: 'var(--muted)', marginLeft: '.3rem' }}>(accent color overlay)</span>
+                      </label>
+                      <input type="range" min={0} max={90} step={5} value={Math.round(form.background_overlay_opacity * 100)}
+                        onChange={e => set('background_overlay_opacity', +e.target.value / 100)} style={{ width: '100%' }} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.7rem', color: 'var(--muted)' }}>
+                        <span>0% — raw photo</span><span>90% — nearly solid</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {bgMode === 'pattern' && (
+                  <div>
+                    <div className="pattern-grid-picker">
+                      {Object.keys(PATTERN_NAMES).map(type => {
+                        const preview = type === 'solid' ? { background: form.pattern_color_primary } : getPatternCSS(type, form.pattern_color_primary, form.pattern_color_secondary, form.pattern_scale);
+                        return (
+                          <button key={type} type="button" title={PATTERN_NAMES[type]}
+                            className={`pattern-swatch${form.pattern_type === type ? ' selected' : ''}`}
+                            onClick={() => set('pattern_type', type)}
+                            style={{ ...preview, opacity: 0.85 }}>
+                            <span className="pattern-swatch-label">{PATTERN_NAMES[type].split(' ')[0]}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="form-row" style={{ marginTop: '.75rem' }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '.78rem' }}>Primary</label>
+                        <input type="color" value={form.pattern_color_primary} onChange={e => set('pattern_color_primary', e.target.value)} style={{ width: 40, height: 28 }} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '.78rem' }}>Secondary</label>
+                        <input type="color" value={form.pattern_color_secondary} onChange={e => set('pattern_color_secondary', e.target.value)} style={{ width: 40, height: 28 }} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '.78rem' }}>Scale</label>
+                        <select className="form-select" style={{ fontSize: '.82rem' }} value={form.pattern_scale} onChange={e => set('pattern_scale', e.target.value)}>
+                          <option value="small">Small</option>
+                          <option value="medium">Medium</option>
+                          <option value="large">Large</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '.78rem' }}>Pattern Opacity: {Math.round(form.pattern_opacity * 100)}%</label>
+                      <input type="range" min={10} max={100} value={Math.round(form.pattern_opacity * 100)} onChange={e => set('pattern_opacity', +e.target.value / 100)} style={{ width: '100%' }} />
+                    </div>
                   </div>
                 )}
               </div>
+
               <div className="form-group">
                 <label className="form-label">Font Style</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>

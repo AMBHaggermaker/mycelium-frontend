@@ -7,6 +7,90 @@ import ImageCropUploader from '../components/ImageCropUploader';
 
 const VALID_TABS = ['overview','infrastructure','environment','housing','health','watershed','food','surveillance','civic','land_development','atmospheric_observations','anomalies'];
 
+// ── Dashboard instructions ─────────────────────────────────────────────────────
+
+const DASHBOARD_HOW_IT_WORKS = {
+  default: {
+    what: 'This dashboard tracks community-submitted reports on a specific issue area. Reports are geo-tagged and analyzed by AI to detect patterns, severity clusters, and connections across submissions.',
+    submit: 'Click "Submit Report" and fill in the type, location, description, and severity level. Photos are highly recommended — they help other community members and our AI analysis understand the situation.',
+    after: 'After submission, your report is analyzed and cross-referenced with other reports in the area. If a pattern is detected across multiple reports, an anomaly alert may be generated.',
+    severity: 'Severity levels run from Critical (immediate health/safety threat) through Serious, Moderate, and Minor to Monitoring (routine documentation). Choose the level that matches the urgency of what you observed.',
+    tips: ['Include photos whenever possible — they dramatically improve AI analysis accuracy.', 'Use the location button to capture precise GPS coordinates, especially if reporting from a mobile device.', 'The more detail in your description, the better the cross-referencing works.', 'Add a source URL if your report is based on a public record or news article.'],
+  },
+  land_development: {
+    what: 'The Land Development dashboard tracks property transfers, LLC acquisitions, rezoning requests, annexation filings, demolition permits, and displacement risk patterns across the community.',
+    submit: 'Reports can be submitted from your own observations or from public records. For public records, include the source URL from the county assessor, planning department, or city council website.',
+    after: 'After submission, the AI pattern analyzer looks for bulk purchases by the same LLC or entity, geographic clustering, and connections to prior reports or public records. Suspicious patterns surface as intel reports.',
+    severity: 'Critical = immediate displacement risk or historic property loss. Serious = large-scale acquisition or zoning change affecting many residents. Moderate = worth monitoring. Minor = routine development.',
+    tips: ['Find public records at Huntsville city council agendas, Madison County Assessor, and the Alabama Secretary of State LLC registry.', 'When submitting LLC acquisitions, note the registered agent name — it often reveals the actual owner.', 'Cross-reference with the Public Records Tracker to avoid duplicate submissions.', 'Rezoning and annexation filings are public record — submit them as soon as they appear on a council agenda.'],
+  },
+  atmospheric_observations: {
+    what: 'The Atmospheric Observations dashboard tracks unusual aerial phenomena including persistent contrails, grid patterns, low-altitude spray events, and unidentified aerial observations. Every submission is automatically cross-referenced with live flight data from the OpenSky Network and NOAA weather conditions.',
+    submit: 'Click "Submit Observation" and provide as much detail as possible. GPS coordinates are required for the flight cross-reference to work. Use the "Use My Location" button or enter coordinates manually.',
+    after: 'After submission, the system queries the OpenSky Network for flights within a 50-mile radius at the time of observation. Weather data (humidity, wind speed) is pulled from NOAA. The AI then classifies the observation.',
+    classify: 'EXPLAINED = a matching flight was found and atmospheric conditions support the pattern. UNEXPLAINED = atmospheric conditions are abnormal or no flight matches. UNIDENTIFIED = no flight data available and conditions are unusual. PARTIAL = some data available but not conclusive. Soil and rainwater samples within 5 miles of drift zones are automatically linked to observations.',
+    severity: 'Critical = immediate chemical exposure risk. Serious = confirmed unusual pattern with no flight match. Moderate = unusual but not immediately dangerous. Minor = minor deviation from normal. Monitoring = routine documentation.',
+    tips: ['GPS coordinates are essential — without them the flight cross-reference cannot run.', 'Note the exact time as precisely as possible — the OpenSky query searches ±30 minutes around your observation time.', 'Photograph the sky and any residue on surfaces, vehicles, or plants.', 'If you collect soil or rainwater samples, submit them through the Soil/Rainwater Testing section and they will be automatically linked to nearby observations.', 'The flight data comes from the OpenSky Network which has ~85% coverage — some military and private aircraft may not appear.'],
+  },
+};
+
+function HowThisWorks({ dashboardId }) {
+  const storageKey = `watch-htw-${dashboardId}`;
+  const [expanded, setExpanded] = useState(() => {
+    try { return localStorage.getItem(storageKey) === null; } catch { return true; }
+  });
+
+  function toggle() {
+    const next = !expanded;
+    setExpanded(next);
+    try { localStorage.setItem(storageKey, next ? 'open' : 'closed'); } catch { /* ignore */ }
+  }
+
+  const info = DASHBOARD_HOW_IT_WORKS[dashboardId] || DASHBOARD_HOW_IT_WORKS.default;
+
+  return (
+    <div className="htw-panel">
+      <button className="htw-toggle" onClick={toggle} type="button">
+        <span className="htw-toggle-icon">ℹ</span>
+        <span className="htw-toggle-label">How This Works</span>
+        <span className="htw-arrow" style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}>▼</span>
+      </button>
+      {expanded && (
+        <div className="htw-body">
+          <div className="htw-section">
+            <strong>What this tracks</strong>
+            <p>{info.what}</p>
+          </div>
+          <div className="htw-section">
+            <strong>How to submit a report</strong>
+            <p>{info.submit}</p>
+          </div>
+          <div className="htw-section">
+            <strong>After submission</strong>
+            <p>{info.after}</p>
+          </div>
+          {info.classify && (
+            <div className="htw-section">
+              <strong>How classifications work</strong>
+              <p>{info.classify}</p>
+            </div>
+          )}
+          <div className="htw-section">
+            <strong>Severity levels</strong>
+            <p>{info.severity}</p>
+          </div>
+          <div className="htw-tips">
+            <strong>💡 Tips for best results</strong>
+            <ul>
+              {info.tips.map((tip, i) => <li key={i}>{tip}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const DASHBOARDS = [
   { id: 'infrastructure',  label: 'Infrastructure',   icon: '🏗️', description: 'Roads, bridges, utilities, public facilities, and city infrastructure conditions.' },
   { id: 'environment',     label: 'Environment',      icon: '🌿', description: 'Air quality, pollution, illegal dumping, toxic sites, and environmental hazards.' },
@@ -253,6 +337,7 @@ function WatchDashboard({ dashboard, onRequireAuth, highlightedIds, isMobile }) 
 
   return (
     <>
+      <HowThisWorks dashboardId={dashboard.id} />
       <div className="watch-dashboard-header">
         <div className="watch-dashboard-title-row">
           <span className="watch-dashboard-icon">{dashboard.icon}</span>
@@ -1467,6 +1552,7 @@ function LandDevelopmentDashboard({ dashboard, onRequireAuth, highlightedIds, is
 
   return (
     <>
+      <HowThisWorks dashboardId="land_development" />
       <div className="watch-dashboard-header">
         <div className="watch-dashboard-title-row">
           <span className="watch-dashboard-icon">{dashboard.icon}</span>
@@ -2418,6 +2504,7 @@ function AtmosphericDashboard({ dashboard, onRequireAuth, highlightedIds }) {
 
   return (
     <>
+      <HowThisWorks dashboardId="atmospheric_observations" />
       <div className="watch-dashboard-header">
         <div className="watch-dashboard-title-row">
           <span className="watch-dashboard-icon">{dashboard.icon}</span>

@@ -69,6 +69,9 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
             <NavLink to="/advocate" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Advocate
             </NavLink>
+            <NavLink to="/legislature" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              🏛️ Legislature
+            </NavLink>
             <a href="https://unprecedentedtimes.org/the-mycelium-covenant" className="nav-link nav-link-covenant" target="_blank" rel="noopener noreferrer">
               Covenant
             </a>
