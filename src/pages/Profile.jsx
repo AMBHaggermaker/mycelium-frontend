@@ -54,7 +54,7 @@ const FONT_STYLES = {
 };
 
 const BOARD_TITLES = {
-  bulletin:      '📌 Bulletin',
+  bulletin:      '📋 Wall',
   timeline:      '📅 Timeline',
   posts:         '📋 My Posts',
   events:        '🗓 Events',
@@ -135,13 +135,16 @@ export default function Profile() {
   const { user: authUser, token } = useAuth();
   const navigate = useNavigate();
 
-  const [data,        setData]        = useState(null);
-  const [boards,      setBoards]      = useState(null); // board settings + supplemental data
-  const [loading,     setLoading]     = useState(true);
-  const [boardOrder,  setBoardOrder]  = useState(null); // current ordered board list
-  const [dragMode,    setDragMode]    = useState(false);
-  const [activeId,    setActiveId]    = useState(null);
-  const [showEditor,  setShowEditor]  = useState(false);
+  const [data,              setData]              = useState(null);
+  const [boards,            setBoards]            = useState(null);
+  const [loading,           setLoading]           = useState(true);
+  const [boardOrder,        setBoardOrder]        = useState(null);
+  const [dragMode,          setDragMode]          = useState(false);
+  const [activeId,          setActiveId]          = useState(null);
+  const [showEditor,        setShowEditor]        = useState(false);
+  const [stickers,          setStickers]          = useState([]);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const bannerTriggerRef = useRef(null);
 
   const isOwn = data && authUser && data.user.id === authUser.id;
 
@@ -162,6 +165,14 @@ export default function Profile() {
   }, [username, token]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!data?.user) return;
+    try {
+      const raw = data.user.profile_stickers;
+      setStickers(Array.isArray(raw) ? raw : (JSON.parse(raw || '[]') || []));
+    } catch { setStickers([]); }
+  }, [data]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -195,11 +206,6 @@ export default function Profile() {
   const { user: u, posts, circles, events, copart, photos, albums, wall } = data;
   const isDark = u.profile_theme === 'dark';
   const pStyle = profileStyle(u);
-
-  const [stickers, setStickers] = useState(() => {
-    try { return Array.isArray(u.profile_stickers) ? u.profile_stickers : (JSON.parse(u.profile_stickers || '[]') || []); } catch { return []; }
-  });
-  const [showStickerPicker, setShowStickerPicker] = useState(false);
 
   const albumMap = {};
   photos.forEach(p => {
@@ -257,7 +263,13 @@ export default function Profile() {
           ? { backgroundImage: `url(${resolveUrl(u.banner_image_url)})` }
           : u.accent_color ? { background: `linear-gradient(135deg, ${u.accent_color}44, ${u.accent_color}22)` } : {}
       }>
-        {isOwn && <BannerUpload token={token} onUploaded={url => setData(d => ({ ...d, user: { ...d.user, banner_image_url: url } }))} />}
+        {isOwn && (
+          <>
+            <button type="button" className="banner-camera-btn" onClick={() => bannerTriggerRef.current?.()} title="Change banner photo">📷</button>
+            <p className="banner-upload-hint">1200×400px landscape (3:1 ratio)</p>
+          </>
+        )}
+        {isOwn && <BannerUpload triggerRef={bannerTriggerRef} token={token} onUploaded={url => setData(d => ({ ...d, user: { ...d.user, banner_image_url: url } }))} />}
       </div>
 
       <div className="profile-layout-wrap">
@@ -391,6 +403,7 @@ export default function Profile() {
                     pStyle={pStyle}
                     onWallPost={wp => setData(d => ({ ...d, wall: [wp, ...d.wall] }))}
                     onWallDelete={id => setData(d => ({ ...d, wall: d.wall.filter(p => p.id !== id) }))}
+                    onWallPin={updated => setData(d => ({ ...d, wall: d.wall.map(wp => ({ ...wp, is_pinned: wp.id === updated.id ? updated.is_pinned : false })) }))}
                     onPhotoUpload={photo => setData(d => ({ ...d, photos: [photo, ...d.photos] }))}
                     onPhotoDelete={id => setData(d => ({ ...d, photos: d.photos.filter(p => p.id !== id) }))}
                     username={username}
@@ -549,7 +562,7 @@ function BoardSettings({ board, onChange, accentColor }) {
 
 // ── Board Content Router ──────────────────────────────────────────────────────
 
-function BoardContent({ board, user: u, profileData, boardsData, albumMap, isOwn, token, authUser, pStyle, onWallPost, onWallDelete, onPhotoUpload, onPhotoDelete, username }) {
+function BoardContent({ board, user: u, profileData, boardsData, albumMap, isOwn, token, authUser, pStyle, onWallPost, onWallDelete, onWallPin, onPhotoUpload, onPhotoDelete, username }) {
   const { posts, circles, copart, photos, wall } = profileData;
   const rsvpEvents  = boardsData?.rsvp_events     || [];
   const timeline    = boardsData?.timeline         || [];
@@ -558,8 +571,8 @@ function BoardContent({ board, user: u, profileData, boardsData, albumMap, isOwn
 
   switch (board.board_type) {
     case 'bulletin':
-      return <BulletinBoard user={u} wall={wall} isOwn={isOwn} token={token} authUser={authUser}
-                onWallPost={onWallPost} onWallDelete={onWallDelete} username={username} />;
+      return <WallBoard user={u} wall={wall} isOwn={isOwn} token={token} authUser={authUser}
+                onWallPost={onWallPost} onWallDelete={onWallDelete} onWallPin={onWallPin} username={username} />;
     case 'timeline':
       return <TimelineBoard timeline={timeline} />;
     case 'posts':
@@ -588,65 +601,332 @@ function BoardContent({ board, user: u, profileData, boardsData, albumMap, isOwn
   }
 }
 
-// ── Board: Bulletin ───────────────────────────────────────────────────────────
+// ── Rich Text Renderer ────────────────────────────────────────────────────────
 
-function BulletinBoard({ user: u, wall, isOwn, token, authUser, onWallPost, onWallDelete, username }) {
-  const [input, setInput] = useState('');
-  const [posting, setPosting] = useState(false);
+function renderRichText(text) {
+  if (!text) return null;
+  const lines = text.split('\n');
+  return lines.map((line, li) => {
+    const parts = [];
+    const re = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|~~([^~\n]+)~~/g;
+    let last = 0, m;
+    while ((m = re.exec(line)) !== null) {
+      if (m.index > last) parts.push(line.slice(last, m.index));
+      if (m[1]) parts.push(<strong key={`b${last}`}>{m[1]}</strong>);
+      else if (m[2]) parts.push(<em key={`i${last}`}>{m[2]}</em>);
+      else if (m[3]) parts.push(<s key={`s${last}`}>{m[3]}</s>);
+      last = re.lastIndex;
+    }
+    if (last < line.length) parts.push(line.slice(last));
+    return <span key={li}>{parts.length ? parts : line}{li < lines.length - 1 && <br />}</span>;
+  });
+}
+
+// ── Board: Wall ───────────────────────────────────────────────────────────────
+
+const WALL_EMOJIS = ['😊','😂','🔥','💯','👍','❤️','🙌','🌱','💪','🤔','🎉','💬','⭐','😅','🙏','🌻','💚','✨','🤝','⬡'];
+
+function WallBoard({ user: u, wall, isOwn, token, authUser, onWallPost, onWallDelete, onWallPin, username }) {
+  const [content,          setContent]          = useState('');
+  const [photos,           setPhotos]           = useState([]);
+  const [photoUrls,        setPhotoUrls]        = useState([]);
+  const [layout,           setLayout]           = useState('single');
+  const [posting,          setPosting]          = useState(false);
+  const [showEmoji,        setShowEmoji]        = useState(false);
+  const [openThreadPostId, setOpenThreadPostId] = useState(null);
+  const textareaRef = useRef(null);
+  const photoRef    = useRef(null);
+
+  function insertFormat(marker) {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    const selected = content.slice(start, end);
+    const newVal = content.slice(0, start) + marker + (selected || 'text') + marker + content.slice(end);
+    setContent(newVal);
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(start + marker.length, start + marker.length + (selected || 'text').length); }, 0);
+  }
+
+  function addEmoji(emoji) {
+    const ta = textareaRef.current;
+    const pos = ta?.selectionStart ?? content.length;
+    setContent(c => c.slice(0, pos) + emoji + c.slice(pos));
+    setShowEmoji(false);
+    setTimeout(() => ta?.focus(), 0);
+  }
+
+  function handlePhotos(e) {
+    const files = Array.from(e.target.files || []).slice(0, 5 - photos.length);
+    if (!files.length) return;
+    setPhotos(prev => [...prev, ...files].slice(0, 5));
+    files.forEach(f => {
+      const reader = new FileReader();
+      reader.onload = ev => setPhotoUrls(prev => [...prev, ev.target.result].slice(0, 5));
+      reader.readAsDataURL(f);
+    });
+    e.target.value = '';
+  }
+
+  function removePhoto(i) {
+    setPhotos(prev => prev.filter((_, idx) => idx !== i));
+    setPhotoUrls(prev => prev.filter((_, idx) => idx !== i));
+  }
 
   async function handlePost(e) {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!content.trim() && !photos.length) return;
     setPosting(true);
     try {
-      const wp = await api.postOnWall(username, { content: input.trim() }, token);
+      const fd = new FormData();
+      fd.append('content', content.trim());
+      fd.append('collage_layout', layout);
+      photos.forEach(f => fd.append('photos', f));
+      const wp = await api.postOnWall(username, fd, token);
       onWallPost(wp);
-      setInput('');
-    } catch (e) { alert(e.message); }
+      setContent(''); setPhotos([]); setPhotoUrls([]); setLayout('single');
+    } catch (err) { alert(err.message); }
     finally { setPosting(false); }
   }
 
+  if (!isOwn && u.wall_privacy === 'disabled') {
+    return <p className="empty board-empty">🔒 Wall posting is disabled on this profile.</p>;
+  }
+
   return (
-    <div className="bulletin-board-content">
-      {u.pinned_bulletin && (
-        <div className="profile-bulletin-pinned">
-          <span className="profile-bulletin-pin">📌</span>
-          <p>{u.pinned_bulletin}</p>
-          {u.bulletin_updated_at && (
-            <span className="profile-bulletin-date">{new Date(u.bulletin_updated_at).toLocaleDateString()}</span>
+    <div className="wall-board-content">
+      {authUser ? (
+        <form onSubmit={handlePost} className="wall-compose-form">
+          <div className="wall-compose-toolbar">
+            <button type="button" className="wall-fmt-btn" title="Bold" onClick={() => insertFormat('**')}><strong>B</strong></button>
+            <button type="button" className="wall-fmt-btn wall-fmt-italic" title="Italic" onClick={() => insertFormat('*')}><em>I</em></button>
+            <button type="button" className="wall-fmt-btn wall-fmt-strike" title="Strikethrough" onClick={() => insertFormat('~~')}><s>S</s></button>
+            <span className="wall-toolbar-sep" />
+            <div style={{ position: 'relative' }}>
+              <button type="button" className="wall-fmt-btn" onClick={() => setShowEmoji(v => !v)} title="Emoji">😊</button>
+              {showEmoji && (
+                <div className="wall-emoji-picker">
+                  {WALL_EMOJIS.map(em => (
+                    <button key={em} type="button" className="wall-emoji-item" onClick={() => addEmoji(em)}>{em}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className="wall-toolbar-sep" />
+            <button type="button" className="wall-fmt-btn" title="Add photos (max 5)"
+              onClick={() => photoRef.current?.click()} disabled={photos.length >= 5}>
+              📷{photos.length > 0 ? ` ${photos.length}/5` : ''}
+            </button>
+            <input ref={photoRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotos} />
+          </div>
+
+          <textarea
+            ref={textareaRef}
+            className="form-textarea wall-compose-input"
+            rows={3}
+            placeholder={isOwn ? 'Post to your wall…' : `Post on ${u.username}'s wall…`}
+            value={content}
+            onChange={e => setContent(e.target.value)}
+          />
+
+          {photoUrls.length > 0 && (
+            <div className="wall-photo-previews">
+              {photoUrls.map((url, i) => (
+                <div key={i} className="wall-photo-preview-item">
+                  <img src={url} alt="" />
+                  <button type="button" className="wall-photo-remove-btn" onClick={() => removePhoto(i)}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {photos.length > 1 && (
+            <div className="wall-layout-selector">
+              {[['single','1 photo'],['side_by_side','Side by side'],['three','3 photos'],['grid','Grid']].map(([val, lbl]) => (
+                <button key={val} type="button"
+                  className={`wall-layout-btn${layout === val ? ' active' : ''}`}
+                  onClick={() => setLayout(val)}>{lbl}</button>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '.4rem' }}>
+            <button className="btn btn-primary btn-sm" disabled={posting || (!content.trim() && !photos.length)}>
+              {posting ? 'Posting…' : 'Post'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <p style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: '.5rem' }}>Sign in to post on this wall.</p>
+      )}
+
+      {u.wall_privacy === 'network' && !isOwn && (
+        <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: '.35rem' }}>🔒 Network members only</div>
+      )}
+
+      <div className="wall-posts-list">
+        {wall.map(wp => (
+          <WallPost
+            key={wp.id}
+            wp={wp}
+            isOwn={isOwn}
+            authUser={authUser}
+            token={token}
+            username={username}
+            onDelete={() => onWallDelete(wp.id)}
+            onPin={onWallPin}
+            openThreadPostId={openThreadPostId}
+            onToggleThread={id => setOpenThreadPostId(prev => prev === id ? null : id)}
+          />
+        ))}
+        {wall.length === 0 && <p className="empty board-empty">No wall posts yet.</p>}
+      </div>
+    </div>
+  );
+}
+
+function WallPostPhotos({ photos, layout }) {
+  const shown = layout === 'grid' ? photos.slice(0, 4)
+    : layout === 'three' ? photos.slice(0, 3)
+    : layout === 'side_by_side' ? photos.slice(0, 2)
+    : photos.slice(0, 1);
+  const cls = {
+    single: 'wall-photos-single', side_by_side: 'wall-photos-side',
+    three: 'wall-photos-three', grid: 'wall-photos-grid',
+  }[layout] || 'wall-photos-single';
+  return (
+    <div className={`wall-photos-collage ${cls}`}>
+      {shown.map((url, i) => (
+        <img key={i} src={resolveUrl(url)} alt="" loading="lazy" className="wall-photo-img" />
+      ))}
+    </div>
+  );
+}
+
+function WallPost({ wp, isOwn, authUser, token, username, onDelete, onPin, openThreadPostId, onToggleThread }) {
+  const [thread,        setThread]        = useState(null);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [newMessage,    setNewMessage]    = useState('');
+  const [sendingMsg,    setSendingMsg]    = useState(false);
+  const isOpen = openThreadPostId === wp.id;
+
+  async function loadThread() {
+    setThreadLoading(true);
+    try {
+      const threads = await api.getWallThreads(wp.id);
+      if (threads.length > 0) {
+        const t = await api.getThread(threads[0].id);
+        setThread(t);
+      } else {
+        setThread({ id: null, messages: [] });
+      }
+    } catch {}
+    finally { setThreadLoading(false); }
+  }
+
+  function handleToggle() {
+    onToggleThread(wp.id);
+    if (!isOpen && thread === null) loadThread();
+  }
+
+  async function sendMessage(e) {
+    e.preventDefault();
+    if (!newMessage.trim() || !authUser) return;
+    setSendingMsg(true);
+    try {
+      if (!thread?.id) {
+        const t = await api.createThread({ title: `Reply on @${wp.author_username}'s wall`, wall_post_id: wp.id }, token);
+        const msg = await api.addMessage(t.id, { content: newMessage.trim() }, token);
+        setThread({ ...t, messages: [{ ...msg, username: authUser.username }] });
+      } else {
+        const msg = await api.addMessage(thread.id, { content: newMessage.trim() }, token);
+        setThread(prev => ({ ...prev, messages: [...prev.messages, { ...msg, username: authUser.username }] }));
+      }
+      setNewMessage('');
+    } catch (err) { alert(err.message); }
+    finally { setSendingMsg(false); }
+  }
+
+  async function handlePin() {
+    try {
+      const updated = await api.pinWallPost(username, wp.id, token);
+      onPin(updated);
+    } catch (err) { alert(err.message); }
+  }
+
+  async function handleDelete() {
+    if (!confirm('Delete this wall post?')) return;
+    try {
+      await api.deleteWallPost(username, wp.id, token);
+      onDelete();
+    } catch (err) { alert(err.message); }
+  }
+
+  return (
+    <div className={`profile-wall-post${wp.is_pinned ? ' wall-post-pinned' : ''}`}>
+      {wp.is_pinned && <div className="wall-pin-badge">📌 Pinned</div>}
+      <div className="profile-wall-post-header">
+        {wp.author_avatar_url && (
+          <img src={resolveUrl(wp.author_avatar_url)} alt={wp.author_username} className="wall-author-avatar" />
+        )}
+        <Link to={`/profile/${wp.author_username}`} className="profile-wall-author">
+          {wp.author_username}{wp.author_verified && <span className="profile-verified-sm">✓</span>}
+        </Link>
+        <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>
+          {new Date(wp.created_at).toLocaleDateString()}
+        </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '.2rem', alignItems: 'center' }}>
+          {isOwn && (
+            <button className="btn btn-ghost"
+              style={{ padding: '0 .3rem', fontSize: '.72rem', color: wp.is_pinned ? 'var(--green)' : 'var(--muted)', lineHeight: 1 }}
+              title={wp.is_pinned ? 'Unpin' : 'Pin to top'} onClick={handlePin}>📌</button>
+          )}
+          {(isOwn || authUser?.id === wp.author_id) && (
+            <button className="btn btn-ghost"
+              style={{ padding: '0 .25rem', fontSize: '.7rem', color: 'var(--danger)', lineHeight: 1 }}
+              onClick={handleDelete}>✕</button>
+          )}
+        </div>
+      </div>
+
+      {wp.content && (
+        <p className="profile-wall-post-content">{renderRichText(wp.content)}</p>
+      )}
+
+      {wp.photo_urls?.length > 0 && (
+        <WallPostPhotos photos={wp.photo_urls} layout={wp.collage_layout || 'single'} />
+      )}
+
+      <div className="wall-post-footer">
+        <button className="wall-reply-btn" onClick={handleToggle}>
+          💬 {wp.reply_count > 0 ? `${wp.reply_count} ${wp.reply_count === 1 ? 'reply' : 'replies'}` : 'Reply'}
+          {' '}{isOpen ? '▲' : '▼'}
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="wall-thread-inline">
+          {threadLoading && <div className="spinner" style={{ width: 16, height: 16, margin: '.5rem auto' }} />}
+          {thread && thread.messages.map(m => (
+            <div key={m.id} className="wall-thread-message">
+              <Link to={`/profile/${m.username}`} className="wall-thread-author">{m.username}</Link>
+              <span className="wall-thread-text">{m.content}</span>
+              <span className="wall-thread-date">{new Date(m.created_at).toLocaleDateString()}</span>
+            </div>
+          ))}
+          {thread && thread.messages.length === 0 && !threadLoading && (
+            <p style={{ fontSize: '.78rem', color: 'var(--muted)', margin: '.25rem 0' }}>No replies yet.</p>
+          )}
+          {authUser && (
+            <form onSubmit={sendMessage} className="wall-reply-form">
+              <input className="form-input wall-reply-input" placeholder="Write a reply…"
+                value={newMessage} onChange={e => setNewMessage(e.target.value)} />
+              <button className="btn btn-primary btn-sm" disabled={sendingMsg || !newMessage.trim()}>
+                {sendingMsg ? '…' : 'Reply'}
+              </button>
+            </form>
           )}
         </div>
       )}
-      {authUser && !isOwn && (
-        <form onSubmit={handlePost} className="wall-compose">
-          <textarea className="form-textarea wall-compose-input" rows={2}
-            placeholder={`Leave a note on ${u.username}'s board…`}
-            value={input} onChange={e => setInput(e.target.value)} />
-          <button className="btn btn-primary btn-sm" disabled={posting || !input.trim()}>
-            {posting ? '…' : 'Post'}
-          </button>
-        </form>
-      )}
-      <div className="wall-posts-list">
-        {wall.slice(0, 5).map(wp => (
-          <div key={wp.id} className="profile-wall-post">
-            <div className="profile-wall-post-header">
-              <Link to={`/profile/${wp.author_username}`} className="profile-wall-author">
-                {wp.author_username}{wp.author_verified && <span className="profile-verified-sm">✓</span>}
-              </Link>
-              <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>{new Date(wp.created_at).toLocaleDateString()}</span>
-              {(isOwn || authUser?.id === wp.author_id) && (
-                <button className="btn btn-ghost" style={{ padding: '0 .25rem', fontSize: '.7rem', color: 'var(--danger)', marginLeft: 'auto' }}
-                  onClick={() => { if (confirm('Delete?')) onWallDelete(wp.id); }}>✕</button>
-              )}
-            </div>
-            <p className="profile-wall-post-content">{wp.content}</p>
-          </div>
-        ))}
-        {wall.length === 0 && !u.pinned_bulletin && (
-          <p className="empty" style={{ fontSize: '.85rem' }}>No posts yet.</p>
-        )}
-      </div>
     </div>
   );
 }
@@ -1196,7 +1476,7 @@ function AvatarBlock({ user: u, isOwn, token, onUpdated }) {
             targetWidth={400}
             targetHeight={400}
             label={uploading ? '…' : '📷'}
-            hint="400×400px · square"
+            hint="400×400px square, displays as circle"
             onFile={handleFile}
             disabled={uploading}
             btnClassName="profile-avatar-edit-btn"
@@ -1209,7 +1489,7 @@ function AvatarBlock({ user: u, isOwn, token, onUpdated }) {
 
 // ── Banner Upload ─────────────────────────────────────────────────────────────
 
-function BannerUpload({ token, onUploaded }) {
+function BannerUpload({ token, onUploaded, triggerRef }) {
   const [src, setSrc] = useState(null);
   const [filename, setFilename] = useState('');
   const [crop, setCrop] = useState();
@@ -1217,6 +1497,10 @@ function BannerUpload({ token, onUploaded }) {
   const [uploading, setUploading] = useState(false);
   const imgRef = useRef(null);
   const fileRef = useRef(null);
+
+  useEffect(() => {
+    if (triggerRef) triggerRef.current = () => fileRef.current?.click();
+  });
 
   function onFileChange(e) {
     const file = e.target.files?.[0];
@@ -1248,9 +1532,6 @@ function BannerUpload({ token, onUploaded }) {
 
   return (
     <>
-      <button type="button" className="banner-camera-btn" onClick={() => fileRef.current?.click()} title="Change banner photo">
-        {uploading ? '…' : '📷'}
-      </button>
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={onFileChange} />
       {src && (
         <div className="img-crop-overlay" onClick={e => e.target === e.currentTarget && setSrc(null)}>
@@ -1288,7 +1569,7 @@ function BackgroundUpload({ token, onUploaded }) {
   }
   return (
     <ImageCropUploader aspect={16/9} targetWidth={1920} targetHeight={1080}
-      label={uploading ? '…' : '📷 Set Background Photo'} hint="1920×1080px · 16:9"
+      label={uploading ? '…' : '📷 Set Background Photo'} hint="1920×1080px landscape (16:9 ratio)"
       onFile={handleFile} disabled={uploading} btnClassName="btn btn-outline btn-sm" />
   );
 }
@@ -1690,7 +1971,7 @@ function StickerPicker({ onPlace, onClose, onClearAll, token }) {
 
       {tab === 'upload' && (
         <div style={{ padding: '.75rem', textAlign: 'center' }}>
-          <p style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: '.75rem' }}>Upload a PNG or transparent image (max 500KB)</p>
+          <p style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: '.75rem' }}>Square PNG with transparent background recommended, max 500KB</p>
           <button className="btn btn-outline btn-sm" onClick={() => fileRef.current?.click()}>Choose Image</button>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" style={{ display: 'none' }}
             onChange={async e => {
@@ -1759,6 +2040,7 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
     pattern_color_secondary: u.pattern_color_secondary || '#1a3b07',
     pattern_scale: u.pattern_scale || 'medium',
     pattern_opacity: u.pattern_opacity ?? 0.8,
+    wall_privacy: u.wall_privacy || 'everyone',
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
@@ -1790,6 +2072,7 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
         pattern_color_secondary: form.pattern_color_secondary,
         pattern_scale: form.pattern_scale,
         pattern_opacity: form.pattern_opacity,
+        wall_privacy: form.wall_privacy || undefined,
       };
       if (bgMode !== 'photo') payload.background_photo_url = null;
       const updated = await api.customizeProfile(payload, token);
@@ -1957,6 +2240,15 @@ function ProfileEditor({ user: u, token, onClose, onSaved }) {
                   onChange={e => set('pinned_bulletin', e.target.value)} maxLength={500}
                   placeholder="What do you want visitors to know?" />
                 <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: '.2rem' }}>{form.pinned_bulletin.length}/500</p>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Wall Privacy</label>
+                <select className="form-select" value={form.wall_privacy} onChange={e => set('wall_privacy', e.target.value)}>
+                  <option value="everyone">Everyone can post</option>
+                  <option value="network">My network only</option>
+                  <option value="disabled">Nobody (wall disabled)</option>
+                </select>
+                <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: '.2rem' }}>Who can post on your Wall board</p>
               </div>
             </div>
           )}

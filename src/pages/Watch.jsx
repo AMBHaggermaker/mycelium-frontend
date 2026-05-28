@@ -713,13 +713,13 @@ function WatchReportModal({ dashboard, token, onClose, onCreated }) {
           </div>
           <div className="form-group">
             <label className="form-label">Photos (up to 5)</label>
-            <p className="img-crop-hint">1200×900px · 4:3</p>
             {photos.length < 5 && (
               <ImageCropUploader
                 aspect={4 / 3}
                 targetWidth={1200}
                 targetHeight={900}
                 label={`+ Add Photo ${photos.length > 0 ? `(${photos.length}/5)` : ''}`}
+                hint="Any size, landscape preferred, min 800px wide"
                 onFile={addPhoto}
                 btnClassName="btn btn-outline btn-sm"
               />
@@ -2116,6 +2116,7 @@ function SubmitAtmosphericObsModal({ token, onClose, onCreated }) {
             <div className="form-group">
               <label className="form-label">Photos</label>
               <input type="file" accept="image/*" multiple className="form-input" onChange={e => setPhotos([...e.target.files])} />
+              <p className="img-crop-hint">Any size, landscape preferred, min 800px wide</p>
             </div>
             {err && <p className="form-error">{err}</p>}
             <button className="btn btn-primary btn-full" disabled={busy}>{busy ? '…' : 'Submit Observation'}</button>

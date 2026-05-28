@@ -15,7 +15,6 @@ export default function FeedbackButton() {
   const [open,        setOpen]        = useState(false);
   const [type,        setType]        = useState('general_feedback');
   const [description, setDescription] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
   const [screenshot,  setScreenshot]  = useState(null);
   const [submitting,  setSubmitting]  = useState(false);
   const [success,     setSuccess]     = useState(false);
@@ -30,11 +29,9 @@ export default function FeedbackButton() {
 
   function closeModal() {
     setOpen(false);
-    // Reset form after a short delay so closing animation isn't jarring
     setTimeout(() => {
       setType('general_feedback');
       setDescription('');
-      setIsAnonymous(false);
       setScreenshot(null);
       setSuccess(false);
       setError(null);
@@ -63,12 +60,11 @@ export default function FeedbackButton() {
     const formData = new FormData();
     formData.append('type', type);
     formData.append('description', description.trim());
-    formData.append('is_anonymous', isAnonymous ? 'true' : 'false');
     if (screenshot) formData.append('screenshot', screenshot);
 
     setSubmitting(true);
     try {
-      await api.submitFeedback(formData, token || null);
+      await api.submitFeedback(formData, token);
       setSuccess(true);
     } catch (err) {
       setError(err.message || 'Failed to submit feedback. Please try again.');
@@ -79,7 +75,6 @@ export default function FeedbackButton() {
 
   return (
     <>
-      {/* Floating action button */}
       <button
         className="feedback-fab"
         onClick={openModal}
@@ -94,11 +89,9 @@ export default function FeedbackButton() {
         </svg>
       </button>
 
-      {/* Modal overlay */}
       {open && (
         <div className="feedback-overlay" onClick={e => { if (e.target === e.currentTarget) closeModal(); }}>
           <div className="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
-            {/* Header */}
             <div className="feedback-modal-header">
               <h2 id="feedback-title" className="feedback-modal-title">Send Feedback</h2>
               <button className="btn btn-ghost feedback-modal-close" onClick={closeModal} aria-label="Close">✕</button>
@@ -112,9 +105,21 @@ export default function FeedbackButton() {
                   Close
                 </button>
               </div>
+            ) : !user ? (
+              <div className="feedback-form" style={{ padding: '1.5rem' }}>
+                <p style={{ margin: '0 0 .75rem', fontSize: '.95rem', color: 'var(--text-primary)' }}>
+                  You must be <strong>signed in</strong> to submit feedback.
+                </p>
+                <p style={{ margin: '0 0 1rem', fontSize: '.85rem', color: 'var(--text-muted)' }}>
+                  Per the Mycelium Covenant, all feedback is attributed to the submitter. For sensitive platform concerns, message{' '}
+                  <strong>@AMBHaggermaker</strong> directly.
+                </p>
+                <div className="feedback-modal-footer">
+                  <button type="button" className="btn btn-ghost" onClick={closeModal}>Close</button>
+                </div>
+              </div>
             ) : (
               <form onSubmit={handleSubmit} className="feedback-form">
-                {/* Type */}
                 <div className="feedback-field">
                   <label className="feedback-label" htmlFor="feedback-type">
                     Type <span className="feedback-required">*</span>
@@ -132,7 +137,6 @@ export default function FeedbackButton() {
                   </select>
                 </div>
 
-                {/* Description */}
                 <div className="feedback-field">
                   <label className="feedback-label" htmlFor="feedback-description">
                     Description <span className="feedback-required">*</span>
@@ -155,7 +159,6 @@ export default function FeedbackButton() {
                   )}
                 </div>
 
-                {/* Screenshot */}
                 <div className="feedback-field">
                   <label className="feedback-label" htmlFor="feedback-screenshot">
                     Screenshot <span className="feedback-label-hint">(optional, images only)</span>
@@ -173,23 +176,13 @@ export default function FeedbackButton() {
                   )}
                 </div>
 
-                {/* Anonymous toggle */}
-                {user && (
-                  <label className="feedback-anon-label">
-                    <input
-                      type="checkbox"
-                      checked={isAnonymous}
-                      onChange={e => setIsAnonymous(e.target.checked)}
-                      className="feedback-anon-checkbox"
-                    />
-                    <span>Submit anonymously</span>
-                  </label>
-                )}
+                <p style={{ margin: '0 0 .5rem', fontSize: '.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  Submitted as <strong>@{user.username}</strong>. For sensitive platform concerns, message{' '}
+                  <strong>@AMBHaggermaker</strong> directly.
+                </p>
 
-                {/* Error */}
                 {error && <p className="feedback-error">{error}</p>}
 
-                {/* Footer */}
                 <div className="feedback-modal-footer">
                   <button type="button" className="btn btn-ghost" onClick={closeModal} disabled={submitting}>
                     Cancel

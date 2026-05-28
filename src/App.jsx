@@ -21,6 +21,7 @@ import MyPosts from './pages/MyPosts';
 import Businesses from './pages/Businesses';
 import BusinessProfile from './pages/BusinessProfile';
 import Legislature from './pages/Legislature';
+import DonationThanks from './pages/DonationThanks';
 import AuthModal from './components/AuthModal';
 import InviteModal from './components/InviteModal';
 import FeedbackButton from './components/FeedbackButton';
@@ -116,6 +117,7 @@ export default function App() {
         <Route path="/businesses"      element={<Businesses onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/businesses/:id"  element={<BusinessProfile />} />
         <Route path="/legislature"     element={<Legislature onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/donate/thanks"   element={<DonationThanks />} />
       </Routes>
       {authOpen   && <AuthModal onClose={() => setAuthOpen(false)} />}
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}

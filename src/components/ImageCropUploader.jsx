@@ -78,13 +78,13 @@ export default function ImageCropUploader({
 
   return (
     <div className="img-crop-uploader">
-      {hint && <p className="img-crop-hint">{hint}</p>}
       <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
         <button type="button" className={btnClassName} onClick={openPicker} disabled={disabled}>
           {thumb ? 'Change' : label}
         </button>
         {thumb && <img src={thumb} alt="preview" className="img-crop-thumb" />}
       </div>
+      {hint && <p className="img-crop-hint">{hint}</p>}
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp"
         style={{ display: 'none' }} onChange={onFileChange} />
 

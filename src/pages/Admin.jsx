@@ -1206,11 +1206,9 @@ function FeedbackTab({ token }) {
 
               {/* Submitter */}
               <p style={{ fontSize: '.8rem', color: 'var(--muted)', marginBottom: '.5rem' }}>
-                {item.is_anonymous
-                  ? <em>Anonymous</em>
-                  : item.submitter_username
-                    ? <>Submitted by <strong>@{item.submitter_username}</strong></>
-                    : <em>Unknown user</em>
+                {item.submitter_username
+                  ? <>Submitted by <strong>@{item.submitter_username}</strong></>
+                  : <em>Unknown user</em>
                 }
               </p>
 

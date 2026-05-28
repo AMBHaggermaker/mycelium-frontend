@@ -92,8 +92,16 @@ export default {
   },
   deleteProfilePhoto: (photoId, token)   => del(`/profiles/photos/${photoId}`, token),
   getWall:            (username)          => get(`/profiles/${username}/wall`),
-  postOnWall:         (username, data, token) => post(`/profiles/${username}/wall`, data, token),
+  postOnWall: (username, formData, token) => {
+    return fetch(`${BASE}/profiles/${username}/wall`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    }).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Failed'); return d; });
+  },
+  pinWallPost:        (username, postId, token) => patch(`/profiles/${username}/wall/${postId}/pin`, {}, token),
   deleteWallPost:     (username, postId, token) => del(`/profiles/${username}/wall/${postId}`, token),
+  getWallThreads:     (wallPostId)        => get(`/threads?wall_post_id=${wallPostId}`),
 
   // Covenant
   agreeToCovenant:    (token)             => request('PATCH', '/users/me/covenant', {}, token),
@@ -413,4 +421,7 @@ export default {
       if (!res.ok) throw new Error(data.error || 'Submit failed');
       return data;
     }),
+
+  // Donations
+  createDonationSession: (amount) => post('/donations/create-session', { amount }),
 };

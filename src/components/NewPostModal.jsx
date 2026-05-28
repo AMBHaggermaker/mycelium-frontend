@@ -305,7 +305,7 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
                   targetWidth={1200}
                   targetHeight={630}
                   label="+ Add Photo"
-                  hint="1200×630px · 1.91:1"
+                  hint="1200×630px landscape recommended"
                   onFile={(blob, name) => setFiles(prev => [...prev, new File([blob], name, { type: 'image/jpeg' })].slice(0, 5))}
                   btnClassName="btn btn-outline btn-sm"
                 />
