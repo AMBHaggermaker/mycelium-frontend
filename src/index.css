@@ -5855,6 +5855,26 @@ a { color: inherit; text-decoration: none; }
 .upload-progress-bar { height: 100%; background: var(--green); border-radius: 4px; transition: width .2s; }
 .upload-progress-label { font-size: .8rem; color: var(--muted); margin-top: .25rem; }
 .upload-preview-notice { font-size: .82rem; color: var(--muted); font-style: italic; }
+.upload-file-limits {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .75rem 1rem;
+  font-size: .85rem;
+}
+.upload-file-limits-heading {
+  display: block;
+  font-weight: 600;
+  margin-bottom: .5rem;
+  color: var(--text);
+}
+.upload-file-limits-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .2rem .75rem;
+  color: var(--muted);
+}
+.upload-file-limits-grid span:nth-child(odd) { font-weight: 600; color: var(--text); }
 .form-label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .4rem; color: var(--muted); }
 
 .guild-thanks-page { display: flex; align-items: center; justify-content: center; min-height: 80vh; padding: calc(var(--nav-h) + 2rem) 1.25rem 2rem; }

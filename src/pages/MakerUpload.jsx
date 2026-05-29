@@ -6,6 +6,12 @@ import api from '../api';
 // Copyright confirmation required on every upload
 const COPYRIGHT_STATEMENT = 'I confirm this is my original work or I have the legal right to distribute it. I understand that uploading copyrighted content I do not own violates the Mycelium Covenant and may result in removal of content and my account.';
 
+const TIER_LIMITS_DISPLAY = {
+  basic:    { audio: '50 MB', image: '10 MB', video: null },
+  standard: { audio: '200 MB', image: '25 MB', video: '500 MB' },
+  pro:      { audio: '1 GB', image: '50 MB', video: '2 GB' },
+};
+
 const CATEGORIES = [
   'Music', 'Visual Art', 'Handmade Goods', 'Writing',
   'Spoken Word and Breathwork', 'Food and Herbal', 'Fiber Arts',
@@ -105,7 +111,7 @@ export default function MakerUpload() {
         name: 'Basic',
         price: '$5/mo',
         storage: '1 GB total',
-        features: ['Audio up to 50 MB/file', 'Images up to 50 MB/file', 'No video uploads'],
+        features: ['Audio up to 50 MB/file', 'Images up to 10 MB/file', 'No video uploads'],
         highlight: false,
       },
       {
@@ -113,7 +119,7 @@ export default function MakerUpload() {
         name: 'Standard',
         price: '$10/mo',
         storage: '5 GB total',
-        features: ['Audio up to 200 MB/file', 'Video up to 500 MB/file', 'Images up to 50 MB/file'],
+        features: ['Audio up to 200 MB/file', 'Video up to 500 MB/file', 'Images up to 25 MB/file'],
         highlight: true,
       },
       {
@@ -181,6 +187,24 @@ export default function MakerUpload() {
         </span>
         {nearLimit && <p className="upload-quota-warning">⚠ You're within 10% of your storage limit.</p>}
       </div>
+
+      {/* Per-file size limits for this tier */}
+      {(() => {
+        const lim = TIER_LIMITS_DISPLAY[maker.storage_tier];
+        if (!lim) return null;
+        return (
+          <div className="upload-file-limits">
+            <span className="upload-file-limits-heading">
+              Per-file limits &mdash; <span style={{ textTransform: 'capitalize' }}>{maker.storage_tier}</span> tier
+            </span>
+            <div className="upload-file-limits-grid">
+              <span>Audio</span><span>{lim.audio}</span>
+              <span>Image</span><span>{lim.image}</span>
+              <span>Video</span><span>{lim.video ?? <em style={{ color: 'var(--muted)' }}>Not available on this tier</em>}</span>
+            </div>
+          </div>
+        );
+      })()}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
         {/* Drop zone */}
