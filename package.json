@@ -17,7 +17,8 @@
     "react-image-crop": "^11.0.10",
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^6.23.1",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "wavesurfer.js": "^7.12.7"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",

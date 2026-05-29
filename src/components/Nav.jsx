@@ -66,6 +66,12 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
             <NavLink to="/businesses" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Businesses
             </NavLink>
+            <NavLink to="/learn" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              Learn
+            </NavLink>
+            <NavLink to="/makers" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              Makers
+            </NavLink>
             <NavLink to="/advocate" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Advocate
             </NavLink>
@@ -171,6 +177,12 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
               <button className="me-sheet-item" onClick={() => handleNavigate('/messages')}>
                 <span className="me-sheet-item-icon">✉</span> Messages
                 {unreadDMs > 0 && <span className="nav-unread-badge" style={{ marginLeft: '.5rem' }}>{unreadDMs}</span>}
+              </button>
+              <button className="me-sheet-item" onClick={() => handleNavigate('/learn')}>
+                <span className="me-sheet-item-icon">📚</span> Learn
+              </button>
+              <button className="me-sheet-item" onClick={() => handleNavigate('/makers')}>
+                <span className="me-sheet-item-icon">⚒</span> Maker's Guild
               </button>
               <button className="me-sheet-item" onClick={() => handleNavigate('/advocate')}>
                 <span className="me-sheet-item-icon">⚖</span> Advocate

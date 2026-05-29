@@ -22,10 +22,20 @@ import Businesses from './pages/Businesses';
 import BusinessProfile from './pages/BusinessProfile';
 import Legislature from './pages/Legislature';
 import DonationThanks from './pages/DonationThanks';
+import Learn from './pages/Learn';
+import CourseDetail from './pages/CourseDetail';
+import MyCourses from './pages/MyCourses';
+import Makers from './pages/Makers';
+import MakerProfile from './pages/MakerProfile';
+import WorkDetail from './pages/WorkDetail';
+import MakerUpload from './pages/MakerUpload';
+import GuildThanks from './pages/GuildThanks';
 import AuthModal from './components/AuthModal';
 import InviteModal from './components/InviteModal';
 import FeedbackButton from './components/FeedbackButton';
 import DidYouKnow from './components/DidYouKnow';
+import MiniPlayer from './components/MiniPlayer';
+import { PlayerProvider } from './contexts/PlayerContext';
 import { useAuth } from './auth';
 import api from './api';
 
@@ -91,7 +101,7 @@ export default function App() {
   if (!ready) return <div className="spinner" style={{ marginTop: '6rem' }} />;
 
   return (
-    <>
+    <PlayerProvider>
       <CriticalAnomalyBanner />
       <Nav onAuthOpen={() => setAuthOpen(true)} onInviteOpen={() => setInviteOpen(true)} />
       <FeedbackButton />
@@ -118,9 +128,21 @@ export default function App() {
         <Route path="/businesses/:id"  element={<BusinessProfile />} />
         <Route path="/legislature"     element={<Legislature onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/donate/thanks"   element={<DonationThanks />} />
+        {/* Learn / Professional Development Hub */}
+        <Route path="/learn"           element={<Learn onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/learn/my-courses" element={<MyCourses />} />
+        <Route path="/learn/create"    element={<CourseDetail onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/learn/:id"       element={<CourseDetail onRequireAuth={() => setAuthOpen(true)} />} />
+        {/* Maker's Guild — static routes BEFORE dynamic :username */}
+        <Route path="/makers/upload"        element={<MakerUpload />} />
+        <Route path="/makers/guild-thanks"  element={<GuildThanks />} />
+        <Route path="/makers/works/:id"     element={<WorkDetail onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/makers"               element={<Makers onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/makers/:username"     element={<MakerProfile onRequireAuth={() => setAuthOpen(true)} />} />
       </Routes>
       {authOpen   && <AuthModal onClose={() => setAuthOpen(false)} />}
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
-    </>
+      <MiniPlayer />
+    </PlayerProvider>
   );
 }

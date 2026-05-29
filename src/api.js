@@ -424,4 +424,41 @@ export default {
 
   // Donations
   createDonationSession: (amount) => post('/donations/create-session', { amount }),
+
+  // Professional Development Hub
+  getProdevCourses:      (params)        => get(`/prodev/courses${qs(params)}`),
+  getProdevCourse:       (id)            => get(`/prodev/courses/${id}`),
+  createProdevCourse:    (data, token)   => post('/prodev/courses', data, token),
+  enrollProdevCourse:    (id, token)     => post(`/prodev/courses/${id}/enroll`, {}, token),
+  getMyProdevCourses:    (token)         => get('/prodev/my-courses', token),
+
+  // Maker's Guild
+  getMakers:             (params)        => get(`/makers${qs(params)}`),
+  getMakerProfile:       (username)      => get(`/makers/${username}`),
+  getMyMakerProfile:     (token)         => get('/makers/my-profile', token),
+  createMakerProfile:    (data, token)   => post('/makers/profile', data, token),
+  getMakerWorks:         (params)        => get(`/makers/works${qs(params)}`),
+  getMakerWork:          (id)            => get(`/makers/works/${id}`),
+  incrementWorkPlay:     (id)            => post(`/makers/works/${id}/play`, {}),
+  requestCommission:     (data, token)   => post('/makers/commissions', data, token),
+  subscribeMakerTier:    (tier, token)   => post('/makers/subscribe', { tier }, token),
+  uploadMakerWork: (formData, token, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${BASE}/makers/works/upload`);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable && onProgress) onProgress(Math.round(e.loaded / e.total * 100));
+      };
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+          else reject(new Error(data.error || 'Upload failed'));
+        } catch { reject(new Error('Upload failed')); }
+      };
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.send(formData);
+    });
+  },
 };
