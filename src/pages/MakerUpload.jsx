@@ -3,6 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 
+// Copyright confirmation required on every upload
+const COPYRIGHT_STATEMENT = 'I confirm this is my original work or I have the legal right to distribute it. I understand that uploading copyrighted content I do not own violates the Mycelium Covenant and may result in removal of content and my account.';
+
 const CATEGORIES = [
   'Music', 'Visual Art', 'Handmade Goods', 'Writing',
   'Spoken Word and Breathwork', 'Food and Herbal', 'Fiber Arts',
@@ -37,6 +40,7 @@ export default function MakerUpload() {
     title: '', description: '', category: '', is_free: true, price: '0',
     tags: '', license: 'all_rights_reserved',
   });
+  const [copyrightConfirmed, setCopyrightConfirmed] = useState(false);
 
   useEffect(() => {
     if (!user) { navigate('/makers'); return; }
@@ -191,7 +195,21 @@ export default function MakerUpload() {
           Audio files: a preview clip will be auto-generated from the full file.
         </p>
 
-        <button type="submit" className="btn btn-primary" disabled={uploading || !file}>
+        {/* Required copyright confirmation */}
+        <div className="upload-copyright-confirm">
+          <label className="toggle-label" style={{ alignItems: 'flex-start', gap: '.75rem' }}>
+            <input type="checkbox" required checked={copyrightConfirmed}
+              onChange={e => setCopyrightConfirmed(e.target.checked)} />
+            <span style={{ fontSize: '.85rem', lineHeight: 1.5 }}>
+              {COPYRIGHT_STATEMENT}
+            </span>
+          </label>
+          <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: '.5rem' }}>
+            Read our <Link to="/makers/copyright">Copyright Policy</Link> to understand what qualifies as original work.
+          </p>
+        </div>
+
+        <button type="submit" className="btn btn-primary" disabled={uploading || !file || !copyrightConfirmed}>
           {uploading ? 'Uploading…' : 'Publish Work'}
         </button>
       </form>

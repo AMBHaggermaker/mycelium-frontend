@@ -57,6 +57,10 @@ export default function Admin() {
           {user.role === 'admin' && (
             <FeedbackTabButton active={tab === 'feedback'} onClick={() => setTab('feedback')} token={token} />
           )}
+          <button className={`tab-btn${tab === 'copyright' ? ' active' : ''}`}
+            onClick={() => setTab('copyright')}>
+            Copyright Claims
+          </button>
         </div>
 
         {tab === 'moderation' && <ModerationQueue token={token} />}
@@ -65,6 +69,7 @@ export default function Admin() {
         {tab === 'anomalies' && user.role === 'admin' && <AnomaliesTab token={token} />}
         {tab === 'businesses' && user.role === 'admin' && <BusinessesTab token={token} />}
         {tab === 'feedback' && user.role === 'admin' && <FeedbackTab token={token} />}
+        {tab === 'copyright' && <CopyrightClaimsTab token={token} />}
       </div>
     </div>
   );
@@ -1285,6 +1290,180 @@ function FeedbackTab({ token }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ── Copyright Claims tab ──────────────────────────────────────────────────────
+
+function CopyrightClaimsTab({ token }) {
+  const [claims, setClaims] = useState([]);
+  const [flagged, setFlagged] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [activeTab, setActiveTab] = useState('claims');
+  const [updating, setUpdating] = useState('');
+  const [notes, setNotes] = useState({});
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [c, f] = await Promise.all([
+        api.getCopyrightClaims(statusFilter, token),
+        api.getCopyrightFlagged(token),
+      ]);
+      setClaims(c);
+      setFlagged(f);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { load(); }, [statusFilter]);
+
+  async function handleStatus(claimId, status) {
+    setUpdating(claimId + status);
+    try {
+      await api.updateCopyrightClaim(claimId, { status, admin_notes: notes[claimId] }, token);
+      await load();
+    } catch (e) { alert(e.message); }
+    finally { setUpdating(''); }
+  }
+
+  async function handleCounterNotice(claimId, decision) {
+    setUpdating(claimId + decision);
+    try {
+      await api.actOnCounterNotice(claimId, decision, token);
+      await load();
+    } catch (e) { alert(e.message); }
+    finally { setUpdating(''); }
+  }
+
+  const STATUS_COLORS = {
+    pending:      '#f59e0b',
+    under_review: '#3b82f6',
+    removed:      '#ef4444',
+    dismissed:    '#6b7280',
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="tabs" style={{ flexShrink: 0 }}>
+          <button className={`tab-btn${activeTab === 'claims' ? ' active' : ''}`} onClick={() => setActiveTab('claims')}>
+            Claims ({claims.length})
+          </button>
+          <button className={`tab-btn${activeTab === 'flagged' ? ' active' : ''}`} onClick={() => setActiveTab('flagged')}>
+            Auto-Flagged ({flagged.length})
+          </button>
+        </div>
+        {activeTab === 'claims' && (
+          <select className="input" style={{ maxWidth: 180 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="under_review">Under Review</option>
+            <option value="removed">Removed</option>
+            <option value="dismissed">Dismissed</option>
+          </select>
+        )}
+      </div>
+
+      {loading && <div className="spinner" style={{ margin: '2rem auto' }} />}
+
+      {activeTab === 'claims' && !loading && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {claims.length === 0 && <p className="empty">No copyright claims.</p>}
+          {claims.map(c => (
+            <div key={c.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.25rem' }}>
+              <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: '.75rem' }}>
+                <span style={{ fontWeight: 700 }}>Work: "{c.work_title}"</span>
+                <span style={{ color: STATUS_COLORS[c.status] || '#888', fontWeight: 600, fontSize: '.82rem', textTransform: 'uppercase' }}>{c.status}</span>
+                {c.counter_notice_status !== 'none' && (
+                  <span style={{ background: '#fef3c7', color: '#92400e', fontSize: '.78rem', padding: '.1rem .45rem', borderRadius: 4 }}>
+                    Counter-notice: {c.counter_notice_status}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '.75rem' }}>
+                <div><strong>Maker:</strong> {c.maker_name} (@{c.maker_username})</div>
+                <div><strong>Claimant:</strong> {c.claimant_name} &lt;{c.claimant_email}&gt;</div>
+                <div><strong>Claimed work:</strong> {c.original_work_desc}</div>
+                <div><strong>Filed:</strong> {new Date(c.created_at).toLocaleDateString()}</div>
+                {c.admin_notes && <div><strong>Admin notes:</strong> {c.admin_notes}</div>}
+              </div>
+
+              {c.counter_notice_text && (
+                <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 6, padding: '.75rem', marginBottom: '.75rem', fontSize: '.85rem' }}>
+                  <strong>Counter-notice:</strong> {c.counter_notice_text}
+                  {c.counter_notice_status === 'received' && (
+                    <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem' }}>
+                      <button className="btn btn-sm btn-outline" onClick={() => handleCounterNotice(c.id, 'accepted')} disabled={!!updating}>Accept (Republish)</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => handleCounterNotice(c.id, 'rejected')} disabled={!!updating}>Reject</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <textarea
+                className="input"
+                placeholder="Admin notes…"
+                rows={2}
+                style={{ width: '100%', marginBottom: '.5rem', fontSize: '.85rem' }}
+                value={notes[c.id] || c.admin_notes || ''}
+                onChange={e => setNotes(n => ({ ...n, [c.id]: e.target.value }))}
+              />
+
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                {c.status !== 'under_review' && (
+                  <button className="btn btn-sm btn-outline" disabled={!!updating} onClick={() => handleStatus(c.id, 'under_review')}>Mark Under Review</button>
+                )}
+                {c.status !== 'removed' && (
+                  <button className="btn btn-sm btn-danger" disabled={!!updating} onClick={() => handleStatus(c.id, 'removed')}>Remove Content</button>
+                )}
+                {c.status !== 'dismissed' && (
+                  <button className="btn btn-sm btn-ghost" disabled={!!updating} onClick={() => handleStatus(c.id, 'dismissed')}>Dismiss Claim</button>
+                )}
+                {c.r2_url && (
+                  <a href={c.r2_url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline">View Work</a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'flagged' && !loading && (
+        <div>
+          <p style={{ color: 'var(--muted)', fontSize: '.9rem', marginBottom: '1rem' }}>
+            These works were automatically flagged because their title matches a known copyrighted work. Review before keeping or removing.
+          </p>
+          {flagged.length === 0 && <p className="empty">No auto-flagged works.</p>}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
+                <th style={{ padding: '.5rem' }}>Work</th>
+                <th style={{ padding: '.5rem' }}>Maker</th>
+                <th style={{ padding: '.5rem' }}>Type</th>
+                <th style={{ padding: '.5rem' }}>Uploaded</th>
+                <th style={{ padding: '.5rem' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {flagged.map(w => (
+                <tr key={w.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '.5rem' }}>{w.title}</td>
+                  <td style={{ padding: '.5rem' }}>{w.maker_name}</td>
+                  <td style={{ padding: '.5rem' }}>{w.work_type}</td>
+                  <td style={{ padding: '.5rem' }}>{new Date(w.created_at).toLocaleDateString()}</td>
+                  <td style={{ padding: '.5rem' }}>
+                    <a href={`/makers/works/${w.id}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline" style={{ marginRight: '.35rem' }}>View</a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

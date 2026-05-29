@@ -4,6 +4,64 @@ import { useAuth } from '../auth';
 import { usePlayer } from '../contexts/PlayerContext';
 import api from '../api';
 
+function CopyrightReportForm({ workId, onClose }) {
+  const [form, setForm] = useState({ claimant_name: '', claimant_email: '', original_work_desc: '', good_faith: false });
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.good_faith) { setError('You must confirm the good faith statement'); return; }
+    setSubmitting(true); setError('');
+    try {
+      await api.reportCopyrightViolation({ work_id: workId, ...form });
+      setDone(true);
+    } catch (e) { setError(e.message); }
+    finally { setSubmitting(false); }
+  }
+
+  if (done) return (
+    <div className="copyright-report-panel">
+      <p className="success-text">Your claim has been submitted. Our team will review it within 5 business days.</p>
+      <button className="btn btn-ghost btn-sm" onClick={onClose} style={{ marginTop: '.75rem' }}>Close</button>
+    </div>
+  );
+
+  return (
+    <form className="copyright-report-panel" onSubmit={handleSubmit}>
+      <h3>Report Copyright Violation</h3>
+      <p style={{ color: 'var(--muted)', fontSize: '.85rem', marginBottom: '1rem' }}>
+        Only file a claim if you own rights to the work being infringed. False claims are a violation of the Mycelium Covenant.
+        Read our <Link to="/makers/copyright">Copyright Policy</Link> for details.
+      </p>
+      <input className="input" required placeholder="Your full name *"
+        value={form.claimant_name} onChange={e => setForm(f => ({ ...f, claimant_name: e.target.value }))} />
+      <input className="input" type="email" required placeholder="Your contact email *"
+        value={form.claimant_email} onChange={e => setForm(f => ({ ...f, claimant_email: e.target.value }))} />
+      <textarea className="input" rows={4} required
+        placeholder="Describe the original work you own and how this upload infringes on it *"
+        value={form.original_work_desc} onChange={e => setForm(f => ({ ...f, original_work_desc: e.target.value }))} />
+      <label className="toggle-label" style={{ alignItems: 'flex-start', gap: '.75rem' }}>
+        <input type="checkbox" checked={form.good_faith}
+          onChange={e => setForm(f => ({ ...f, good_faith: e.target.checked }))} />
+        <span style={{ fontSize: '.85rem' }}>
+          I have a good faith belief that the use of the material is not authorized by the copyright owner,
+          its agent, or the law. I understand that filing a false DMCA claim violates the Mycelium Covenant
+          and may have legal consequences.
+        </span>
+      </label>
+      {error && <p className="error-text">{error}</p>}
+      <div style={{ display: 'flex', gap: '.75rem' }}>
+        <button type="submit" className="btn btn-danger" disabled={submitting}>
+          {submitting ? 'Submitting…' : 'Submit Claim'}
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+      </div>
+    </form>
+  );
+}
+
 const LICENSE_INFO = {
   all_rights_reserved:            { label: 'All Rights Reserved', desc: 'All rights reserved by the creator. Ask before using.' },
   creative_commons_attribution:   { label: 'CC Attribution',      desc: 'Free to use with credit to the creator.' },
@@ -15,9 +73,10 @@ export default function WorkDetail({ onRequireAuth }) {
   const { id }              = useParams();
   const { user, token }     = useAuth();
   const { setTrack, track, isPlaying, toggle } = usePlayer();
-  const [work,       setWork]      = useState(null);
-  const [loading,    setLoading]   = useState(true);
-  const [error,      setError]     = useState('');
+  const [work,         setWork]        = useState(null);
+  const [loading,      setLoading]     = useState(true);
+  const [error,        setError]       = useState('');
+  const [showReport,   setShowReport]  = useState(false);
   const waveRef      = useRef(null);
   const wsRef        = useRef(null);
 
@@ -165,6 +224,17 @@ export default function WorkDetail({ onRequireAuth }) {
             ↓ Download
           </a>
         )}
+
+        {/* Copyright report */}
+        <div className="work-copyright-section">
+          {!showReport ? (
+            <button className="btn btn-ghost btn-sm work-report-btn" onClick={() => setShowReport(true)}>
+              🚩 Report Copyright Violation
+            </button>
+          ) : (
+            <CopyrightReportForm workId={work.id} onClose={() => setShowReport(false)} />
+          )}
+        </div>
       </div>
     </div>
   );

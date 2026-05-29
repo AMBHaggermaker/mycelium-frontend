@@ -442,6 +442,14 @@ export default {
   incrementWorkPlay:     (id)            => post(`/makers/works/${id}/play`, {}),
   requestCommission:     (data, token)   => post('/makers/commissions', data, token),
   subscribeMakerTier:    (tier, token)   => post('/makers/subscribe', { tier }, token),
+  // Copyright protection
+  reportCopyrightViolation: (data) => post('/copyright/report', data),
+  submitCounterNotice:      (claimId, statement, token) => post(`/copyright/counter-notice/${claimId}`, { statement }, token),
+  getCopyrightClaims:       (status, token) => get(`/copyright/admin/claims${status ? '?status=' + status : ''}`, token),
+  updateCopyrightClaim:     (id, data, token) => request('PATCH', `/copyright/admin/claims/${id}`, data, token),
+  actOnCounterNotice:       (id, decision, token) => request('PATCH', `/copyright/admin/claims/${id}/counter-notice`, { counter_notice_status: decision }, token),
+  getCopyrightFlagged:      (token) => get('/copyright/admin/flagged', token),
+
   uploadMakerWork: (formData, token, onProgress) => {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();

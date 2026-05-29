@@ -660,7 +660,7 @@ export default function Legislature({ onRequireAuth }) {
         .leg-hero {
           background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8e 100%);
           color: #fff;
-          padding: 2.5rem 0 2rem;
+          padding: calc(var(--nav-h) + 2.5rem) 0 2rem;
         }
         .leg-hero-title {
           font-size: 2rem;

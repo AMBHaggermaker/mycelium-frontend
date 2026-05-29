@@ -1790,7 +1790,7 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 2rem 1rem 4rem;
+  padding: calc(var(--nav-h) + 2rem) 1rem 4rem;
 }
 .invite-card {
   width: 100%;
@@ -3182,6 +3182,7 @@ a { color: inherit; text-decoration: none; }
 .messages-layout {
   display: flex; height: calc(100vh - var(--nav-h) - var(--banner-h, 0px));
   max-height: calc(100vh - var(--nav-h) - var(--banner-h, 0px));
+  margin-top: var(--nav-h);
   overflow: hidden;
 }
 .messages-sidebar {
@@ -5196,7 +5197,7 @@ a { color: inherit; text-decoration: none; }
 /* ── Donation Thanks Page ───────────────────────────────────── */
 .donation-thanks-page {
   min-height: 100vh; display: flex; align-items: center;
-  justify-content: center; padding: 2rem;
+  justify-content: center; padding: calc(var(--nav-h) + 2rem) 2rem 2rem;
   background: var(--bg);
 }
 .donation-thanks-card {
@@ -5856,7 +5857,7 @@ a { color: inherit; text-decoration: none; }
 .upload-preview-notice { font-size: .82rem; color: var(--muted); font-style: italic; }
 .form-label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .4rem; color: var(--muted); }
 
-.guild-thanks-page { display: flex; align-items: center; justify-content: center; min-height: 80vh; padding: 2rem 1.25rem; }
+.guild-thanks-page { display: flex; align-items: center; justify-content: center; min-height: 80vh; padding: calc(var(--nav-h) + 2rem) 1.25rem 2rem; }
 .guild-thanks-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 2.5rem; max-width: 560px; width: 100%; text-align: center; }
 .guild-thanks-icon { font-size: 3rem; margin-bottom: 1rem; }
 .guild-thanks-card h1 { font-size: 1.7rem; font-weight: 800; margin-bottom: .5rem; }
@@ -5891,3 +5892,54 @@ a { color: inherit; text-decoration: none; }
 .success-text { color: var(--green); font-weight: 600; }
 .error-text { color: var(--red); font-size: .9rem; }
 .maker-commission-panel { padding: 1rem 0; }
+
+/* ── Global nav clearance ───────────────────────────────────────────────────
+   Any top-level page wrapper that doesn't already set padding-top explicitly
+   should clear the fixed nav. Use this pattern for any future page wrappers.
+   scroll-padding-top helps hash anchors land below the nav bar.       */
+html { scroll-padding-top: var(--nav-h); }
+
+/* ── Copyright Protection ────────────────────────────────────────────────── */
+.copyright-policy-page {
+  padding-top: calc(var(--nav-h) + 1rem);
+  padding-bottom: 6rem;
+}
+.policy-section { margin-bottom: 2rem; }
+.policy-section h2 { font-size: 1.15rem; font-weight: 700; margin-bottom: .6rem; color: var(--text); }
+.policy-section p { color: var(--muted); line-height: 1.7; margin-bottom: .75rem; }
+.policy-section a { color: var(--green); text-decoration: underline; }
+.policy-list { padding-left: 1.35rem; display: flex; flex-direction: column; gap: .4rem; color: var(--muted); line-height: 1.6; }
+.policy-list li strong { color: var(--text); }
+
+.copyright-report-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+  margin-top: 1rem;
+}
+.copyright-report-panel h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0; }
+.copyright-report-panel a { color: var(--green); text-decoration: underline; }
+
+.work-copyright-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.work-report-btn { color: var(--muted); font-size: .82rem; }
+.work-report-btn:hover { color: var(--red); }
+
+.upload-copyright-confirm {
+  background: #fff8e1;
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+}
+.upload-copyright-confirm a { color: var(--green); text-decoration: underline; }
+
+/* btn-danger (if not already defined) */
+.btn-danger {
+  background: var(--red, #b52424);
+  color: #fff;
+  border: 1px solid var(--red, #b52424);
+}
+.btn-danger:hover { background: #8b1a1a; border-color: #8b1a1a; }

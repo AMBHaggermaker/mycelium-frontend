@@ -30,6 +30,7 @@ import MakerProfile from './pages/MakerProfile';
 import WorkDetail from './pages/WorkDetail';
 import MakerUpload from './pages/MakerUpload';
 import GuildThanks from './pages/GuildThanks';
+import CopyrightPolicy from './pages/CopyrightPolicy';
 import AuthModal from './components/AuthModal';
 import InviteModal from './components/InviteModal';
 import FeedbackButton from './components/FeedbackButton';
@@ -136,6 +137,7 @@ export default function App() {
         {/* Maker's Guild — static routes BEFORE dynamic :username */}
         <Route path="/makers/upload"        element={<MakerUpload />} />
         <Route path="/makers/guild-thanks"  element={<GuildThanks />} />
+        <Route path="/makers/copyright"     element={<CopyrightPolicy />} />
         <Route path="/makers/works/:id"     element={<WorkDetail onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/makers"               element={<Makers onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/makers/:username"     element={<MakerProfile onRequireAuth={() => setAuthOpen(true)} />} />
