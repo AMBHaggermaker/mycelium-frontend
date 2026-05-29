@@ -5943,3 +5943,72 @@ html { scroll-padding-top: var(--nav-h); }
   border: 1px solid var(--red, #b52424);
 }
 .btn-danger:hover { background: #8b1a1a; border-color: #8b1a1a; }
+
+/* ── Maker Gate (inline tier selection on upload page) ─── */
+.maker-gate-page {
+  padding-top: calc(var(--nav-h) + 2rem);
+  padding-bottom: 5rem;
+  max-width: 900px;
+  margin: 0 auto;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  text-align: center;
+}
+.maker-gate-heading { font-size: 2rem; font-weight: 800; margin-bottom: .5rem; }
+.maker-gate-sub { font-size: 1.05rem; color: var(--muted); margin-bottom: 2rem; }
+.maker-gate-note { font-size: .85rem; color: var(--muted); margin-top: 2rem; }
+
+.maker-tier-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+@media (max-width: 700px) {
+  .maker-tier-cards { grid-template-columns: 1fr; }
+  .maker-gate-heading { font-size: 1.5rem; }
+}
+
+.maker-tier-card {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.75rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+  position: relative;
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+.maker-tier-card--highlight {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(42,95,10,.12);
+}
+.maker-tier-badge {
+  position: absolute;
+  top: -13px;
+  background: var(--green);
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: .25rem .75rem;
+  border-radius: 99px;
+}
+.maker-tier-name { font-size: 1.25rem; font-weight: 800; }
+.maker-tier-price { font-size: 1.6rem; font-weight: 700; color: var(--green); }
+.maker-tier-storage { font-size: .85rem; color: var(--muted); font-weight: 600; }
+.maker-tier-features {
+  list-style: none;
+  margin: .75rem 0;
+  text-align: left;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+.maker-tier-features li { font-size: .88rem; color: var(--text); }
+.maker-tier-features li::before { content: '✓ '; color: var(--green); font-weight: 700; }
+.maker-tier-btn { width: 100%; margin-top: auto; }

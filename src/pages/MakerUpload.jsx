@@ -41,6 +41,20 @@ export default function MakerUpload() {
     tags: '', license: 'all_rights_reserved',
   });
   const [copyrightConfirmed, setCopyrightConfirmed] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const [subError, setSubError] = useState('');
+
+  async function handleSubscribe(tier) {
+    if (!user) { navigate('/makers/upload'); return; }
+    setSubscribing(tier); setSubError('');
+    try {
+      const { checkout_url } = await api.subscribeMakerTier(tier, token);
+      window.location.href = checkout_url;
+    } catch (e) {
+      setSubError(e.message);
+      setSubscribing(false);
+    }
+  }
 
   useEffect(() => {
     if (!user) { navigate('/makers'); return; }
@@ -85,13 +99,64 @@ export default function MakerUpload() {
   if (loading) return <div className="spinner" style={{ margin: '4rem auto' }} />;
 
   if (!maker || maker.storage_tier === 'free') {
+    const TIERS = [
+      {
+        tier: 'basic',
+        name: 'Basic',
+        price: '$5/mo',
+        storage: '1 GB total',
+        features: ['Audio up to 50 MB/file', 'Images up to 50 MB/file', 'No video uploads'],
+        highlight: false,
+      },
+      {
+        tier: 'standard',
+        name: 'Standard',
+        price: '$10/mo',
+        storage: '5 GB total',
+        features: ['Audio up to 200 MB/file', 'Video up to 500 MB/file', 'Images up to 50 MB/file'],
+        highlight: true,
+      },
+      {
+        tier: 'pro',
+        name: 'Pro',
+        price: '$25/mo',
+        storage: '20 GB total',
+        features: ['Audio up to 1 GB/file', 'Video up to 2 GB/file', 'Images up to 50 MB/file'],
+        highlight: false,
+      },
+    ];
+
     return (
-      <div className="container" style={{ maxWidth: 560, padding: '2rem 1rem', textAlign: 'center' }}>
-        <h2>Upgrade to Upload</h2>
-        <p style={{ color: 'var(--muted)', margin: '1rem 0' }}>
-          You need a paid Maker tier to upload works. Free accounts can browse and listen.
+      <div className="maker-gate-page">
+        <h1 className="maker-gate-heading">Become a Maker on Mycelium</h1>
+        <p className="maker-gate-sub">Choose your plan to start sharing your original work.</p>
+
+        {subError && <p className="error-text" style={{ textAlign: 'center', marginBottom: '1rem' }}>{subError}</p>}
+
+        <div className="maker-tier-cards">
+          {TIERS.map(t => (
+            <div key={t.tier} className={'maker-tier-card' + (t.highlight ? ' maker-tier-card--highlight' : '')}>
+              {t.highlight && <div className="maker-tier-badge">Most Popular</div>}
+              <div className="maker-tier-name">{t.name}</div>
+              <div className="maker-tier-price">{t.price}</div>
+              <div className="maker-tier-storage">{t.storage}</div>
+              <ul className="maker-tier-features">
+                {t.features.map(f => <li key={f}>{f}</li>)}
+              </ul>
+              <button
+                className={'btn btn-primary maker-tier-btn' + (t.highlight ? '' : ' btn-outline')}
+                disabled={subscribing === t.tier}
+                onClick={() => handleSubscribe(t.tier)}
+              >
+                {subscribing === t.tier ? 'Redirecting…' : 'Subscribe Now'}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <p className="maker-gate-note">
+          Already a subscriber? Make sure you are logged in and your subscription is active.
         </p>
-        <Link to="/makers" className="btn btn-primary">View Maker Tiers</Link>
       </div>
     );
   }
