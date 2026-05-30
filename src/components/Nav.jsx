@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
@@ -12,6 +12,17 @@ const BOTTOM_TABS = [
   { to: '/watch',              icon: '◉',  label: 'Watch'    },
 ];
 
+const MORE_LINKS = [
+  { to: '/businesses', label: 'Businesses', icon: '🏢' },
+  { to: '/learn',      label: 'Learn',      icon: '📚' },
+  { to: '/makers',     label: 'Makers',     icon: '⚒' },
+  { to: '/advocate',   label: 'Advocate',   icon: '⚖' },
+  { to: '/legislature', label: 'Legislature', icon: '🏛️' },
+  { href: 'https://unprecedentedtimes.org/the-mycelium-covenant', label: 'Covenant', icon: '⬡', external: true, covenant: true },
+  { to: '/merch',      label: 'Merch',      icon: '🛍' },
+  { href: 'https://unprecedentedtimes.org', label: 'Newsletter', icon: '📰', external: true },
+];
+
 export default function Nav({ onAuthOpen, onInviteOpen }) {
   const { user, logout, token } = useAuth();
   const navigate = useNavigate();
@@ -19,7 +30,20 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
   const [meOpen, setMeOpen] = useState(false);
   const [unreadDMs, setUnreadDMs] = useState(0);
   const { myStatus, setMyStatus } = usePresence();
-  const [statusOpen, setStatusOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const moreRef = useRef(null);
+  const userRef = useRef(null);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    function handleClick(e) {
+      if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false);
+      if (userRef.current && !userRef.current.contains(e.target)) setUserMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   // Poll unread DM count
   useEffect(() => {
@@ -36,6 +60,7 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
   }, [user, token]);
 
   function handleLogout() {
+    setUserMenuOpen(false);
     setMeOpen(false);
     logout();
   }
@@ -51,6 +76,8 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
       <nav className="nav">
         <div className="container nav-inner">
           <Link to="/" className="nav-logo">⬡ Mycelium</Link>
+
+          {/* Primary nav links */}
           <div className="nav-links">
             <NavLink to="/" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Hotlight
@@ -61,42 +88,65 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
             <NavLink to="/chat" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Chat
             </NavLink>
-            <a href="https://lostfound.unprecedentedtimes.org" className="nav-link" target="_blank" rel="noopener noreferrer">
-              Lost &amp; Found
-            </a>
             <NavLink to="/watch" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               Watch
             </NavLink>
-            <NavLink to="/businesses" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              Businesses
-            </NavLink>
-            <NavLink to="/learn" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              Learn
-            </NavLink>
-            <NavLink to="/makers" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              Makers
-            </NavLink>
-            <NavLink to="/advocate" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              Advocate
-            </NavLink>
-            <NavLink to="/legislature" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              🏛️ Legislature
-            </NavLink>
-            <a href="https://unprecedentedtimes.org/the-mycelium-covenant" className="nav-link nav-link-covenant" target="_blank" rel="noopener noreferrer">
-              Covenant
+            <a href="https://lostfound.unprecedentedtimes.org" className="nav-link" target="_blank" rel="noopener noreferrer">
+              Lost &amp; Found
             </a>
-            <NavLink to="/merch" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              Merch
-            </NavLink>
-            <a href="https://unprecedentedtimes.org" className="nav-link" target="_blank" rel="noopener noreferrer">
-              Newsletter
-            </a>
-            {isMod && (
-              <NavLink to="/admin" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-                Admin
-              </NavLink>
-            )}
+
+            {/* More dropdown */}
+            <div className="nav-more-wrap" ref={moreRef}>
+              <button
+                className={'nav-link nav-more-btn' + (moreOpen ? ' active' : '')}
+                onClick={() => setMoreOpen(v => !v)}
+                aria-expanded={moreOpen}
+              >
+                More <span className="nav-more-chevron">▾</span>
+              </button>
+              {moreOpen && (
+                <div className="nav-more-dropdown">
+                  {MORE_LINKS.map(item =>
+                    item.external ? (
+                      <a
+                        key={item.label}
+                        href={item.href}
+                        className={'nav-more-item' + (item.covenant ? ' nav-more-item--covenant' : '')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setMoreOpen(false)}
+                      >
+                        <span className="nav-more-icon">{item.icon}</span>
+                        {item.label}
+                      </a>
+                    ) : (
+                      <NavLink
+                        key={item.label}
+                        to={item.to}
+                        className={({ isActive }) => 'nav-more-item' + (isActive ? ' active' : '')}
+                        onClick={() => setMoreOpen(false)}
+                      >
+                        <span className="nav-more-icon">{item.icon}</span>
+                        {item.label}
+                      </NavLink>
+                    )
+                  )}
+                  {isMod && (
+                    <NavLink
+                      to="/admin"
+                      className={({ isActive }) => 'nav-more-item' + (isActive ? ' active' : '')}
+                      onClick={() => setMoreOpen(false)}
+                    >
+                      <span className="nav-more-icon">🛡</span>
+                      Admin
+                    </NavLink>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Auth area */}
           <div className="nav-auth">
             {user ? (
               <>
@@ -106,38 +156,68 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
                 <button className="btn btn-outline btn-sm nav-invite-btn" onClick={onInviteOpen}>
                   + Invite
                 </button>
-                <div className="nav-presence-wrap">
-                  <Link to={`/profile/${user.username}`} className="nav-username">{user.username}</Link>
+
+                {/* User dropdown */}
+                <div className="nav-user-wrap" ref={userRef}>
                   <button
-                    className="nav-status-btn"
-                    onClick={() => setStatusOpen(v => !v)}
-                    title="Set presence status"
+                    className={'nav-user-btn' + (userMenuOpen ? ' open' : '')}
+                    onClick={() => setUserMenuOpen(v => !v)}
+                    aria-expanded={userMenuOpen}
                   >
-                    <PresenceDot status={myStatus} size={10} border="transparent" />
+                    <PresenceDot status={myStatus} size={9} border="transparent" />
+                    <span className="nav-username">{user.username}</span>
+                    <span className="nav-user-chevron">▾</span>
                   </button>
-                  {statusOpen && (
-                    <div className="nav-status-dropdown" onMouseLeave={() => setStatusOpen(false)}>
-                      {Object.entries(STATUS_LABELS).map(([s, label]) => (
-                        <button
-                          key={s}
-                          className={'nav-status-option' + (myStatus === s ? ' active' : '')}
-                          onClick={() => { setMyStatus(s); setStatusOpen(false); }}
-                        >
-                          <PresenceDot status={s === 'offline' ? null : s} size={9} border="transparent"
-                            style={{ background: s === 'offline' ? '#d1d5db' : undefined }} />
-                          {label}
-                        </button>
-                      ))}
+                  {userMenuOpen && (
+                    <div className="nav-user-dropdown">
+                      <div className="nav-user-dropdown-section">
+                        {Object.entries(STATUS_LABELS).map(([s, label]) => (
+                          <button
+                            key={s}
+                            className={'nav-status-option' + (myStatus === s ? ' active' : '')}
+                            onClick={() => setMyStatus(s)}
+                          >
+                            <PresenceDot
+                              status={s === 'offline' ? null : s}
+                              size={9}
+                              border="transparent"
+                              style={{ background: s === 'offline' ? '#d1d5db' : undefined }}
+                            />
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="nav-user-dropdown-divider" />
+                      <Link
+                        to={`/profile/${user.username}`}
+                        className="nav-user-dropdown-item"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        Profile
+                      </Link>
+                      <Link
+                        to="/settings"
+                        className="nav-user-dropdown-item"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        Settings
+                      </Link>
+                      <div className="nav-user-dropdown-divider" />
+                      <button
+                        className="nav-user-dropdown-item nav-user-dropdown-item--danger"
+                        onClick={handleLogout}
+                      >
+                        Sign Out
+                      </button>
                     </div>
                   )}
                 </div>
-                <Link to="/settings" className="btn btn-ghost btn-sm">Settings</Link>
-                <button className="btn btn-ghost btn-sm" onClick={logout}>Sign Out</button>
               </>
             ) : (
               <button className="btn btn-primary btn-sm" onClick={onAuthOpen}>Sign In</button>
             )}
           </div>
+
           {/* Mobile: auth in top nav */}
           <div className="nav-auth-mobile">
             {user ? (
@@ -204,20 +284,32 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
                     className={'me-sheet-status-btn' + (myStatus === s ? ' active' : '')}
                     onClick={() => setMyStatus(s)}
                   >
-                    <PresenceDot status={s === 'offline' ? null : s} size={8} border="transparent"
-                      style={{ background: s === 'offline' ? '#d1d5db' : undefined }} />
+                    <PresenceDot
+                      status={s === 'offline' ? null : s}
+                      size={8}
+                      border="transparent"
+                      style={{ background: s === 'offline' ? '#d1d5db' : undefined }}
+                    />
                     {label}
                   </button>
                 ))}
               </div>
             </div>
             <nav className="me-sheet-nav">
-              <button className="me-sheet-item" onClick={() => handleNavigate(`/profile/${user?.id}`)}>
+              <button className="me-sheet-item" onClick={() => handleNavigate(`/profile/${user?.username}`)}>
                 <span className="me-sheet-item-icon">⬡</span> My Profile
               </button>
               <button className="me-sheet-item" onClick={() => handleNavigate('/messages')}>
                 <span className="me-sheet-item-icon">✉</span> Messages
                 {unreadDMs > 0 && <span className="nav-unread-badge" style={{ marginLeft: '.5rem' }}>{unreadDMs}</span>}
+              </button>
+              <button className="me-sheet-item" onClick={() => { setMeOpen(false); onInviteOpen(); }}>
+                <span className="me-sheet-item-icon">+</span> Invite Someone
+              </button>
+
+              <div className="me-sheet-section-label">Explore</div>
+              <button className="me-sheet-item" onClick={() => handleNavigate('/businesses')}>
+                <span className="me-sheet-item-icon">🏢</span> Businesses
               </button>
               <button className="me-sheet-item" onClick={() => handleNavigate('/learn')}>
                 <span className="me-sheet-item-icon">📚</span> Learn
@@ -228,20 +320,20 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
               <button className="me-sheet-item" onClick={() => handleNavigate('/advocate')}>
                 <span className="me-sheet-item-icon">⚖</span> Advocate
               </button>
-              <button className="me-sheet-item" onClick={() => handleNavigate('/settings')}>
-                <span className="me-sheet-item-icon">⚙</span> Settings
+              <button className="me-sheet-item" onClick={() => handleNavigate('/legislature')}>
+                <span className="me-sheet-item-icon">🏛️</span> Legislature
               </button>
-              <button className="me-sheet-item" onClick={() => { setMeOpen(false); onInviteOpen(); }}>
-                <span className="me-sheet-item-icon">+</span> Invite Someone
+              <button className="me-sheet-item" onClick={() => handleNavigate('/merch')}>
+                <span className="me-sheet-item-icon">🛍</span> Merch
               </button>
               <a
-                className="me-sheet-item me-sheet-item--covenant"
-                href="https://unprecedentedtimes.org/the-mycelium-covenant"
+                className="me-sheet-item"
+                href="https://unprecedentedtimes.org"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setMeOpen(false)}
               >
-                <span className="me-sheet-item-icon">⬡</span> The Mycelium Covenant
+                <span className="me-sheet-item-icon">📰</span> Newsletter
               </a>
               <a
                 className="me-sheet-item"
@@ -252,6 +344,20 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
               >
                 <span className="me-sheet-item-icon">🔍</span> Lost &amp; Found
               </a>
+              <a
+                className="me-sheet-item me-sheet-item--covenant"
+                href="https://unprecedentedtimes.org/the-mycelium-covenant"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMeOpen(false)}
+              >
+                <span className="me-sheet-item-icon">⬡</span> The Mycelium Covenant
+              </a>
+
+              <div className="me-sheet-section-label">Account</div>
+              <button className="me-sheet-item" onClick={() => handleNavigate('/settings')}>
+                <span className="me-sheet-item-icon">⚙</span> Settings
+              </button>
               {isMod && (
                 <button className="me-sheet-item" onClick={() => handleNavigate('/admin')}>
                   <span className="me-sheet-item-icon">🛡</span> Admin
