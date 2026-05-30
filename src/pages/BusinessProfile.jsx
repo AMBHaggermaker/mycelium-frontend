@@ -89,6 +89,7 @@ export default function BusinessProfile() {
   const [pageSettings,  setPageSettings]  = useState({});
   const [editingPage,   setEditingPage]   = useState(false);
   const [savingPage,    setSavingPage]    = useState(false);
+  const [pageSaved,     setPageSaved]     = useState(false);
   const [bizBannerUrl,  setBizBannerUrl]  = useState(null);
   const [bannerUploading, setBannerUploading] = useState(false);
   const bannerFileRef = useRef(null);
@@ -127,9 +128,12 @@ export default function BusinessProfile() {
 
   async function saveBizPageSettings(updated) {
     setSavingPage(true);
+    setPageSaved(false);
     try {
       await api.saveBusinessPageSettings(id, updated, token);
-      setPageSettings(updated);
+      setPageSettings({ ...updated });
+      setPageSaved(true);
+      setTimeout(() => setPageSaved(false), 3000);
     } catch (e) { alert(e.message); }
     finally { setSavingPage(false); }
   }
@@ -336,13 +340,14 @@ export default function BusinessProfile() {
                 )}
               </div>
             </div>
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '.5rem' }}>
-              <button className="btn btn-primary btn-sm" disabled={savingPage}
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+              <button type="button" className="btn btn-primary btn-sm" disabled={savingPage}
                 style={{ background: 'var(--biz-accent,#00ff88)', color: '#071a0e', boxShadow: 'var(--biz-glow)' }}
                 onClick={() => saveBizPageSettings(pageSettings)}>
                 {savingPage ? 'Saving…' : 'Save Changes'}
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditingPage(false)}>Cancel</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingPage(false)}>Cancel</button>
+              {pageSaved && <span style={{ fontSize: '.85rem', color: 'var(--biz-accent,#00ff88)', fontWeight: 600 }}>✓ Saved</span>}
             </div>
           </div>
         )}

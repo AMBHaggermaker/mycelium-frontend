@@ -298,6 +298,19 @@ function UsersTab({ token }) {
     }
   }
 
+  async function grantMakerAccess(u, tier) {
+    if (!confirm(`Grant complimentary ${tier} maker access to @${u.username}? This bypasses payment and gives them immediate access.`)) return;
+    setActionId(u.id);
+    try {
+      await api.adminGrantMakerAccess(u.id, tier, token);
+      alert(`✓ @${u.username} now has ${tier} maker access.`);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionId(null);
+    }
+  }
+
   if (loading) return <div className="spinner" />;
   if (err) return <p className="error-msg">{err}</p>;
 
@@ -449,6 +462,7 @@ function UsersTab({ token }) {
               onClick={() => sendPasswordReset(u)}>
               {busy ? '…' : 'Reset PW'}
             </button>
+            <MakerGrantBtn u={u} busy={busy} onGrant={grantMakerAccess} />
             {canDelete ? (
               <button className="btn btn-sm btn-danger" disabled={busy}
                 style={{ fontSize: '.72rem' }}
@@ -1531,5 +1545,36 @@ function CopyrightClaimsTab({ token }) {
         </div>
       )}
     </div>
+  );
+}
+
+function MakerGrantBtn({ u, busy, onGrant }) {
+  const [open, setOpen] = useState(false);
+  const [tier, setTier] = useState('basic');
+  if (!open) {
+    return (
+      <button className="btn btn-sm btn-outline" disabled={busy}
+        style={{ fontSize: '.72rem', color: '#b388ff', borderColor: '#b388ff' }}
+        onClick={() => setOpen(true)}>
+        Maker ▸
+      </button>
+    );
+  }
+  return (
+    <span style={{ display: 'inline-flex', gap: '.2rem', alignItems: 'center' }}>
+      <select value={tier} onChange={e => setTier(e.target.value)}
+        style={{ fontSize: '.72rem', padding: '.15rem .25rem', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+        <option value="basic">Basic</option>
+        <option value="standard">Standard</option>
+        <option value="pro">Pro</option>
+      </select>
+      <button className="btn btn-sm" disabled={busy}
+        style={{ fontSize: '.72rem', background: '#b388ff', color: '#1a0033', padding: '.15rem .4rem' }}
+        onClick={() => { setOpen(false); onGrant(u, tier); }}>
+        Grant
+      </button>
+      <button className="btn btn-sm btn-ghost" style={{ fontSize: '.72rem', padding: '.15rem .25rem' }}
+        onClick={() => setOpen(false)}>✕</button>
+    </span>
   );
 }

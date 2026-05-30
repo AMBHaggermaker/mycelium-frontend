@@ -191,7 +191,8 @@ export default {
   adminMarkCovenantAgreed: (userId, token)           => patch(`/admin/users/${userId}/covenant-agreed`, {}, token),
   deleteUser:             (userId, token)   => patch(`/admin/users/${userId}/delete`, {}, token),
   restoreUser:            (userId, token)   => patch(`/admin/users/${userId}/restore`, {}, token),
-  adminSendPasswordReset: (userId, token)   => post(`/admin/users/${userId}/send-password-reset`, {}, token),
+  adminSendPasswordReset:  (userId, token)        => post(`/admin/users/${userId}/send-password-reset`, {}, token),
+  adminGrantMakerAccess:   (userId, tier, token)  => post(`/admin/users/${userId}/maker-access`, { tier }, token),
 
   // Admin chat-room management
   getAdminChatRooms:    (token)              => get('/admin/chat-rooms', token),
