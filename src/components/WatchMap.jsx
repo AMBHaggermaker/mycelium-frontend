@@ -22,6 +22,15 @@ const SEV_COLORS = {
   monitoring: '#6b7280',
 };
 
+// Atmospheric classification pin colors
+const ATMOS_CLASS_COLORS = {
+  explained:    '#22c55e',   // green
+  partial:      '#eab308',   // yellow
+  unexplained:  '#f97316',   // orange
+  unidentified: '#ef4444',   // red (pulsing)
+  pending:      '#9ca3af',   // gray
+};
+
 // Dashboard icons (emoji fallback)
 const DASH_ICONS = {
   infrastructure: '🏗️',
@@ -103,6 +112,35 @@ function buildPopupHtml(report, dashboard) {
     </div>`;
 }
 
+function buildAtmosPopupHtml(obs) {
+  const classColors = {
+    explained:    { color: '#15803d', bg: '#dcfce7', label: 'EXPLAINED' },
+    partial:      { color: '#854d0e', bg: '#fef9c3', label: 'PARTIAL' },
+    unexplained:  { color: '#c2410c', bg: '#fff7ed', label: 'UNEXPLAINED' },
+    unidentified: { color: '#991b1b', bg: '#fee2e2', label: 'UNIDENTIFIED' },
+    pending:      { color: '#6b7280', bg: '#f3f4f6', label: 'PENDING' },
+  };
+  const sevColors = { critical: '#dc2626', serious: '#ea580c', moderate: '#ca8a04', minor: '#2563eb', monitoring: '#6b7280' };
+  const cs = classColors[obs.classification] || classColors.pending;
+  const sc = sevColors[obs.severity] || '#6b7280';
+  const date = formatDate(obs.created_at);
+  return `
+    <div style="min-width:210px;max-width:290px;font-family:system-ui,sans-serif;font-size:.82rem;">
+      <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;margin-bottom:.35rem;">
+        <span style="padding:.1rem .45rem;border-radius:99px;background:${cs.bg};color:${cs.color};font-weight:700;font-size:.68rem;border:1px solid ${cs.color}44;text-transform:uppercase;letter-spacing:.05em;">${cs.label}</span>
+        <span style="padding:.1rem .4rem;border-radius:99px;background:${sc}22;color:${sc};font-weight:700;font-size:.68rem;border:1px solid ${sc}44;text-transform:uppercase;">${obs.severity || ''}</span>
+      </div>
+      <div style="font-weight:600;color:#1a1a1a;margin-bottom:.25rem;line-height:1.35;">${obs.title}</div>
+      ${obs.location_label ? `<div style="font-size:.76rem;color:#888;margin-bottom:.15rem;">📍 ${obs.location_label}</div>` : ''}
+      ${obs.estimated_altitude ? `<div style="font-size:.76rem;color:#666;margin-bottom:.1rem;">✈ Alt: ${obs.estimated_altitude}</div>` : ''}
+      ${obs.wind_direction ? `<div style="font-size:.76rem;color:#666;margin-bottom:.1rem;">🌬 Wind from ${obs.wind_direction}</div>` : ''}
+      <div style="font-size:.73rem;color:#999;margin-bottom:.35rem;">${obs.username ? `by ${obs.username} · ` : ''}${date}</div>
+      <a href="/watch?tab=atmospheric_observations" style="display:block;text-align:center;padding:.28rem .5rem;background:#2a7a2a;color:#fff;border-radius:4px;font-weight:600;font-size:.77rem;text-decoration:none;">
+        View Report →
+      </a>
+    </div>`;
+}
+
 export default function WatchMap({
   reports = [],
   dashboard = null,          // null = all dashboards (overview mode)
@@ -157,9 +195,16 @@ export default function WatchMap({
     });
 
     visible.forEach(r => {
-      const color   = SEV_COLORS[r.severity] || '#6b7280';
-      const isPulse = r.severity === 'critical';
       const dash    = r.dashboard_type || dashboard;
+      const isAtmos = dash === 'atmospheric_observations';
+
+      // Pin color: classification-based for atmos, severity-based otherwise
+      const color   = isAtmos
+        ? (ATMOS_CLASS_COLORS[r.classification] || '#9ca3af')
+        : (SEV_COLORS[r.severity] || '#6b7280');
+      const isPulse = isAtmos
+        ? r.classification === 'unidentified'
+        : r.severity === 'critical';
 
       // Choose icon based on dashboard type
       let icon;
@@ -177,11 +222,12 @@ export default function WatchMap({
       if (onPinClick) {
         marker.on('click', () => onPinClick(r));
       } else {
-        marker.bindPopup(buildPopupHtml(r, dash), { maxWidth: 290 });
+        const popup = isAtmos ? buildAtmosPopupHtml(r) : buildPopupHtml(r, dash);
+        marker.bindPopup(popup, { maxWidth: 300 });
       }
 
       // Atmospheric drift cone
-      if (dash === 'atmospheric_observations' && r.wind_direction) {
+      if (isAtmos && r.wind_direction) {
         const cone = buildDriftCone(r);
         if (cone) cone.addTo(markersRef.current);
       }
@@ -288,12 +334,20 @@ export default function WatchMap({
 
         {/* Legend */}
         <div className="watch-map-legend">
-          {Object.entries(SEV_COLORS).map(([sev, color]) => (
-            <div key={sev} className="watch-map-legend-item">
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
-              <span>{sev}</span>
-            </div>
-          ))}
+          {dashboard === 'atmospheric_observations'
+            ? Object.entries(ATMOS_CLASS_COLORS).map(([cls, color]) => (
+                <div key={cls} className="watch-map-legend-item">
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ textTransform: 'capitalize' }}>{cls}</span>
+                </div>
+              ))
+            : Object.entries(SEV_COLORS).map(([sev, color]) => (
+                <div key={sev} className="watch-map-legend-item">
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                  <span>{sev}</span>
+                </div>
+              ))
+          }
         </div>
       </div>
 

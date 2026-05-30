@@ -2478,6 +2478,7 @@ function AtmosphericDashboard({ dashboard, onRequireAuth, highlightedIds }) {
   const [loading,      setLoading]      = useState(true);
   const [showForm,     setShowForm]     = useState(false);
   const [filterClass,  setFilterClass]  = useState('');
+  const [viewMode,     setViewMode]     = useState('list');
 
   useEffect(() => {
     const params = {};
@@ -2516,11 +2517,25 @@ function AtmosphericDashboard({ dashboard, onRequireAuth, highlightedIds }) {
         <p className="watch-dashboard-desc">{dashboard.description}</p>
         <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <button className="btn btn-primary" onClick={() => { if (!user) { onRequireAuth?.(); return; } setShowForm(true); }}>+ Submit Observation</button>
+          <div className="watch-view-toggle">
+            <button className={`watch-view-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')}>☰ List</button>
+            <button className={`watch-view-btn${viewMode === 'map'  ? ' active' : ''}`} onClick={() => setViewMode('map')}>🗺 Map</button>
+          </div>
           <p style={{ fontSize: '.78rem', color: 'var(--muted)', margin: 0 }}>Submissions are automatically cross-referenced with OpenSky Network flight data and NOAA weather conditions.</p>
         </div>
       </div>
 
       <WeatherModPermitsPanel isAdmin={isAdmin} token={token} />
+
+      {viewMode === 'map' && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <WatchMap
+            reports={observations.filter(o => o.location_lat && o.location_lng)}
+            dashboard="atmospheric_observations"
+            height="500px"
+          />
+        </div>
+      )}
 
       <div className="atmos-section">
         <div className="atmos-section-header" style={{ marginBottom: '.75rem' }}>
