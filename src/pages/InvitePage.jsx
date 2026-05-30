@@ -181,11 +181,12 @@ function InviteRegisterForm({ inviteToken, inviterName, lockedEmail }) {
 
   // form state
   const [form, setForm] = useState({
-    username:  '',
-    password:  '',
-    location:  '',
-    how_found: 'invited',
-    covenant:  false,
+    username:      '',
+    password:      '',
+    location:      '',
+    how_found:     'invited',
+    covenant:      false,
+    age_confirmed: false,
     // login mode
     loginEmail: lockedEmail || '',
     loginPw:    '',
@@ -215,16 +216,19 @@ function InviteRegisterForm({ inviteToken, inviterName, lockedEmail }) {
 
   async function submitRegister(e) {
     e.preventDefault();
+    if (!form.age_confirmed) { setErr('You must confirm you are 18 or older to join.'); return; }
     if (!form.covenant) { setErr('You must agree to The Mycelium Covenant to join.'); return; }
     setBusy(true); setErr(null);
     try {
       const res = await api.register({
-        username:     form.username.trim(),
-        email:        lockedEmail,
-        password:     form.password,
-        location:     form.location.trim(),
-        how_found:    form.how_found,
-        invite_token: inviteToken,
+        username:        form.username.trim(),
+        email:           lockedEmail,
+        password:        form.password,
+        location:        form.location.trim(),
+        how_found:       form.how_found,
+        invite_token:    inviteToken,
+        age_18_or_older: true,
+        covenant_agreed: true,
       });
       login(res.token, res.user);
       setDone(true);
@@ -452,6 +456,11 @@ function InviteRegisterForm({ inviteToken, inviterName, lockedEmail }) {
                 value={form.password} onChange={e => set('password', e.target.value)}
                 autoComplete="new-password" placeholder="At least 8 characters" />
             </div>
+
+            <label className="invite-covenant-check">
+              <input type="checkbox" checked={form.age_confirmed} onChange={e => set('age_confirmed', e.target.checked)} />
+              {' '}I confirm I am 18 years of age or older
+            </label>
 
             <label className="invite-covenant-check">
               <input type="checkbox" checked={form.covenant} onChange={e => set('covenant', e.target.checked)} />
