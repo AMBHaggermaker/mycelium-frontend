@@ -167,10 +167,10 @@ export default function Feed({ onRequireAuth }) {
         {!donateDismissed && (
           <div className="donate-banner">
             <div className="donate-banner-body">
-              <span className="donate-banner-icon">💛</span>
+              <span className="donate-banner-icon">♥</span>
               <div className="donate-banner-text">
                 <strong>Support Mycelium</strong>
-                <span className="donate-banner-sub"> — Keep this platform free for the community</span>
+                <span className="donate-banner-sub"> — Keep this platform free and sovereign</span>
               </div>
               <DonateButton className="btn btn-sm btn-primary donate-banner-btn" label="Donate" />
               <button

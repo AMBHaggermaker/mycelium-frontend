@@ -5196,24 +5196,27 @@ a { color: inherit; text-decoration: none; }
 
 /* ── Donate Banner (Feed) ──────────────────────────────────── */
 .donate-banner {
-  background: linear-gradient(135deg, #fffbeb 0%, #fef9e7 100%);
-  border: 1px solid #fbbf24;
+  background: linear-gradient(135deg, #1d1d38 0%, var(--card) 100%);
+  border: 1px solid rgba(0,255,136,0.25);
   border-radius: var(--radius);
-  padding: .6rem 1rem;
+  padding: .65rem 1rem;
   margin-bottom: .75rem;
+  box-shadow: 0 0 16px rgba(0,255,136,0.1), var(--shadow);
 }
 .donate-banner-body {
   display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
 }
-.donate-banner-icon { font-size: 1.15rem; flex-shrink: 0; }
+.donate-banner-icon { font-size: 1.1rem; flex-shrink: 0; color: var(--green); filter: drop-shadow(0 0 6px rgba(0,255,136,0.5)); }
 .donate-banner-text { flex: 1; font-size: .875rem; color: var(--text); min-width: 180px; }
+.donate-banner-text strong { color: var(--text); }
 .donate-banner-sub { color: var(--muted); }
 .donate-banner-btn { flex-shrink: 0; }
 .donate-banner-dismiss {
   background: none; border: none; cursor: pointer; color: var(--muted);
-  font-size: 1rem; padding: .2rem .3rem; line-height: 1; border-radius: 4px; margin-left: auto;
+  font-size: .85rem; padding: .2rem .35rem; line-height: 1; border-radius: 4px;
+  opacity: .5; transition: opacity var(--transition);
 }
-.donate-banner-dismiss:hover { color: var(--text); }
+.donate-banner-dismiss:hover { opacity: 1; color: var(--text); }
 
 /* ── Donate Modal ───────────────────────────────────────────── */
 .donate-overlay {
@@ -6202,8 +6205,26 @@ html { scroll-padding-top: var(--nav-h); }
 
 /* Nav More dropdown */
 .nav-more-wrap { position: relative; }
-.nav-more-btn { display: flex; align-items: center; gap: .2rem; white-space: nowrap; }
-.nav-more-chevron { font-size: .7rem; opacity: .7; }
+.nav-more-btn {
+  display: flex; align-items: center; gap: .2rem; white-space: nowrap;
+  background: var(--green-bg) !important;
+  border: 1px solid rgba(0,255,136,0.35) !important;
+  color: var(--green) !important;
+  box-shadow: 0 0 8px rgba(0,255,136,0.2), inset 0 0 8px rgba(0,255,136,0.04);
+  text-shadow: 0 0 8px rgba(0,255,136,0.4);
+}
+.nav-more-btn:hover {
+  background: rgba(0,255,136,0.18) !important;
+  border-color: var(--green) !important;
+  box-shadow: 0 0 16px rgba(0,255,136,0.45), inset 0 0 12px rgba(0,255,136,0.08) !important;
+  text-shadow: 0 0 12px rgba(0,255,136,0.7);
+}
+.nav-more-btn.active {
+  background: rgba(0,255,136,0.18) !important;
+  border-color: var(--green) !important;
+  box-shadow: 0 0 16px rgba(0,255,136,0.45) !important;
+}
+.nav-more-chevron { font-size: .7rem; opacity: .8; }
 .nav-more-dropdown {
   position: absolute; top: calc(100% + 6px); left: 0;
   background: var(--card); border: 1px solid var(--border);
