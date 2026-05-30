@@ -148,6 +148,33 @@ function ModerationQueue({ token }) {
   );
 }
 
+function CopyEmail({ email }) {
+  const [copied, setCopied] = useState(false);
+  async function doCopy(e) {
+    e.stopPropagation();
+    try { await navigator.clipboard.writeText(email); } catch { return; }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '.3rem', marginTop: '.15rem' }}>
+      <span style={{ fontSize: '.72rem', color: 'var(--muted)', fontWeight: 400, fontFamily: 'monospace' }}>{email}</span>
+      <button
+        onClick={doCopy}
+        style={{
+          background: 'none', border: '1px solid var(--border)', cursor: 'pointer',
+          padding: '1px 5px', borderRadius: 4, fontSize: '.62rem',
+          color: copied ? 'var(--green)' : 'var(--muted)', transition: 'color .15s',
+          lineHeight: 1.4,
+        }}
+        title={copied ? 'Copied!' : 'Copy email'}
+      >
+        {copied ? '✓ copied' : 'copy'}
+      </button>
+    </div>
+  );
+}
+
 function UsersTab({ token }) {
   const { user: me } = useAuth();
   const [users,        setUsers]       = useState([]);
@@ -309,9 +336,10 @@ function UsersTab({ token }) {
         borderBottom: '1px solid var(--border)',
         background: isSelected ? 'var(--surface)' : undefined,
       }}>
-        {/* Username + badges */}
+        {/* Username + email + badges */}
         <td style={{ padding: '.5rem .75rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
           <span>{u.username}</span>
+          {me?.role === 'admin' && u.email && <CopyEmail email={u.email} />}
           <div style={{ display: 'flex', gap: '.25rem', flexWrap: 'wrap', marginTop: '.2rem' }}>
             {u.founding_member
               ? <BadgeSmall color="var(--green)" bg="var(--green-bg)" border="var(--green)">⬡ Founding</BadgeSmall>
