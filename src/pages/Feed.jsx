@@ -8,6 +8,7 @@ import NewPostModal from '../components/NewPostModal';
 import UrgentStrip from '../components/UrgentStrip';
 import DonateButton from '../components/DonateButton';
 import { getSocket } from '../socket';
+import WhyThisWorks from '../components/WhyThisWorks';
 
 const FEED_TABS = [
   { value: '',          label: 'All',               desc: 'Everything from the community' },
@@ -184,6 +185,11 @@ export default function Feed({ onRequireAuth }) {
             </div>
           </div>
         )}
+
+        {/* Why no likes */}
+        <WhyThisWorks id="feed-no-likes">
+          Because we want dialogue, not dopamine. A reply requires a thought. A like requires nothing and tells you nothing.
+        </WhyThisWorks>
 
         {/* Feed sub-tabs */}
         <div className="feed-subtabs">

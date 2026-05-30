@@ -301,7 +301,7 @@ export default function Profile() {
         {/* Header row */}
         <div className="profile-header-row">
           <div style={{ position: 'relative' }}>
-            <AvatarBlock user={u} isOwn={isOwn} token={token}
+            <AvatarBlock user={u} isOwn={isOwn} token={token} showHint={showEditor}
               onUpdated={url => setData(d => ({ ...d, user: { ...d.user, avatar_url: url } }))} />
             {u.mood_emoji && <span className="profile-mood-emoji-badge" title={u.mood}>{u.mood_emoji}</span>}
           </div>
@@ -1507,7 +1507,7 @@ function MyBusinessesBoard({ user: u, isOwn, token }) {
 
 // ── Avatar Block ──────────────────────────────────────────────────────────────
 
-function AvatarBlock({ user: u, isOwn, token, onUpdated }) {
+function AvatarBlock({ user: u, isOwn, token, onUpdated, showHint }) {
   const [uploading, setUploading] = useState(false);
 
   async function handleFile(blob, filename) {
@@ -1530,7 +1530,7 @@ function AvatarBlock({ user: u, isOwn, token, onUpdated }) {
             targetWidth={400}
             targetHeight={400}
             label={uploading ? '…' : '📷'}
-            hint="400×400px square, displays as circle"
+            hint={showHint ? '400×400px square, displays as circle' : undefined}
             onFile={handleFile}
             disabled={uploading}
             btnClassName="profile-avatar-edit-btn"
@@ -1809,6 +1809,15 @@ const COMMUNITY_BADGES = [
 
 function StickerLayer({ stickers, isEditMode, onUpdate, onSave, accentColor }) {
   const layerRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler, { passive: true });
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
+  const scale = isMobile ? 0.6 : 1;
 
   if (!stickers.length && !isEditMode) return null;
 
@@ -1817,13 +1826,13 @@ function StickerLayer({ stickers, isEditMode, onUpdate, onSave, accentColor }) {
       {stickers.map(s => (
         <StickerItem key={s.id} sticker={s} isEditMode={isEditMode} layerRef={layerRef}
           onUpdate={(id, changes) => onUpdate(id, changes)}
-          onSave={onSave} accentColor={accentColor} />
+          onSave={onSave} accentColor={accentColor} scale={scale} />
       ))}
     </div>
   );
 }
 
-function StickerItem({ sticker: s, isEditMode, layerRef, onUpdate, onSave, accentColor }) {
+function StickerItem({ sticker: s, isEditMode, layerRef, onUpdate, onSave, accentColor, scale = 1 }) {
   const moveDrag = useRef(null);
   const resizeDrag = useRef(null);
   const rotateDrag = useRef(null);
@@ -1874,7 +1883,7 @@ function StickerItem({ sticker: s, isEditMode, layerRef, onUpdate, onSave, accen
   }
   function onRotateUp() { if (rotateDrag.current) { rotateDrag.current = null; onSave(); } }
 
-  const sz = s.size || 60;
+  const sz = Math.max(20, Math.min(300, s.size || 60)) * scale;
   const style = {
     position: 'absolute',
     left: `${s.x_percent}%`,

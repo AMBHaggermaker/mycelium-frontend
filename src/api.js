@@ -461,6 +461,26 @@ export default {
       body: JSON.stringify(prefs),
     }).then(r => r.json()),
 
+  saveMakerPageSettings: (username, settings, token) =>
+    patch(`/makers/${encodeURIComponent(username)}/page-settings`, settings, token),
+
+  uploadMakerBanner: (username, file, token) => {
+    const fd = new FormData(); fd.append('banner', file);
+    return fetch(`${BASE}/makers/${encodeURIComponent(username)}/banner`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
+    }).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Upload failed'); return d; });
+  },
+
+  saveBusinessPageSettings: (id, settings, token) =>
+    patch(`/businesses/${id}/page-settings`, settings, token),
+
+  uploadBusinessBanner: (id, file, token) => {
+    const fd = new FormData(); fd.append('banner', file);
+    return fetch(`${BASE}/businesses/${id}/banner`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
+    }).then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Upload failed'); return d; });
+  },
+
   uploadMakerWork: (formData, token, onProgress) => {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();

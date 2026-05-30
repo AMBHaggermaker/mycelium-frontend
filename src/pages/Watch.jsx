@@ -4,6 +4,7 @@ import { useAuth } from '../auth';
 import api from '../api';
 import WatchMap, { AnomalyMap } from '../components/WatchMap';
 import ImageCropUploader from '../components/ImageCropUploader';
+import WhyThisWorks from '../components/WhyThisWorks';
 
 const VALID_TABS = ['overview','infrastructure','environment','housing','health','watershed','food','surveillance','civic','land_development','atmospheric_observations','anomalies'];
 
@@ -202,6 +203,10 @@ export default function Watch({ onRequireAuth }) {
             <p className="page-subtitle">Community intelligence — document, report, and monitor what matters</p>
           </div>
         </div>
+
+        <WhyThisWorks id="watch-community-reports">
+          Because the people closest to a problem see it first. Institutions report what they are required to report. Communities report what they actually experience.
+        </WhyThisWorks>
 
         <div className="watch-tab-row">
           <button

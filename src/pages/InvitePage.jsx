@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 import PasswordInput from '../components/PasswordInput';
+import WhyThisWorks from '../components/WhyThisWorks';
 
 const BASE_URL = 'https://mycelium.unprecedentedtimes.org';
 
@@ -129,6 +130,11 @@ export default function InvitePage() {
             <p className="invite-personal-note-body">"{invite.personal_note}"</p>
           </div>
         )}
+
+        {/* Why invite only */}
+        <WhyThisWorks id="invite-why-only">
+          Because anonymous platforms become what anonymous people do to each other. Real identity and human vouching changes what people are willing to say and do.
+        </WhyThisWorks>
 
         {/* About blurb */}
         <div className="invite-about">

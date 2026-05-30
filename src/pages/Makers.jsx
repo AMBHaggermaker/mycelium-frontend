@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
+import WhyThisWorks from '../components/WhyThisWorks';
 
 const CATEGORIES = [
   'Music', 'Visual Art', 'Handmade Goods', 'Writing',
@@ -63,6 +64,12 @@ export default function Makers({ onRequireAuth }) {
             <Link to="/makers/upload" className="btn btn-outline">Upload Work</Link>
           )}
         </div>
+      </div>
+
+      <div style={{ padding: '0 1rem' }}>
+        <WhyThisWorks id="makers-metrics">
+          These numbers show what actually matters to you as a creator — not what keeps you posting more. We show plays, completions, return listeners, and commissions. We never show how you compare to others or how to game an algorithm.
+        </WhyThisWorks>
       </div>
 
       {/* Category filters */}

@@ -4,6 +4,46 @@ import { useAuth } from '../auth';
 import api from '../api';
 import ImageCropUploader from '../components/ImageCropUploader';
 
+const PATTERN_SCALE_PX = { small: 16, medium: 32, large: 64 };
+function getPatternCSS(type, c1, c2, scale) {
+  const sz = PATTERN_SCALE_PX[scale] || 32;
+  const a = c1 || '#1a1a2e', b = c2 || '#0d0d1a';
+  switch (type) {
+    case 'diagonal_stripes': return { background: `repeating-linear-gradient(45deg, ${a}, ${a} ${sz/4}px, ${b} ${sz/4}px, ${b} ${sz/2}px)` };
+    case 'horizontal_stripes': return { background: `repeating-linear-gradient(0deg, ${a}, ${a} ${sz/2}px, ${b} ${sz/2}px, ${b} ${sz}px)` };
+    case 'grid': return { background: b, backgroundImage: `linear-gradient(${a} 1px, transparent 1px), linear-gradient(90deg, ${a} 1px, transparent 1px)`, backgroundSize: `${sz}px ${sz}px` };
+    case 'dots': return { background: b, backgroundImage: `radial-gradient(circle, ${a} ${sz/8}px, transparent ${sz/8}px)`, backgroundSize: `${sz}px ${sz}px` };
+    case 'checkerboard': return { background: b, backgroundImage: `repeating-conic-gradient(${a} 0% 25%, ${b} 0% 50%)`, backgroundSize: `${sz}px ${sz}px` };
+    case 'zigzag': return { backgroundColor: b, backgroundImage: `linear-gradient(135deg, ${a} 25%, transparent 25%) -${sz/2}px 0, linear-gradient(225deg, ${a} 25%, transparent 25%) -${sz/2}px 0, linear-gradient(315deg, ${a} 25%, transparent 25%), linear-gradient(45deg, ${a} 25%, transparent 25%)`, backgroundSize: `${sz}px ${sz}px` };
+    case 'diamonds': return { backgroundColor: b, backgroundImage: `linear-gradient(45deg, ${a} 25%, transparent 25%), linear-gradient(-45deg, ${a} 25%, transparent 25%), linear-gradient(45deg, transparent 75%, ${a} 75%), linear-gradient(-45deg, transparent 75%, ${a} 75%)`, backgroundSize: `${sz}px ${sz}px`, backgroundPosition: `0 0, 0 ${sz/2}px, ${sz/2}px -${sz/2}px, -${sz/2}px 0px` };
+    default: return { backgroundColor: a };
+  }
+}
+
+const BIZ_FONT_STYLES = [
+  { value: 'mystical',   label: 'Mystical',   css: "'Cinzel Decorative', cursive" },
+  { value: 'modern',     label: 'Modern',     css: "-apple-system, 'Segoe UI', sans-serif" },
+  { value: 'classic',    label: 'Classic',    css: "'Georgia', serif" },
+  { value: 'typewriter', label: 'Typewriter', css: "'Courier New', monospace" },
+];
+const BIZ_PATTERN_TYPES = [
+  { value: 'solid', label: 'Solid' }, { value: 'diagonal_stripes', label: 'Stripes' },
+  { value: 'grid', label: 'Grid' }, { value: 'dots', label: 'Dots' },
+  { value: 'checkerboard', label: 'Checkerboard' }, { value: 'zigzag', label: 'Zigzag' }, { value: 'diamonds', label: 'Diamonds' },
+];
+function buildBizPageStyle(settings) {
+  const accent = settings.accent || '#00ff88';
+  const style = { '--biz-accent': accent, '--biz-glow': `0 0 12px ${accent}55` };
+  const fontEntry = BIZ_FONT_STYLES.find(f => f.value === settings.font);
+  if (fontEntry) style['--biz-font'] = fontEntry.css;
+  if (settings.pattern_type && settings.pattern_type !== 'solid') {
+    Object.assign(style, getPatternCSS(settings.pattern_type, settings.pattern_color_primary, settings.pattern_color_secondary, settings.pattern_scale || 'medium'));
+  } else if (settings.background_color) {
+    style.backgroundColor = settings.background_color;
+  }
+  return style;
+}
+
 const BIZ_TYPE_LABELS = {
   independently_owned:    'Independently Owned',
   locally_owned_franchise:'Locally Owned Franchise',
@@ -46,10 +86,21 @@ export default function BusinessProfile() {
   const [reported,    setReported]    = useState(false);
   const [deactivating,setDeactivating]= useState(false);
   const [deactivateConfirm, setDeactivateConfirm] = useState('');
+  const [pageSettings,  setPageSettings]  = useState({});
+  const [editingPage,   setEditingPage]   = useState(false);
+  const [savingPage,    setSavingPage]    = useState(false);
+  const [bizBannerUrl,  setBizBannerUrl]  = useState(null);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const bannerFileRef = useRef(null);
 
   useEffect(() => {
     Promise.all([api.getBusiness(id), api.getBusinessRecommendations(id)])
-      .then(([b, r]) => { setBiz(b); setRecs(r); })
+      .then(([b, r]) => {
+        setBiz(b);
+        setRecs(r);
+        setPageSettings(b.page_settings || {});
+        setBizBannerUrl(b.banner_url || null);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id]);
@@ -72,6 +123,27 @@ export default function BusinessProfile() {
   const isOwner = user?.id === biz.owner_id;
   const isAdmin = user?.role === 'admin' || user?.role === 'moderator';
   const cover   = biz.photos.find(p => p.is_cover) || biz.photos[0];
+  const bizPageStyle = buildBizPageStyle(pageSettings);
+
+  async function saveBizPageSettings(updated) {
+    setSavingPage(true);
+    try {
+      await api.saveBusinessPageSettings(id, updated, token);
+      setPageSettings(updated);
+    } catch (e) { alert(e.message); }
+    finally { setSavingPage(false); }
+  }
+
+  async function handleBizBannerFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBannerUploading(true);
+    try {
+      const res = await api.uploadBusinessBanner(id, file, token);
+      setBizBannerUrl(res.banner_url);
+    } catch (e) { alert(e.message); }
+    finally { setBannerUploading(false); e.target.value = ''; }
+  }
 
   async function submitRecommendation(e) {
     e.preventDefault();
@@ -120,13 +192,25 @@ export default function BusinessProfile() {
   const HOURS_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
   return (
-    <div className="page biz-profile-page">
+    <div className="page biz-profile-page" style={bizPageStyle}>
+      <input ref={bannerFileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={handleBizBannerFile} />
       {!biz.is_active && (
         <div style={{ background: 'var(--red-bg,#fef2f2)', borderBottom: '2px solid var(--red,#dc2626)', padding: '.75rem 1rem', textAlign: 'center', fontSize: '.9rem', fontWeight: 600, color: 'var(--red,#dc2626)' }}>
           This business is no longer active.
         </div>
       )}
-      {/* Cover banner */}
+      {/* Branded banner (from page settings) */}
+      {bizBannerUrl && (
+        <div className="biz-brand-banner" style={{ backgroundImage: `url(${bizBannerUrl})` }}>
+          {isOwner && (
+            <button className="maker-banner-change-btn" onClick={() => bannerFileRef.current?.click()}>
+              {bannerUploading ? '…' : '📷 Change Banner'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Cover banner (from photo gallery) */}
       <div className="biz-cover-banner" style={cover ? { backgroundImage: `url(${resolveUrl(cover.url)})` } : {}}>
         {!cover && <div className="biz-cover-placeholder">{biz.business_name[0].toUpperCase()}</div>}
         {isOwner && (
@@ -162,6 +246,12 @@ export default function BusinessProfile() {
           </div>
           <div className="biz-profile-actions">
             {isOwner && biz.is_active && <button className="btn btn-outline btn-sm" onClick={() => setEditing(true)}>Edit</button>}
+            {isOwner && biz.is_active && (
+              <button className="btn btn-sm" style={{ background: 'var(--biz-accent,#00ff88)', color: '#071a0e', boxShadow: 'var(--biz-glow)' }}
+                onClick={() => setEditingPage(p => !p)}>
+                {editingPage ? '✕ Done' : '✏ Edit Page'}
+              </button>
+            )}
             {isAdmin && biz.is_active && (
               <button className={`btn btn-sm ${biz.is_verified_local ? 'btn-outline' : 'btn-primary'}`} onClick={toggleVerify}>
                 {biz.is_verified_local ? 'Revoke Verification' : '✓ Verify Local'}
@@ -181,6 +271,81 @@ export default function BusinessProfile() {
             )}
           </div>
         </div>
+
+        {/* Page customization panel */}
+        {isOwner && editingPage && (
+          <div className="page-editor-panel maker-page-editor" style={{ marginBottom: '1.5rem' }}>
+            <h3 className="page-editor-title">✏ Customize Business Page</h3>
+            <div className="page-editor-grid">
+              <div className="page-editor-section">
+                <label className="page-editor-label">Banner Image</label>
+                <p className="page-editor-hint">1200×400px, 3:1 ratio</p>
+                <button className="btn btn-outline btn-sm" onClick={() => bannerFileRef.current?.click()}>
+                  {bannerUploading ? 'Uploading…' : bizBannerUrl ? 'Change Banner' : 'Upload Banner'}
+                </button>
+              </div>
+              <div className="page-editor-section">
+                <label className="page-editor-label">Accent Color</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                  <input type="color" value={pageSettings.accent || '#00ff88'}
+                    onChange={e => setPageSettings(s => ({ ...s, accent: e.target.value }))}
+                    style={{ width: 40, height: 32, cursor: 'pointer', border: 'none', background: 'none' }} />
+                  <span style={{ fontSize: '.8rem', color: 'var(--muted)' }}>{pageSettings.accent || '#00ff88'}</span>
+                </div>
+              </div>
+              <div className="page-editor-section">
+                <label className="page-editor-label">Heading Font</label>
+                <div className="page-editor-font-pills">
+                  {BIZ_FONT_STYLES.map(f => (
+                    <button key={f.value}
+                      className={'page-editor-pill' + (pageSettings.font === f.value ? ' active' : '')}
+                      onClick={() => setPageSettings(s => ({ ...s, font: f.value }))}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="page-editor-section">
+                <label className="page-editor-label">Background</label>
+                <div className="page-editor-font-pills">
+                  {BIZ_PATTERN_TYPES.map(p => (
+                    <button key={p.value}
+                      className={'page-editor-pill' + ((pageSettings.pattern_type || 'solid') === p.value ? ' active' : '')}
+                      onClick={() => setPageSettings(s => ({ ...s, pattern_type: p.value }))}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                {pageSettings.pattern_type && pageSettings.pattern_type !== 'solid' ? (
+                  <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem', alignItems: 'center' }}>
+                    <label className="page-editor-label" style={{ marginBottom: 0 }}>Colors:</label>
+                    <input type="color" value={pageSettings.pattern_color_primary || '#1a1a2e'}
+                      onChange={e => setPageSettings(s => ({ ...s, pattern_color_primary: e.target.value }))}
+                      style={{ width: 32, height: 28, cursor: 'pointer', border: 'none', background: 'none' }} />
+                    <input type="color" value={pageSettings.pattern_color_secondary || '#0d0d1a'}
+                      onChange={e => setPageSettings(s => ({ ...s, pattern_color_secondary: e.target.value }))}
+                      style={{ width: 32, height: 28, cursor: 'pointer', border: 'none', background: 'none' }} />
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem', alignItems: 'center' }}>
+                    <label className="page-editor-label" style={{ marginBottom: 0 }}>Color:</label>
+                    <input type="color" value={pageSettings.background_color || '#0d0d1a'}
+                      onChange={e => setPageSettings(s => ({ ...s, background_color: e.target.value }))}
+                      style={{ width: 32, height: 28, cursor: 'pointer', border: 'none', background: 'none' }} />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '.5rem' }}>
+              <button className="btn btn-primary btn-sm" disabled={savingPage}
+                style={{ background: 'var(--biz-accent,#00ff88)', color: '#071a0e', boxShadow: 'var(--biz-glow)' }}
+                onClick={() => saveBizPageSettings(pageSettings)}>
+                {savingPage ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditingPage(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="tab-bar" style={{ marginBottom: '1.5rem' }}>

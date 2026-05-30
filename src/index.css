@@ -6504,3 +6504,150 @@ body.reduce-motion *::after { animation: none !important; transition: none !impo
 /* ── Nav user dropdown → Theme Settings link ─────────── */
 .nav-user-dropdown-item--theme { color: var(--green); }
 .nav-user-dropdown-item--theme:hover { background: var(--green-bg); color: var(--green); }
+
+/* ── WhyThisWorks transparency panels ──────────────────── */
+.why-panel {
+  border: 1px solid rgba(0,255,136,0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(0,255,136,0.04);
+  box-shadow: 0 0 8px rgba(0,255,136,0.08);
+  margin: .75rem 0;
+  overflow: hidden;
+}
+.why-panel-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .6rem .9rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--green);
+  font-size: .8rem;
+  text-align: left;
+}
+.why-panel-btn:hover { background: rgba(0,255,136,0.06); }
+.why-panel-title {
+  font-family: var(--font-heading, 'Cinzel Decorative', cursive);
+  font-size: .75rem;
+  letter-spacing: .04em;
+  flex: 1;
+}
+.why-panel-chevron { font-size: .65rem; color: var(--muted); margin-left: auto; }
+.why-panel-body {
+  padding: .6rem .9rem .75rem;
+  font-size: .83rem;
+  color: var(--muted);
+  line-height: 1.6;
+  border-top: 1px solid rgba(0,255,136,0.1);
+}
+
+/* ── Maker / Business page editor panel ─────────────────── */
+.page-editor-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin: 1rem 0;
+}
+.page-editor-title {
+  font-size: .95rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--text);
+}
+.page-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+.page-editor-section {}
+.page-editor-label {
+  display: block;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: .35rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.page-editor-hint { font-size: .72rem; color: var(--muted); margin-bottom: .4rem; }
+.page-editor-font-pills { display: flex; flex-wrap: wrap; gap: .3rem; }
+.page-editor-pill {
+  padding: .25rem .55rem;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  font-size: .75rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.page-editor-pill:hover { border-color: var(--green); color: var(--text); }
+.page-editor-pill.active { border-color: var(--green); color: var(--green); background: var(--green-bg); box-shadow: var(--glow-green); }
+@media (max-width: 480px) {
+  .page-editor-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Maker profile banner ──────────────────────────────── */
+.maker-profile-banner {
+  width: 100%;
+  height: 200px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  border-radius: 0 0 var(--radius) var(--radius);
+  margin-bottom: .5rem;
+}
+.maker-banner-change-btn {
+  position: absolute;
+  bottom: .75rem;
+  right: .75rem;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius-sm);
+  padding: .3rem .7rem;
+  font-size: .78rem;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.maker-banner-change-btn:hover { background: rgba(0,0,0,0.8); }
+
+/* ── Business branded banner ──────────────────────────── */
+.biz-brand-banner {
+  width: 100%;
+  height: 200px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+.biz-brand-banner .maker-banner-change-btn {
+  bottom: .75rem;
+  right: .75rem;
+}
+
+/* ── Maker page CSS vars ──────────────────────────────── */
+.maker-profile-page .maker-tab.active {
+  border-bottom-color: var(--maker-accent, var(--green));
+  color: var(--maker-accent, var(--green));
+}
+.maker-profile-page .maker-profile-name { font-family: var(--maker-font, inherit); }
+.maker-profile-page .maker-specialty-tag {
+  border-color: var(--maker-accent, var(--green));
+  color: var(--maker-accent, var(--green));
+}
+.maker-profile-page .btn-primary {
+  background: var(--maker-accent, var(--green));
+  box-shadow: var(--maker-glow, var(--glow-green));
+}
+.maker-profile-page .work-card:hover {
+  border-color: var(--maker-accent, var(--green));
+  box-shadow: var(--maker-glow, var(--glow-green));
+}
+
+/* ── Business page CSS vars ──────────────────────────── */
+.biz-profile-page .biz-verified-badge-lg,
+.biz-profile-page .biz-type-pill { color: var(--biz-accent, var(--green)); border-color: var(--biz-accent, var(--green)); }
+.biz-profile-page .biz-profile-name { font-family: var(--biz-font, inherit); }

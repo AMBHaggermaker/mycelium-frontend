@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
+import WhyThisWorks from '../components/WhyThisWorks';
 
 export default function Covenant() {
   const { user, token } = useAuth();
@@ -38,6 +39,10 @@ export default function Covenant() {
             <p className="page-subtitle">The principles this community is built on</p>
           </div>
         </div>
+
+        <WhyThisWorks id="covenant-not-tos">
+          Terms of service protect the platform from users. A Covenant is a mutual commitment between the platform and the community. The difference is whether this document is a weapon aimed at you or a promise made to you.
+        </WhyThisWorks>
 
         <div className="covenant-page-body">
           <section className="covenant-section">
