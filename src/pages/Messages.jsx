@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 import { getSocket } from '../socket';
+import { usePresence } from '../contexts/PresenceContext';
+import PresenceDot from '../components/PresenceDot';
 
 export default function Messages({ onRequireAuth }) {
   const { user, token } = useAuth();
@@ -190,10 +192,13 @@ function ThreadPanel({ userId, token, currentUser, onBack, onConvoUpdate, isMobi
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); }
   }
 
+  const { getStatus } = usePresence();
+
   if (loading) return <div className="spinner" style={{ margin: '2rem auto' }} />;
   if (!data) return <p className="error-msg">{err || 'Could not load thread'}</p>;
 
   const { other_user, messages, is_blocked } = data;
+  const otherStatus = getStatus(other_user.id);
 
   return (
     <div className="messages-thread">
@@ -203,9 +208,10 @@ function ThreadPanel({ userId, token, currentUser, onBack, onConvoUpdate, isMobi
             ← Back
           </button>
         )}
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
           <strong>{other_user.username}</strong>
-          {other_user.verified && <span className="messages-verified-badge" style={{ marginLeft: '.3rem' }}>✓</span>}
+          {other_user.verified && <span className="messages-verified-badge">✓</span>}
+          <PresenceDot status={otherStatus} size={9} border="transparent" />
         </div>
         <BlockReportMenu otherUserId={userId} token={token} isBlocked={is_blocked} onUpdate={load} />
       </div>
@@ -213,6 +219,11 @@ function ThreadPanel({ userId, token, currentUser, onBack, onConvoUpdate, isMobi
       <div className="messages-privacy-notice">
         Messages on Mycelium are private from other members. Platform administrators may access message logs when investigating documented reports of abuse or harassment. This is stated in the Mycelium Covenant. Only verified members can initiate new conversations. Unverified members can only reply to messages they receive.
       </div>
+      {otherStatus === 'busy' && (
+        <div className="busy-notice">
+          ⏸ This person is currently busy and may not respond immediately.
+        </div>
+      )}
 
       <div className="messages-scroll-area">
         {messages.length === 0 ? (

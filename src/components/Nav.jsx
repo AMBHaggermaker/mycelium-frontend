@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
+import { usePresence, STATUS_LABELS } from '../contexts/PresenceContext';
+import PresenceDot from './PresenceDot';
 
 const BOTTOM_TABS = [
   { to: '/',        end: true, icon: '⚡', label: 'Hotlight' },
@@ -16,6 +18,8 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
   const isMod = user?.role === 'moderator' || user?.role === 'admin';
   const [meOpen, setMeOpen] = useState(false);
   const [unreadDMs, setUnreadDMs] = useState(0);
+  const { myStatus, setMyStatus } = usePresence();
+  const [statusOpen, setStatusOpen] = useState(false);
 
   // Poll unread DM count
   useEffect(() => {
@@ -102,7 +106,31 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
                 <button className="btn btn-outline btn-sm nav-invite-btn" onClick={onInviteOpen}>
                   + Invite
                 </button>
-                <Link to={`/profile/${user.username}`} className="nav-username">{user.username}</Link>
+                <div className="nav-presence-wrap">
+                  <Link to={`/profile/${user.username}`} className="nav-username">{user.username}</Link>
+                  <button
+                    className="nav-status-btn"
+                    onClick={() => setStatusOpen(v => !v)}
+                    title="Set presence status"
+                  >
+                    <PresenceDot status={myStatus} size={10} border="transparent" />
+                  </button>
+                  {statusOpen && (
+                    <div className="nav-status-dropdown" onMouseLeave={() => setStatusOpen(false)}>
+                      {Object.entries(STATUS_LABELS).map(([s, label]) => (
+                        <button
+                          key={s}
+                          className={'nav-status-option' + (myStatus === s ? ' active' : '')}
+                          onClick={() => { setMyStatus(s); setStatusOpen(false); }}
+                        >
+                          <PresenceDot status={s === 'offline' ? null : s} size={9} border="transparent"
+                            style={{ background: s === 'offline' ? '#d1d5db' : undefined }} />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <Link to="/settings" className="btn btn-ghost btn-sm">Settings</Link>
                 <button className="btn btn-ghost btn-sm" onClick={logout}>Sign Out</button>
               </>
@@ -169,6 +197,19 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
             <div className="me-sheet-handle" />
             <div className="me-sheet-header">
               <span className="me-sheet-username">{user?.username}</span>
+              <div className="me-sheet-status-row">
+                {Object.entries(STATUS_LABELS).map(([s, label]) => (
+                  <button
+                    key={s}
+                    className={'me-sheet-status-btn' + (myStatus === s ? ' active' : '')}
+                    onClick={() => setMyStatus(s)}
+                  >
+                    <PresenceDot status={s === 'offline' ? null : s} size={8} border="transparent"
+                      style={{ background: s === 'offline' ? '#d1d5db' : undefined }} />
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             <nav className="me-sheet-nav">
               <button className="me-sheet-item" onClick={() => handleNavigate(`/profile/${user?.id}`)}>

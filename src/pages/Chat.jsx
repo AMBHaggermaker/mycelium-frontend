@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from '../auth';
 import api from '../api';
+import { usePresence } from '../contexts/PresenceContext';
+import PresenceDot from '../components/PresenceDot';
 
 const SOCKET_URL = 'https://mycelium.unprecedentedtimes.org';
 const FIVE_MIN = 5 * 60 * 1000;
@@ -28,6 +30,7 @@ export default function Chat({ onRequireAuth }) {
   const [roomCounts, setRoomCounts] = useState({});
   const [lastActivity, setLastActivity] = useState({});
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const { getStatus } = usePresence();
   const [composer, setComposer] = useState('');
   const [showNewRoom, setShowNewRoom] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
@@ -236,7 +239,10 @@ export default function Chat({ onRequireAuth }) {
                     <span className="online-label">{onlineUsers.length} online:</span>
                     <div className="online-list">
                       {onlineUsers.map(u => (
-                        <span key={u.id} className="online-user">{u.username}</span>
+                        <span key={u.id} className="online-user">
+                          <PresenceDot status={getStatus(u.id) || 'online'} size={8} border="transparent" style={{ marginRight: 3 }} />
+                          {u.username}
+                        </span>
                       ))}
                     </div>
                   </div>

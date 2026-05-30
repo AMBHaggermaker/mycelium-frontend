@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../auth';
 import api from '../api';
+import { usePresence } from '../contexts/PresenceContext';
+import PresenceDot from '../components/PresenceDot';
 import PostCard from '../components/PostCard';
 import NewPostModal from '../components/NewPostModal';
 import UrgentStrip from '../components/UrgentStrip';
@@ -354,9 +356,11 @@ const SEVERITY_STYLES = {
 
 function LiveNetworkPanel({ token }) {
   const [activities, setActivities] = useState([]);
-  const [activeNow,  setActiveNow]  = useState(0);
   const [todayStats, setTodayStats] = useState(null);
   const [newIds,     setNewIds]     = useState(new Set());
+  const [showWho,    setShowWho]    = useState(false);
+  const { onlineUsers } = usePresence();
+  const activeNow = onlineUsers.length;
 
   useEffect(() => {
     api.getTodayActivity().then(setTodayStats).catch(() => {});
@@ -377,11 +381,9 @@ function LiveNetworkPanel({ token }) {
         return next;
       });
     }
-    function onPresence({ active }) { setActiveNow(active); }
 
     socket.on('network_activity', onActivity);
-    socket.on('presence_update', onPresence);
-    return () => { socket.off('network_activity', onActivity); socket.off('presence_update', onPresence); };
+    return () => { socket.off('network_activity', onActivity); };
   }, [token]);
 
   return (
@@ -389,8 +391,38 @@ function LiveNetworkPanel({ token }) {
       <div className="live-network-header">
         <span className="live-dot" />
         <span className="live-network-title">Live Network</span>
-        {activeNow > 0 && <span className="live-active-count">{activeNow} online</span>}
+        {activeNow > 0 && (
+          <button className="live-active-count live-active-btn" onClick={() => setShowWho(v => !v)}>
+            {activeNow} online {showWho ? '▲' : '▼'}
+          </button>
+        )}
       </div>
+
+      {showWho && (
+        <div className="who-online-panel">
+          {onlineUsers.length === 0 ? (
+            <p className="who-online-empty">No one visible right now.</p>
+          ) : (
+            <ul className="who-online-list">
+              {onlineUsers.map(u => (
+                <li key={u.id} className="who-online-item">
+                  <div className="who-online-avatar-wrap">
+                    {u.avatar_url
+                      ? <img src={u.avatar_url} alt={u.username} className="who-online-avatar" />
+                      : <div className="who-online-avatar who-online-avatar-placeholder">{u.username[0]?.toUpperCase()}</div>
+                    }
+                    <PresenceDot status={u.presence_status} size={9} style={{ position: 'absolute', bottom: 0, right: 0 }} />
+                  </div>
+                  <div className="who-online-info">
+                    <a href={`/profile/${u.username}`} className="who-online-name">{u.username}</a>
+                    {u.mood_emoji && <span className="who-online-mood">{u.mood_emoji}</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {todayStats && (
         <div className="live-today-stats">

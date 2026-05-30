@@ -37,6 +37,7 @@ import FeedbackButton from './components/FeedbackButton';
 import DidYouKnow from './components/DidYouKnow';
 import MiniPlayer from './components/MiniPlayer';
 import { PlayerProvider } from './contexts/PlayerContext';
+import { PresenceProvider } from './contexts/PresenceContext';
 import { useAuth } from './auth';
 import api from './api';
 
@@ -102,6 +103,7 @@ export default function App() {
   if (!ready) return <div className="spinner" style={{ marginTop: '6rem' }} />;
 
   return (
+    <PresenceProvider>
     <PlayerProvider>
       <CriticalAnomalyBanner />
       <Nav onAuthOpen={() => setAuthOpen(true)} onInviteOpen={() => setInviteOpen(true)} />
@@ -146,5 +148,6 @@ export default function App() {
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
       <MiniPlayer />
     </PlayerProvider>
+    </PresenceProvider>
   );
 }
