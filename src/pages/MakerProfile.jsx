@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { usePlayer } from '../contexts/PlayerContext';
 import api from '../api';
+import MakerMetrics from '../components/MakerMetrics';
 
 const WORK_TYPE_ICONS = { audio: '♪', image: '🖼', video: '▶', document: '📄', other: '📦' };
 
@@ -88,6 +89,7 @@ export default function MakerProfile({ onRequireAuth }) {
   const [pageSettings, setPageSettings] = useState({});
   const [editingPage,  setEditingPage]  = useState(false);
   const [savingPage,   setSavingPage]   = useState(false);
+  const [pageSaved,    setPageSaved]    = useState(false);
   const [bannerUrl,    setBannerUrl]    = useState(null);
   const [bannerUploading, setBannerUploading] = useState(false);
   const bannerFileRef = useRef(null);
@@ -117,9 +119,12 @@ export default function MakerProfile({ onRequireAuth }) {
 
   async function savePageSettings(updated) {
     setSavingPage(true);
+    setPageSaved(false);
     try {
       await api.saveMakerPageSettings(username, updated, token);
       setPageSettings(updated);
+      setPageSaved(true);
+      setTimeout(() => setPageSaved(false), 3000);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -283,13 +288,14 @@ export default function MakerProfile({ onRequireAuth }) {
             </div>
           </div>
 
-          <div style={{ marginTop: '1rem', display: 'flex', gap: '.5rem' }}>
-            <button className="btn btn-primary btn-sm" disabled={savingPage}
+          <div style={{ marginTop: '1rem', display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+            <button type="button" className="btn btn-primary btn-sm" disabled={savingPage}
               style={{ background: 'var(--maker-accent,#ff3366)', boxShadow: 'var(--maker-glow)' }}
               onClick={() => savePageSettings(pageSettings)}>
               {savingPage ? 'Saving…' : 'Save Changes'}
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setEditingPage(false)}>Cancel</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingPage(false)}>Cancel</button>
+            {pageSaved && <span style={{ fontSize: '.85rem', color: '#00ff88', fontWeight: 600 }}>✓ Saved</span>}
           </div>
         </div>
       )}
@@ -306,6 +312,11 @@ export default function MakerProfile({ onRequireAuth }) {
         <button className={'maker-tab' + (activeTab === 'commission' ? ' active' : '')} onClick={() => setActiveTab('commission')}>
           Commission
         </button>
+        {isOwner && (
+          <button className={'maker-tab' + (activeTab === 'metrics' ? ' active' : '')} onClick={() => setActiveTab('metrics')}>
+            My Metrics
+          </button>
+        )}
       </div>
 
       {activeTab === 'works' && (
@@ -384,6 +395,12 @@ export default function MakerProfile({ onRequireAuth }) {
               <button type="submit" className="btn btn-primary">Send Request</button>
             </form>
           )}
+        </div>
+      )}
+
+      {activeTab === 'metrics' && isOwner && (
+        <div style={{ paddingTop: '1rem' }}>
+          <MakerMetrics username={makerUser.username} token={token} />
         </div>
       )}
 

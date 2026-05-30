@@ -347,7 +347,7 @@ export default function BusinessProfile() {
                 {savingPage ? 'Saving…' : 'Save Changes'}
               </button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingPage(false)}>Cancel</button>
-              {pageSaved && <span style={{ fontSize: '.85rem', color: 'var(--biz-accent,#00ff88)', fontWeight: 600 }}>✓ Saved</span>}
+              {pageSaved && <span style={{ fontSize: '.85rem', color: '#00ff88', fontWeight: 600 }}>✓ Saved</span>}
             </div>
           </div>
         )}

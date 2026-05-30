@@ -52,6 +52,7 @@ export default function Makers({ onRequireAuth }) {
     <div className="makers-page">
       <div className="makers-hero">
         <h1 className="makers-hero-title">Maker's Guild</h1>
+        <p className="makers-hero-napster">Not Your Mama's Napster</p>
         <p className="makers-hero-sub">
           Sovereign original content market. No algorithms, no content ID strikes, no corporate cut.
           Files live on infrastructure owned by this platform.

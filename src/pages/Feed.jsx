@@ -19,9 +19,10 @@ const FEED_TABS = [
 
 const TYPES = [
   { value: '',      label: 'All'    },
-  { value: 'need',  label: 'Needs'  },
-  { value: 'offer', label: 'Offers' },
-  { value: 'event', label: 'Events' },
+  { value: 'need',       label: 'Needs'  },
+  { value: 'offer',      label: 'Offers' },
+  { value: 'event',      label: 'Events' },
+  { value: 'story_card', label: '✦ Stories' },
 ];
 
 const CATEGORIES = [

@@ -2,9 +2,25 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../auth';
 import api from '../api';
 import ImageCropUploader from './ImageCropUploader';
+import EventLocationPicker from './EventLocationPicker';
 
-const TYPES = ['need', 'offer', 'event'];
+const TYPES = ['need', 'offer', 'event', 'story_card'];
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime';
+
+const PLATFORM_MOODS = [
+  'hopeful','determined','reflective','creative','grateful','curious','energized',
+  'concerned','frustrated','tired','grieving','resilient','inspired','grounded',
+  'anxious','peaceful','angry','joyful','uncertain','connected','overwhelmed','healing','fierce',
+];
+
+const COLLAGE_LAYOUTS = [
+  { value: 'single',    label: 'Full Width',       for: 1 },
+  { value: 'two-side',  label: 'Side by Side',     for: 2 },
+  { value: 'three-1l',  label: '1 Left + 2 Right', for: 3 },
+  { value: 'four-grid', label: '2×2 Grid',         for: 4 },
+  { value: 'five-top',  label: 'Large Top + 4',    for: 5 },
+  { value: 'masonry',   label: 'Masonry Grid',     for: 6 },
+];
 
 const CATEGORIES = [
   { value: 'jobs_services',  label: 'Jobs & Services' },
@@ -22,17 +38,24 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
   const { user, token } = useAuth();
   const [form, setForm] = useState({
     type: 'offer', title: '', description: '', circle_id: defaultCircleId || '',
-    capacity: '', location: '', starts_at: '', ends_at: '', tags: '',
+    capacity: '', location: '', location_lat: null, location_lng: null,
+    starts_at: '', ends_at: '', tags: '',
     category: '', subcategory: '', is_urgent: false, expires_at: '',
     commerce_type: '', price: '', business_id: '',
+    rich_content: '', mood_tag: '', collage_layout: 'single',
   });
   const [circles,   setCircles]   = useState([]);
   const [myBizList, setMyBizList] = useState([]);
   const [files,     setFiles]     = useState([]);
   const [previews,  setPreviews]  = useState([]);
+  const [storyFiles, setStoryFiles] = useState([]);
+  const [storyPreviews, setStoryPreviews] = useState([]);
+  const [storyAttachments, setStoryAttachments] = useState([]);
   const [err,  setErr]  = useState(null);
   const [busy, setBusy] = useState(false);
   const fileInputRef = useRef(null);
+  const storyPhotoRef = useRef(null);
+  const storyAttachRef = useRef(null);
 
   useEffect(() => {
     api.getCircles({ limit: 100 }).then(setCircles).catch(() => {});
@@ -44,6 +67,12 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
     setPreviews(urls);
     return () => urls.forEach(u => URL.revokeObjectURL(u));
   }, [files]);
+
+  useEffect(() => {
+    const urls = storyFiles.map(f => URL.createObjectURL(f));
+    setStoryPreviews(urls);
+    return () => urls.forEach(u => URL.revokeObjectURL(u));
+  }, [storyFiles]);
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
@@ -65,13 +94,16 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
+      const isStory = form.type === 'story_card';
       const payload = {
         type:          form.type,
         title:         form.title.trim(),
-        description:   form.description.trim() || undefined,
+        description:   isStory ? (form.rich_content.trim() || undefined) : (form.description.trim() || undefined),
         circle_id:     form.circle_id || undefined,
         capacity:      form.capacity ? parseInt(form.capacity) : undefined,
         location:      form.location.trim() || undefined,
+        location_lat:  form.location_lat ?? undefined,
+        location_lng:  form.location_lng ?? undefined,
         starts_at:     form.starts_at || undefined,
         ends_at:       form.ends_at || undefined,
         tags:          form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
@@ -80,11 +112,15 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
         is_urgent:     form.is_urgent || undefined,
         expires_at:    form.expires_at || undefined,
         commerce_type: form.commerce_type || undefined,
-        price:       form.commerce_type === 'commerce' && form.price ? parseFloat(form.price) : undefined,
-        business_id: form.business_id || undefined,
+        price:         form.commerce_type === 'commerce' && form.price ? parseFloat(form.price) : undefined,
+        business_id:   form.business_id || undefined,
+        rich_content:  isStory ? (form.rich_content.trim() || undefined) : undefined,
+        mood_tag:      isStory ? (form.mood_tag || undefined) : undefined,
+        collage_layout: isStory && storyFiles.length > 1 ? form.collage_layout : undefined,
       };
       const post = await api.createPost(payload, token);
-      if (files.length) await api.uploadPostMedia(post.id, files, token);
+      if (isStory && storyFiles.length) await api.uploadPostMedia(post.id, storyFiles, token);
+      else if (files.length) await api.uploadPostMedia(post.id, files, token);
       onCreated();
     } catch (e) {
       setErr(e.message);
@@ -112,13 +148,13 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
           {/* Type */}
           <div className="form-group">
             <label className="form-label">Type</label>
-            <div style={{ display: 'flex', gap: '.4rem' }}>
+            <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
               {TYPES.map(t => (
                 <button key={t} type="button"
-                  className={`btn btn-sm ${form.type === t ? `badge badge-${t}` : 'btn-outline'}`}
-                  style={{ flex: 1, textTransform: 'capitalize' }}
+                  className={`btn btn-sm ${form.type === t ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ flex: '1 1 auto', textTransform: 'capitalize', minWidth: 70 }}
                   onClick={() => set('type', t)}>
-                  {t}
+                  {t === 'story_card' ? '✦ Story' : t}
                 </button>
               ))}
             </div>
@@ -184,27 +220,99 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
               onChange={e => set('title', e.target.value)} />
           </div>
 
-          {/* Description */}
-          <div className="form-group">
-            <label className="form-label">Description</label>
-            <textarea className="form-textarea" value={form.description}
-              onChange={e => set('description', e.target.value)} />
-          </div>
+          {/* Story Card composer */}
+          {form.type === 'story_card' ? (
+            <>
+              <div className="form-group">
+                <label className="form-label">Story Content</label>
+                <textarea className="form-textarea story-rich-textarea" rows={6} value={form.rich_content}
+                  onChange={e => set('rich_content', e.target.value)}
+                  placeholder="Write your story here…" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Photos <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(up to 8)</span></label>
+                <input ref={storyPhotoRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+                  onChange={e => {
+                    const sel = Array.from(e.target.files);
+                    setStoryFiles(prev => [...prev, ...sel].slice(0, 8));
+                    e.target.value = '';
+                  }} />
+                {storyPreviews.length > 0 && (
+                  <div className="story-photo-preview-grid">
+                    {storyPreviews.map((url, i) => (
+                      <div key={i} className="story-photo-thumb">
+                        <img src={url} alt="" />
+                        <button type="button" className="story-photo-remove"
+                          onClick={() => setStoryFiles(f => f.filter((_, idx) => idx !== i))}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => storyPhotoRef.current?.click()}
+                  disabled={storyFiles.length >= 8}>
+                  + Add Photos
+                </button>
+                {storyFiles.length > 1 && (
+                  <div style={{ marginTop: '.5rem' }}>
+                    <label className="form-label" style={{ fontSize: '.8rem' }}>Layout</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', marginTop: '.25rem' }}>
+                      {COLLAGE_LAYOUTS.filter(l => l.for <= storyFiles.length || l.value === 'masonry').map(l => (
+                        <button key={l.value} type="button"
+                          className={`btn btn-sm ${form.collage_layout === l.value ? 'btn-primary' : 'btn-outline'}`}
+                          onClick={() => set('collage_layout', l.value)}>{l.label}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mood <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
+                  {PLATFORM_MOODS.map(m => (
+                    <button key={m} type="button"
+                      className={`btn btn-sm ${form.mood_tag === m ? 'btn-primary' : 'btn-outline'}`}
+                      style={{ textTransform: 'capitalize', fontSize: '.75rem' }}
+                      onClick={() => set('mood_tag', form.mood_tag === m ? '' : m)}>{m}</button>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Description */
+            <div className="form-group">
+              <label className="form-label">Description</label>
+              <textarea className="form-textarea" value={form.description}
+                onChange={e => set('description', e.target.value)} />
+            </div>
+          )}
 
-          <div className="form-row">
+          {form.type === 'event' ? (
+            <div className="form-group">
+              <label className="form-label">Location</label>
+              <EventLocationPicker
+                value={form.location}
+                lat={form.location_lat}
+                lng={form.location_lng}
+                onChange={({ location, location_lat, location_lng }) =>
+                  setForm(f => ({ ...f, location, location_lat, location_lng }))
+                }
+              />
+            </div>
+          ) : (
             <div className="form-group">
               <label className="form-label">Location</label>
               <input className="form-input" value={form.location}
                 onChange={e => set('location', e.target.value)} />
             </div>
-            {form.type === 'event' && (
-              <div className="form-group">
-                <label className="form-label">Capacity</label>
-                <input className="form-input" type="number" min="1" value={form.capacity}
-                  onChange={e => set('capacity', e.target.value)} placeholder="Unlimited" />
-              </div>
-            )}
-          </div>
+          )}
+
+          {form.type === 'event' && (
+            <div className="form-group">
+              <label className="form-label">Capacity</label>
+              <input className="form-input" type="number" min="1" value={form.capacity}
+                onChange={e => set('capacity', e.target.value)} placeholder="Unlimited" />
+            </div>
+          )}
 
           {form.type === 'event' && (
             <div className="form-row">

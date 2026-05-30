@@ -14,7 +14,7 @@ const HOW_FOUND_OPTIONS = [
 export default function AuthModal({ onClose }) {
   const { login } = useAuth();
   const [mode,    setMode]    = useState('login');
-  const [form,    setForm]    = useState({ username: '', email: '', password: '', location: '', how_found: '', covenant: false });
+  const [form,    setForm]    = useState({ username: '', email: '', password: '', location: '', how_found: '', covenant: false, age_confirmed: false });
   const [err,     setErr]     = useState(null);
   const [busy,    setBusy]    = useState(false);
 
@@ -44,6 +44,7 @@ export default function AuthModal({ onClose }) {
         onClose();
       } else {
         // register
+        if (!form.age_confirmed) { setErr('You must confirm you are 18 or older to join.'); setBusy(false); return; }
         if (!form.covenant) { setErr('You must agree to The Mycelium Covenant to join.'); setBusy(false); return; }
         if (!form.how_found) { setErr('Please tell us how you found Mycelium.'); setBusy(false); return; }
         const res = await api.register({
@@ -53,6 +54,7 @@ export default function AuthModal({ onClose }) {
           location:        form.location.trim(),
           how_found:       form.how_found,
           covenant_agreed: true,
+          age_18_or_older: true,
         });
         login(res.token, res.user);
         onClose();
@@ -278,13 +280,17 @@ export default function AuthModal({ onClose }) {
             </p>
           )}
           {mode === 'register' && (
-            <label className="invite-covenant-check" style={{ fontSize: '.85rem' }}>
-              <input type="checkbox" checked={form.covenant} onChange={e => set('covenant', e.target.checked)} />
-              {' '}I have read and agree to{' '}
-              <a href="/covenant">
-                The Mycelium Covenant
-              </a>
-            </label>
+            <>
+              <label className="invite-covenant-check" style={{ fontSize: '.85rem' }}>
+                <input type="checkbox" checked={form.age_confirmed} onChange={e => set('age_confirmed', e.target.checked)} />
+                {' '}I am 18 years of age or older
+              </label>
+              <label className="invite-covenant-check" style={{ fontSize: '.85rem' }}>
+                <input type="checkbox" checked={form.covenant} onChange={e => set('covenant', e.target.checked)} />
+                {' '}I have read and agree to{' '}
+                <a href="/covenant">The Mycelium Covenant</a>
+              </label>
+            </>
           )}
           {err && <p className="form-error">{err}</p>}
           <button className="btn btn-primary btn-full" disabled={busy}>

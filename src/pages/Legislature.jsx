@@ -5,10 +5,11 @@ import api from '../api';
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'federal', label: 'Federal' },
-  { id: 'state',   label: 'State (Alabama)' },
-  { id: 'local',   label: 'Local' },
-  { id: 'records', label: 'Votes & Records' },
+  { id: 'federal',  label: 'Federal' },
+  { id: 'state',    label: 'State (Alabama)' },
+  { id: 'local',    label: 'Local' },
+  { id: 'records',  label: 'Votes & Records' },
+  { id: 'my_alerts',label: 'My Alerts' },
 ];
 
 const TOPICS = [
@@ -66,14 +67,25 @@ function StarRating({ value, onChange, readonly = false }) {
 
 // ── Bill Card ─────────────────────────────────────────────────────────────────
 
-function BillCard({ bill }) {
+function BillCard({ bill, user, subscribed, onSubscribe }) {
   const sc = STATUS_CONFIG[bill.status] || STATUS_CONFIG.introduced;
   const displaySummary = bill.ai_summary || bill.summary || 'No summary available.';
   const tags = Array.isArray(bill.topic_tags) ? bill.topic_tags : [];
+  const [copied, setCopied] = useState(false);
 
   const mailtoHref = `mailto:?subject=${encodeURIComponent(`RE: ${bill.bill_number} - ${bill.title}`)}&body=${encodeURIComponent(`I am writing regarding ${bill.bill_number} - ${bill.title}.\n\n[Please add your message here]\n`)}`;
 
   const isUrgent = bill.status === 'floor_vote' || bill.status === 'committee';
+
+  function handleShare() {
+    const url = `${window.location.origin}/legislature?bill=${encodeURIComponent(bill.bill_number || bill.id)}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      prompt('Copy this link:', url);
+    });
+  }
 
   return (
     <div className="leg-bill-card" style={{ borderLeft: isUrgent ? '4px solid #d97706' : '4px solid #e5e7eb' }}>
@@ -88,10 +100,7 @@ function BillCard({ bill }) {
       <div className="leg-bill-header">
         <div>
           <span className="leg-bill-number">{bill.bill_number}</span>
-          <span
-            className="leg-status-badge"
-            style={{ color: sc.color, background: sc.bg }}
-          >
+          <span className="leg-status-badge" style={{ color: sc.color, background: sc.bg }}>
             {sc.label}
           </span>
         </div>
@@ -101,37 +110,37 @@ function BillCard({ bill }) {
       </div>
 
       <h3 className="leg-bill-title">{bill.title}</h3>
-
       <p className="leg-bill-summary">{displaySummary}</p>
 
       {bill.last_action && (
-        <p className="leg-last-action">
-          <strong>Last action:</strong> {bill.last_action}
-        </p>
+        <p className="leg-last-action"><strong>Last action:</strong> {bill.last_action}</p>
       )}
 
       {tags.length > 0 && (
         <div className="leg-tags">
-          {tags.map(t => (
-            <span key={t} className="leg-tag">{t.replace(/_/g, ' ')}</span>
-          ))}
+          {tags.map(t => <span key={t} className="leg-tag">{t.replace(/_/g, ' ')}</span>)}
         </div>
       )}
 
       <div className="leg-bill-actions">
         {bill.source_url && (
-          <a
-            href={bill.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="leg-btn leg-btn-ghost"
-          >
+          <a href={bill.source_url} target="_blank" rel="noopener noreferrer" className="leg-btn leg-btn-ghost">
             View Source
           </a>
         )}
-        <a href={mailtoHref} className="leg-btn leg-btn-primary">
-          Contact Your Rep
-        </a>
+        <button className="leg-btn leg-btn-ghost" onClick={handleShare} title="Copy link to this bill">
+          {copied ? '✓ Copied' : '🔗 Share'}
+        </button>
+        {user && (
+          <button
+            className={`leg-btn ${subscribed ? 'leg-btn-ghost' : 'leg-btn-outline'}`}
+            onClick={() => onSubscribe?.(bill)}
+            title={subscribed ? 'Unsubscribe from alerts' : 'Subscribe to alerts for this bill'}
+          >
+            {subscribed ? '🔕 Unsubscribe' : '🔔 Alert Me'}
+          </button>
+        )}
+        <a href={mailtoHref} className="leg-btn leg-btn-primary">Contact Your Rep</a>
       </div>
     </div>
   );
@@ -444,6 +453,8 @@ export default function Legislature({ onRequireAuth }) {
   const [topicFilter, setTopicFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [error, setError]             = useState('');
+  const [myAlerts, setMyAlerts]       = useState([]);
+  const [alertsLoading, setAlertsLoading] = useState(false);
 
   // level mapped from tab
   const levelForTab = activeTab === 'records' ? null
@@ -482,17 +493,46 @@ export default function Legislature({ onRequireAuth }) {
     }
   }, [levelForTab]);
 
+  const loadAlerts = useCallback(async () => {
+    if (!token) return;
+    setAlertsLoading(true);
+    try {
+      const data = await api.getBillAlerts(token);
+      setMyAlerts(data);
+    } catch { setMyAlerts([]); }
+    finally { setAlertsLoading(false); }
+  }, [token]);
+
   useEffect(() => {
-    if (activeTab !== 'records') {
+    if (activeTab !== 'records' && activeTab !== 'my_alerts') {
       loadBills();
       loadReps();
     }
-  }, [activeTab, loadBills, loadReps]);
+    if (activeTab === 'my_alerts') loadAlerts();
+  }, [activeTab, loadBills, loadReps, loadAlerts]);
 
   async function handleRate(repId, data) {
     if (!user) return onRequireAuth();
     await api.rateLegislationRep(repId, data, token);
     loadReps();
+  }
+
+  async function handleSubscribeBill(bill) {
+    if (!user) return onRequireAuth();
+    const isSubscribed = myAlerts.some(a => a.bill_id === bill.id);
+    try {
+      if (isSubscribed) {
+        await api.unsubscribeBillAlert(bill.id, token);
+        setMyAlerts(prev => prev.filter(a => a.bill_id !== bill.id));
+      } else {
+        const alert = await api.subscribeBillAlert({
+          bill_id: bill.id,
+          bill_title: bill.title,
+          bill_number: bill.bill_number,
+        }, token);
+        setMyAlerts(prev => [...prev, alert]);
+      }
+    } catch (e) { alert(e.message); }
   }
 
   async function handleSeedAdmin() {
@@ -538,9 +578,12 @@ export default function Legislature({ onRequireAuth }) {
               role="tab"
               aria-selected={activeTab === tab.id}
               className={'leg-tab' + (activeTab === tab.id ? ' leg-tab--active' : '')}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => { if (tab.id === 'my_alerts' && !user) { onRequireAuth?.(); return; } setActiveTab(tab.id); }}
             >
               {tab.label}
+              {tab.id === 'my_alerts' && myAlerts.length > 0 && (
+                <span className="leg-alert-badge">{myAlerts.length}</span>
+              )}
             </button>
           ))}
         </nav>
@@ -550,16 +593,55 @@ export default function Legislature({ onRequireAuth }) {
           <VotesRecordsTab user={user} token={token} onRequireAuth={onRequireAuth} />
         )}
 
+        {/* My Alerts tab */}
+        {activeTab === 'my_alerts' && (
+          <section className="leg-section">
+            <h2 className="leg-section-title">My Bill Alerts</h2>
+            {alertsLoading ? (
+              <div className="leg-loading">Loading alerts…</div>
+            ) : myAlerts.length === 0 ? (
+              <div className="leg-empty">
+                No alerts yet. Click <strong>🔔 Alert Me</strong> on any bill to get notified when it changes status.
+              </div>
+            ) : (
+              <div className="leg-bills-grid">
+                {myAlerts.map(a => (
+                  <div key={a.id} className="leg-bill-card">
+                    <div className="leg-bill-header">
+                      <span className="leg-bill-number">{a.bill_number}</span>
+                    </div>
+                    <h3 className="leg-bill-title">{a.bill_title}</h3>
+                    <p style={{ fontSize: '.8rem', color: 'var(--muted)' }}>
+                      Subscribed {new Date(a.created_at).toLocaleDateString()}
+                    </p>
+                    <div className="leg-bill-actions">
+                      <button className="leg-btn leg-btn-ghost"
+                        onClick={() => handleSubscribeBill({ id: a.bill_id, title: a.bill_title, bill_number: a.bill_number })}>
+                        🔕 Unsubscribe
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Bills + Reps tabs */}
-        {activeTab !== 'records' && (
+        {activeTab !== 'records' && activeTab !== 'my_alerts' && (
           <>
-            {/* Urgent action banners */}
+            {/* Community Action banner for urgent bills */}
             {urgentBills.length > 0 && (
               <div className="leg-urgent-strip">
-                <strong>Community Action Needed:</strong>{' '}
-                {urgentBills.length} bill{urgentBills.length > 1 ? 's' : ''} currently in{' '}
-                {urgentBills.some(b => b.status === 'floor_vote') ? 'a floor vote or ' : ''}committee
-                — see highlighted cards below and contact your representative.
+                <strong>🚨 Community Action Needed:</strong>{' '}
+                {urgentBills.map((b, i) => (
+                  <span key={b.id}>
+                    {i > 0 && ' · '}
+                    <strong>{b.bill_number}</strong> — {b.status === 'floor_vote' ? 'floor vote imminent' : 'in committee'}
+                    {b.last_action_date && ` (${formatDate(b.last_action_date)})`}
+                  </span>
+                ))}
+                {' '}<a href={`mailto:?subject=Urgent+Legislative+Action+Needed&body=Community members are needed to contact representatives regarding pending legislation.`} className="leg-btn leg-btn-outline leg-btn-sm" style={{ marginLeft: '.5rem' }}>Contact Your Rep</a>
               </div>
             )}
 
@@ -617,7 +699,13 @@ export default function Legislature({ onRequireAuth }) {
               ) : (
                 <div className="leg-bills-grid">
                   {bills.map(bill => (
-                    <BillCard key={bill.id} bill={bill} />
+                    <BillCard
+                      key={bill.id}
+                      bill={bill}
+                      user={user}
+                      subscribed={myAlerts.some(a => a.bill_id === bill.id)}
+                      onSubscribe={handleSubscribeBill}
+                    />
                   ))}
                 </div>
               )}
@@ -1022,6 +1110,20 @@ export default function Legislature({ onRequireAuth }) {
         }
         .leg-source-link { color: #2563eb; text-decoration: none; }
         .leg-source-link:hover { text-decoration: underline; }
+        .leg-alert-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: #dc2626;
+          color: #fff;
+          font-size: .7rem;
+          font-weight: 700;
+          min-width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          padding: 0 4px;
+          margin-left: .4rem;
+        }
         @media (max-width: 640px) {
           .leg-bills-grid { grid-template-columns: 1fr; }
           .leg-reps-grid  { grid-template-columns: 1fr; }

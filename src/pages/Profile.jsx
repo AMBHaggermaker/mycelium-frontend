@@ -5,6 +5,7 @@ import { useAuth } from '../auth';
 import api from '../api';
 import ImageCropUploader from '../components/ImageCropUploader';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
+import ProfileCardThumbnail from '../components/ProfileCardThumbnail';
 
 async function cropToBlob(img, crop, targetW, targetH) {
   const canvas = document.createElement('canvas');
@@ -1672,7 +1673,7 @@ function ProfileNetworkSidebar({ copart, networkSettings, isOwn, token, accentCo
         <span className="pns-title">My Network</span>
         {isOwn && <button className="pns-gear" onClick={() => setShowSettings(true)} title="Customize">⚙</button>}
       </div>
-      <div className={`pns-carousel${fadeIn ? '' : ' pns-fading'}`}>
+      <div className={`pns-carousel pns-card-grid${fadeIn ? '' : ' pns-fading'}`}>
         {displayPeople.map(p => <PersonNetCard key={p.id} person={p} accentColor={accentColor} />)}
       </div>
       {rotationOn && total > visibleCount && (
@@ -1698,22 +1699,21 @@ function ProfileNetworkSidebar({ copart, networkSettings, isOwn, token, accentCo
 }
 
 function PersonNetCard({ person: p, accentColor }) {
-  const preview = p.status_text || p.pinned_bulletin || '';
   return (
-    <div className="pns-person-card">
-      <div style={{ position: 'relative', flexShrink: 0 }}>
-        <div className="pns-avatar" style={{ background: p.accent_color || accentColor || 'var(--green)' }}>
-          {p.avatar_url ? <img src={resolveUrl(p.avatar_url)} alt={p.username} /> : <span>{p.username[0].toUpperCase()}</span>}
-        </div>
-        {p.mood_emoji && <span className="pns-mood-badge">{p.mood_emoji}</span>}
-      </div>
-      <div className="pns-person-info">
-        <span className="pns-display-name">{p.username}</span>
-        {p.mood && <span className="pns-mood-label">{p.mood}</span>}
-        {preview && <p className="pns-status-line">{preview.slice(0, 60)}</p>}
-        <Link to={`/profile/${p.username}`} className="pns-view-link">View Profile →</Link>
-      </div>
-    </div>
+    <ProfileCardThumbnail profile={{
+      username: p.username,
+      display_name: p.username,
+      avatar_url: p.avatar_url,
+      banner_url: p.banner_image_url,
+      accent_color: p.accent_color || accentColor,
+      background_color: p.background_color,
+      mood_emoji: p.mood_emoji,
+      mood_label: p.mood,
+      status_text: p.status_text || p.pinned_bulletin,
+      is_verified: p.verified,
+      founding_member: p.founding_member,
+      font_style: p.font_style,
+    }} />
   );
 }
 

@@ -4,6 +4,7 @@ import { useAuth } from '../auth';
 import api from '../api';
 import { usePresence } from '../contexts/PresenceContext';
 import PresenceDot from '../components/PresenceDot';
+import EmojiPicker from '../components/EmojiPicker';
 
 const SOCKET_URL = 'https://mycelium.unprecedentedtimes.org';
 const FIVE_MIN = 5 * 60 * 1000;
@@ -34,6 +35,17 @@ export default function Chat({ onRequireAuth }) {
   const [composer, setComposer] = useState('');
   const [showNewRoom, setShowNewRoom] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifSearch, setGifSearch] = useState('');
+  const [gifs, setGifs] = useState([]);
+  const [gifsLoading, setGifsLoading] = useState(false);
+  const composerRef = useRef(null);
+  const emojiPickerRef = useRef(null);
+  const gifPickerRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
   const [roomReported, setRoomReported] = useState({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -127,6 +139,82 @@ export default function Chat({ onRequireAuth }) {
     }
   }
 
+  function insertEmoji(emoji) {
+    const textarea = composerRef.current;
+    if (!textarea) { setComposer(prev => prev + emoji); return; }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const val = composer;
+    setComposer(val.slice(0, start) + emoji + val.slice(end));
+    setTimeout(() => {
+      textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+      textarea.focus();
+    }, 0);
+    setShowEmojiPicker(false);
+  }
+
+  async function searchGifs(query) {
+    setGifsLoading(true);
+    const BASE = 'https://mycelium.unprecedentedtimes.org/api';
+    try {
+      const res = await fetch(`${BASE}/chat/gifs?q=${encodeURIComponent(query || '')}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setGifs(await res.json());
+    } catch { setGifs([]); }
+    finally { setGifsLoading(false); }
+  }
+
+  useEffect(() => {
+    if (showGifPicker) searchGifs(gifSearch);
+  }, [showGifPicker]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleFileUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file || !activeSlug || !user) return;
+    setUploading(true);
+    try {
+      const BASE = 'https://mycelium.unprecedentedtimes.org/api';
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`${BASE}/chat/rooms/${activeSlug}/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      socketRef.current?.emit('chat_message', {
+        room_slug: activeSlug,
+        content: file.name,
+        media_url: data.url,
+        media_type: data.media_type,
+        media_filename: data.media_filename,
+        media_size: data.media_size,
+      });
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  }
+
+  function sendGif(gifUrl, gifTitle) {
+    if (!activeSlug || !user) return;
+    socketRef.current?.emit('chat_message', {
+      room_slug: activeSlug,
+      content: gifTitle ? `[GIF: ${gifTitle}]` : '[GIF]',
+      media_url: gifUrl,
+      media_type: 'gif',
+      media_filename: gifTitle || 'gif',
+    });
+    setShowGifPicker(false);
+    setGifSearch('');
+  }
+
+  const activeRoom = rooms.find(r => r.slug === activeSlug);
+
   function saveChat() {
     if (!activeRoom || messages.length === 0) return;
     const exportTime = new Date().toLocaleString('en-US', {
@@ -143,6 +231,7 @@ export default function Chat({ onRequireAuth }) {
           year: 'numeric', month: '2-digit', day: '2-digit',
           hour: '2-digit', minute: '2-digit',
         });
+        if (m.media_url) return `[${ts}] ${m.username}: [Media: ${m.media_filename || 'file'} — ${m.media_url}]`;
         return `[${ts}] ${m.username}: ${m.content}`;
       }),
     ];
@@ -158,7 +247,31 @@ export default function Chat({ onRequireAuth }) {
     URL.revokeObjectURL(url);
   }
 
-  const activeRoom = rooms.find(r => r.slug === activeSlug);
+  async function saveChatPDF() {
+    if (!activeRoom || messages.length === 0) return;
+    try {
+      const BASE = 'https://mycelium.unprecedentedtimes.org/api';
+      const res = await fetch(`${BASE}/chat/rooms/${activeRoom.slug}/export-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ messages }),
+      });
+      if (!res.ok) throw new Error('PDF export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const date = new Date().toISOString().slice(0, 10);
+      a.download = `${activeRoom.slug}-${date}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e.message);
+    }
+    setShowExportModal(false);
+  }
 
   function isRecentlyActive(slug) {
     const t = lastActivity[slug];
@@ -248,9 +361,9 @@ export default function Chat({ onRequireAuth }) {
                   </div>
                 )}
                 {user && messages.length > 0 && (
-                  <button className="btn btn-sm btn-outline" onClick={saveChat}
-                    title="Download message history as .txt">
-                    Save Chat
+                  <button className="btn btn-sm btn-outline" onClick={() => setShowExportModal(true)}
+                    title="Export message history">
+                    Export Chat
                   </button>
                 )}
                 {user && (
@@ -277,17 +390,69 @@ export default function Chat({ onRequireAuth }) {
                       <span className="chat-msg-author">{msg.username}</span>
                       <span className="chat-msg-time">{fmt(msg.created_at)}</span>
                     </div>
-                    <div className="chat-msg-body">{msg.content}</div>
+                    {(msg.media_type === 'gif' || msg.media_type === 'image') && msg.media_url ? (
+                      <div className="chat-msg-body">
+                        <img src={msg.media_url} alt={msg.media_filename || msg.media_type}
+                          className="chat-msg-gif" loading="lazy" />
+                      </div>
+                    ) : msg.media_type === 'video' && msg.media_url ? (
+                      <div className="chat-msg-body">
+                        <video src={msg.media_url} controls className="chat-msg-video" />
+                      </div>
+                    ) : msg.media_type === 'file' && msg.media_url ? (
+                      <div className="chat-msg-body">
+                        <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="chat-msg-file">
+                          📄 {msg.media_filename || 'Download file'}
+                          {msg.media_size && <span className="chat-msg-file-size"> ({(msg.media_size / 1024).toFixed(0)} KB)</span>}
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="chat-msg-body">{msg.content}</div>
+                    )}
                   </div>
                 ))
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="chat-composer">
+            <div className="chat-composer" style={{ position: 'relative' }}>
+              {showEmojiPicker && (
+                <div className="chat-emoji-picker" ref={emojiPickerRef}>
+                  <EmojiPicker onSelect={insertEmoji} onClose={() => setShowEmojiPicker(false)} />
+                </div>
+              )}
+              {showGifPicker && (
+                <div className="chat-gif-picker" ref={gifPickerRef}>
+                  <div className="chat-gif-header">
+                    <input
+                      className="chat-gif-search"
+                      placeholder="Search GIFs…"
+                      value={gifSearch}
+                      onChange={e => { setGifSearch(e.target.value); searchGifs(e.target.value); }}
+                      autoFocus
+                    />
+                    <button className="chat-picker-close" onClick={() => setShowGifPicker(false)}>✕</button>
+                  </div>
+                  <div className="chat-gif-grid">
+                    {gifsLoading ? (
+                      <div className="chat-gif-loading">Searching…</div>
+                    ) : gifs.length === 0 ? (
+                      <div className="chat-gif-loading">No GIFs found</div>
+                    ) : (
+                      gifs.map((g, i) => (
+                        <button key={i} className="chat-gif-item" onClick={() => sendGif(g.url, g.title)}>
+                          <img src={g.preview} alt={g.title} loading="lazy" />
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <p className="chat-gif-powered">Powered by Tenor</p>
+                </div>
+              )}
               {user ? (
                 <>
                   <textarea
+                    ref={composerRef}
                     className="chat-input"
                     placeholder={`Message #${activeRoom.name}… (Enter to send, Shift+Enter for newline)`}
                     value={composer}
@@ -295,10 +460,15 @@ export default function Chat({ onRequireAuth }) {
                     onKeyDown={handleKeyDown}
                     rows={2}
                   />
-                  <button className="btn btn-primary" onClick={sendMessage}
-                    disabled={!composer.trim()}>
-                    Send
-                  </button>
+                  <div className="chat-composer-actions">
+                    <input ref={fileInputRef} type="file" accept="image/*,video/mp4,video/quicktime,.pdf,.doc,.docx,.txt" style={{ display: 'none' }} onChange={handleFileUpload} />
+                    <button className="chat-picker-btn" title="Attach file" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                      {uploading ? '⏳' : '📎'}
+                    </button>
+                    <button className="chat-picker-btn" title="Emoji" onClick={() => { setShowEmojiPicker(v => !v); setShowGifPicker(false); }}>😊</button>
+                    <button className="chat-picker-btn" title="GIF" onClick={() => { setShowGifPicker(v => !v); setShowEmojiPicker(false); }}>GIF</button>
+                    <button className="btn btn-primary" onClick={sendMessage} disabled={!composer.trim()}>Send</button>
+                  </div>
                 </>
               ) : (
                 <div className="chat-signin-prompt">
@@ -326,6 +496,28 @@ export default function Chat({ onRequireAuth }) {
             setActiveSlug(room.slug);
           }}
         />
+      )}
+
+      {showExportModal && activeRoom && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowExportModal(false)}>
+          <div className="modal" style={{ maxWidth: 360 }}>
+            <div className="modal-header">
+              <span className="modal-title">Export Chat</span>
+              <button className="modal-close" onClick={() => setShowExportModal(false)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>
+                Choose an export format for <strong>{activeRoom.name}</strong> ({messages.length} messages):
+              </p>
+              <button className="btn btn-outline btn-full" onClick={() => { saveChat(); setShowExportModal(false); }}>
+                📄 Text File (.txt)
+              </button>
+              <button className="btn btn-primary btn-full" onClick={saveChatPDF}>
+                📑 PDF Document (.pdf)
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

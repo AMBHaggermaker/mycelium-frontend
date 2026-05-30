@@ -60,6 +60,7 @@ export default {
 
   // Profiles (by username)
   getProfile:         (username)          => get(`/profiles/${username}`),
+  getProfileCard:     (username)          => get(`/profiles/${username}/card`),
   customizeProfile:   (data, token)       => patch('/profiles/customize', data, token),
   uploadProfilePhoto: (file, opts, token) => {
     const form = new FormData();
@@ -193,6 +194,19 @@ export default {
   restoreUser:            (userId, token)   => patch(`/admin/users/${userId}/restore`, {}, token),
   adminSendPasswordReset:  (userId, token)        => post(`/admin/users/${userId}/send-password-reset`, {}, token),
   adminGrantMakerAccess:   (userId, tier, token)  => post(`/admin/users/${userId}/maker-access`, { tier }, token),
+
+  // Admin child safety
+  getChildSafetyFlags:     (token)             => get('/admin/child-safety/flags', token),
+  getCsamReports:          (token)             => get('/admin/child-safety/csam-reports', token),
+  reviewSafetyFlag:        (id, data, token)   => patch(`/admin/child-safety/flags/${id}`, data, token),
+  getNcmecReport:          (id, token)         => get(`/admin/child-safety/ncmec-report/${id}`, token),
+
+  // Admin audit log
+  logAuditAccess:          (data, token)       => post('/admin/audit-log', data, token),
+  getAuditLog:             (token)             => get('/admin/audit-log', token),
+
+  // Moderation action log
+  logModerationAction:     (data, token)       => post('/admin/moderation-log', data, token),
 
   // Admin chat-room management
   getAdminChatRooms:    (token)              => get('/admin/chat-rooms', token),
@@ -374,6 +388,11 @@ export default {
   triggerBillAiSummary:         (id, token)   => post(`/legislature/bills/${id}/ai-summary`, {}, token),
   createLegislationRep:         (data, token) => post('/legislature/representatives', data, token),
 
+  // Bill alert subscriptions
+  getBillAlerts:                (token)              => get('/legislature/bill-alerts', token),
+  subscribeBillAlert:           (data, token)        => post('/legislature/bill-alerts', data, token),
+  unsubscribeBillAlert:         (billId, token)      => del(`/legislature/bill-alerts/${billId}`, token),
+
   // Professional profiles
   getProfessionalProfile:       (username)          => get(`/profiles/${username}/professional`),
   updateProfessionalProfile:    (data, token)       => patch('/profiles/professional', data, token),
@@ -435,6 +454,7 @@ export default {
   getMyProdevCourses:    (token)         => get('/prodev/my-courses', token),
 
   // Maker's Guild
+  getMakerMetrics:       (username, token) => get(`/makers/${username}/metrics`, token),
   getMakers:             (params)        => get(`/makers${qs(params)}`),
   getMakerProfile:       (username)      => get(`/makers/${username}`),
   getMyMakerProfile:     (token)         => get('/makers/my-profile', token),

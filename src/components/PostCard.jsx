@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 
-const TYPE_BADGE = { need: 'badge-need', offer: 'badge-offer', event: 'badge-event' };
+const TYPE_BADGE = { need: 'badge-need', offer: 'badge-offer', event: 'badge-event', story_card: 'badge-story' };
 const BASE_URL = 'https://mycelium.unprecedentedtimes.org';
 
 const CATEGORY_LABELS = {
@@ -91,10 +91,18 @@ export default function PostCard({ post, onRequireAuth, onReserved, onDeleted })
 
   async function handleDelete(e) {
     e.stopPropagation();
-    if (!confirm('This will permanently remove this post and all reservations. This cannot be undone. Confirm delete?')) return;
+    const isMod = !isOwn && (user?.role === 'admin' || user?.role === 'moderator');
+    const msg = isMod
+      ? 'You are removing this post as a moderator. This action is logged. Confirm removal.'
+      : 'Are you sure you want to delete this post? This cannot be undone.';
+    if (!confirm(msg)) return;
     setDeleting(true);
     try {
       await api.deletePost(post.id, token);
+      if (isMod) {
+        api.logModerationAction({ action: 'delete_post', target_type: 'post', target_id: post.id }, token)
+          .catch(() => {});
+      }
       onDeleted?.(post.id);
     } catch (e) {
       setErr(e.message);
@@ -153,7 +161,9 @@ export default function PostCard({ post, onRequireAuth, onReserved, onDeleted })
       style={{ cursor: 'pointer' }}
     >
       <div className="post-header">
-        <span className={`badge ${TYPE_BADGE[post.type]}`}>{post.type}</span>
+        <span className={`badge ${TYPE_BADGE[post.type] || 'badge-offer'}`}>
+          {post.type === 'story_card' ? '✦ Story' : post.type}
+        </span>
         {urgencyDot}
         {isExpiringSoon && (
           <span className="badge-expiring-soon" title={`Expires ${new Date(post.expires_at).toLocaleString()}`}>
@@ -218,14 +228,28 @@ export default function PostCard({ post, onRequireAuth, onReserved, onDeleted })
         </div>
       )}
 
-      {post.description && <p className="post-description">{post.description}</p>}
+      {post.type === 'story_card' && post.mood_tag && (
+        <span className="post-mood-tag">{post.mood_tag}</span>
+      )}
+
+      {post.description && (
+        <p className="post-description">
+          {post.type === 'story_card'
+            ? post.description.slice(0, 180) + (post.description.length > 180 ? '…' : '')
+            : post.description}
+        </p>
+      )}
 
       <div onClick={e => e.stopPropagation()}>
         <MediaGrid media={post.media} />
       </div>
 
       <div className="post-details">
-        {post.location    && <span>📍 {post.location}</span>}
+        {post.location    && (
+          <span>
+            {post.location_lat && post.location_lng ? '🗺' : '📍'} {post.location}
+          </span>
+        )}
         {post.starts_at   && <span>🗓 {fmt(post.starts_at)}</span>}
         {post.circle_name && <span>⬡ {post.circle_name}</span>}
       </div>
