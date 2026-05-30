@@ -231,7 +231,23 @@ function UsersTab({ token }) {
     setActionId(u.id);
     try {
       const updated = await api.setFoundingMember(u.id, grant, token);
-      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, founding_member: updated.founding_member } : x));
+      setUsers(prev => prev.map(x => x.id === u.id
+        ? { ...x, founding_member: updated.founding_member, verified: updated.verified ?? x.verified }
+        : x
+      ));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  async function handleVerify(u, verified) {
+    if (!verified && !confirm(`Remove verified status from @${u.username}?`)) return;
+    setActionId(u.id);
+    try {
+      const updated = await api.adminSetVerified(u.id, verified, token);
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, verified: updated.verified } : x));
     } catch (e) {
       alert(e.message);
     } finally {
@@ -297,8 +313,14 @@ function UsersTab({ token }) {
         <td style={{ padding: '.5rem .75rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
           <span>{u.username}</span>
           <div style={{ display: 'flex', gap: '.25rem', flexWrap: 'wrap', marginTop: '.2rem' }}>
-            {u.founding_member && <BadgeSmall color="var(--green)" bg="var(--green-bg)" border="var(--green)">⬡ Founding</BadgeSmall>}
-            {u.verified && <BadgeSmall color="#1565c0" bg="#e3f2fd" border="#90caf9">✓ Verified</BadgeSmall>}
+            {u.founding_member
+              ? <BadgeSmall color="var(--green)" bg="var(--green-bg)" border="var(--green)">⬡ Founding</BadgeSmall>
+              : <BadgeSmall color="var(--muted)" bg="var(--surface)" border="var(--border)">⬡</BadgeSmall>
+            }
+            {u.verified
+              ? <BadgeSmall color="#1565c0" bg="#e3f2fd" border="#90caf9">✓ Verified</BadgeSmall>
+              : <BadgeSmall color="var(--muted)" bg="var(--surface)" border="var(--border)">○ Unverified</BadgeSmall>
+            }
             {u.covenant_agreed
               ? <BadgeSmall color="#2e7d32" bg="#e8f5e9" border="#a5d6a7" title={u.covenant_agreed_at ? `Agreed ${new Date(u.covenant_agreed_at).toLocaleDateString()}` : ''}>✓ Covenant</BadgeSmall>
               : <BadgeSmall color="var(--muted)" bg="var(--surface)" border="var(--border)">No Covenant</BadgeSmall>
@@ -369,6 +391,22 @@ function UsersTab({ token }) {
                 style={{ fontSize: '.72rem', color: 'var(--green)', borderColor: 'var(--green)' }}
                 onClick={() => toggleFoundingMember(u, true)}>
                 {busy ? '…' : '⬡ Grant'}
+              </button>
+            )}
+            {/* Verify / Unverify */}
+            {u.verified ? (
+              u.username !== 'AMBHaggermaker' && (
+                <button className="btn btn-sm btn-outline" disabled={busy}
+                  style={{ fontSize: '.72rem', color: 'var(--muted)', borderColor: 'var(--border)' }}
+                  onClick={() => handleVerify(u, false)}>
+                  {busy ? '…' : '○ Unverify'}
+                </button>
+              )
+            ) : (
+              <button className="btn btn-sm btn-outline" disabled={busy}
+                style={{ fontSize: '.72rem', color: '#1565c0', borderColor: '#90caf9' }}
+                onClick={() => handleVerify(u, true)}>
+                {busy ? '…' : '✓ Verify'}
               </button>
             )}
             {!u.covenant_agreed && (
