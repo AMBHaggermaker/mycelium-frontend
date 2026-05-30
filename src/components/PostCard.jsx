@@ -141,7 +141,14 @@ export default function PostCard({ post, onRequireAuth, onReserved, onDeleted })
 
   return (
     <div
-      className={`card post-card${isExpired ? ' post-card-expired' : ''}`}
+      className={[
+        'card post-card',
+        isExpired ? 'post-card-expired' : '',
+        post.auto_urgent ? 'post-card--auto-urgent' : (post.is_urgent ? 'post-card--urgent' : ''),
+        post.category === 'community' ? 'post-card--community' : '',
+        post.category === 'commerce' ? 'post-card--commerce' : '',
+        post.type === 'need' && !post.auto_urgent && !post.is_urgent ? 'post-card--need' : '',
+      ].filter(Boolean).join(' ')}
       onClick={e => { if (!e.defaultPrevented) navigate(`/posts/${post.id}`); }}
       style={{ cursor: 'pointer' }}
     >

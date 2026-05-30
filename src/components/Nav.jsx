@@ -75,7 +75,24 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
       {/* Desktop / header nav */}
       <nav className="nav">
         <div className="container nav-inner">
-          <Link to="/" className="nav-logo">⬡ Mycelium</Link>
+          <Link to="/" className="nav-logo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+              <line x1="12" y1="9.5" x2="12" y2="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="12" y1="14.5" x2="12" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="14.1" y1="10.9" x2="20" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="9.9" y1="13.1" x2="4" y2="19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="14.5" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="9.5" y1="12" x2="2" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="12" cy="2" r="1.5" fill="currentColor" opacity=".6" />
+              <circle cx="12" cy="22" r="1.5" fill="currentColor" opacity=".6" />
+              <circle cx="20" cy="5" r="1.5" fill="currentColor" opacity=".6" />
+              <circle cx="4" cy="19" r="1.5" fill="currentColor" opacity=".6" />
+              <circle cx="22" cy="12" r="1.5" fill="currentColor" opacity=".6" />
+              <circle cx="2" cy="12" r="1.5" fill="currentColor" opacity=".6" />
+            </svg>
+            Mycelium
+          </Link>
 
           {/* Primary nav links */}
           <div className="nav-links">
@@ -201,6 +218,13 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
                         onClick={() => setUserMenuOpen(false)}
                       >
                         Settings
+                      </Link>
+                      <Link
+                        to="/theme"
+                        className="nav-user-dropdown-item nav-user-dropdown-item--theme"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        ✦ Theme
                       </Link>
                       <div className="nav-user-dropdown-divider" />
                       <button
@@ -355,6 +379,9 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
               </a>
 
               <div className="me-sheet-section-label">Account</div>
+              <button className="me-sheet-item" onClick={() => handleNavigate('/theme')}>
+                <span className="me-sheet-item-icon">✦</span> Theme
+              </button>
               <button className="me-sheet-item" onClick={() => handleNavigate('/settings')}>
                 <span className="me-sheet-item-icon">⚙</span> Settings
               </button>

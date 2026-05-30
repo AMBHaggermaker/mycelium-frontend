@@ -118,16 +118,16 @@ const REPORT_TYPES = {
 };
 
 const SEVERITY_OPTIONS = [
-  { value: 'critical',   label: 'Critical',   color: '#dc2626', bg: '#fef2f2', desc: 'Imminent threat to health or safety' },
-  { value: 'serious',    label: 'Serious',    color: '#ea580c', bg: '#fff7ed', desc: 'Significant concern requiring attention' },
-  { value: 'moderate',   label: 'Moderate',   color: '#ca8a04', bg: '#fefce8', desc: 'Noteworthy issue to monitor' },
-  { value: 'minor',      label: 'Minor',      color: '#2563eb', bg: '#eff6ff', desc: 'Low-level concern or observation' },
-  { value: 'monitoring', label: 'Monitoring', color: '#6b7280', bg: '#f9fafb', desc: 'Routine documentation, no immediate concern' },
+  { value: 'critical',   label: 'Critical',   color: '#ff4060', bg: 'rgba(255,64,96,0.12)',   glow: '0 0 10px rgba(255,64,96,0.5)',   desc: 'Imminent threat to health or safety' },
+  { value: 'serious',    label: 'Serious',    color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  glow: '0 0 10px rgba(245,158,11,0.4)',  desc: 'Significant concern requiring attention' },
+  { value: 'moderate',   label: 'Moderate',   color: '#ffc832', bg: 'rgba(255,200,50,0.1)',   glow: '0 0 8px rgba(255,200,50,0.3)',   desc: 'Noteworthy issue to monitor' },
+  { value: 'minor',      label: 'Minor',      color: '#4da6ff', bg: 'rgba(77,166,255,0.1)',   glow: '0 0 8px rgba(77,166,255,0.3)',   desc: 'Low-level concern or observation' },
+  { value: 'monitoring', label: 'Monitoring', color: '#a8b5a0', bg: 'rgba(168,181,160,0.08)', glow: 'none',                           desc: 'Routine documentation, no immediate concern' },
 ];
 
 function getSeverityStyle(severity) {
   const opt = SEVERITY_OPTIONS.find(s => s.value === severity) || SEVERITY_OPTIONS[4];
-  return { color: opt.color, bg: opt.bg, label: opt.label };
+  return { color: opt.color, bg: opt.bg, label: opt.label, glow: opt.glow };
 }
 
 function SeverityBadge({ severity, style = {} }) {
@@ -143,7 +143,8 @@ function SeverityBadge({ severity, style = {} }) {
       letterSpacing: '.06em',
       background: s.bg,
       color: s.color,
-      border: `1px solid ${s.color}44`,
+      border: `1px solid ${s.color}66`,
+      boxShadow: s.glow,
       ...style,
     }}>
       {s.label}
@@ -412,6 +413,7 @@ function WatchReportCard({ report, highlighted }) {
     <div
       id={`report-${report.id}`}
       className={`watch-report-card${highlighted ? ' watch-report-highlighted' : ''}`}
+      data-severity={report.severity}
     >
       <div className="watch-report-card-header">
         <div style={{ flex: 1 }}>

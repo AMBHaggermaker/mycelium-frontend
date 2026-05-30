@@ -11,6 +11,7 @@ import Watch from './pages/Watch';
 import Merch from './pages/Merch';
 import InvitePage from './pages/InvitePage';
 import Settings from './pages/Settings';
+import ThemeSettings from './pages/ThemeSettings';
 import EmailVerifyPage from './pages/EmailVerifyPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PostDetailPage from './pages/PostDetailPage';
@@ -38,6 +39,7 @@ import DidYouKnow from './components/DidYouKnow';
 import MiniPlayer from './components/MiniPlayer';
 import { PlayerProvider } from './contexts/PlayerContext';
 import { PresenceProvider } from './contexts/PresenceContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { useAuth } from './auth';
 import api from './api';
 
@@ -103,6 +105,7 @@ export default function App() {
   if (!ready) return <div className="spinner" style={{ marginTop: '6rem' }} />;
 
   return (
+    <ThemeProvider>
     <PresenceProvider>
     <PlayerProvider>
       <CriticalAnomalyBanner />
@@ -120,6 +123,7 @@ export default function App() {
         <Route path="/merch"       element={<Merch />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="/settings"        element={<Settings />} />
+        <Route path="/theme"           element={<ThemeSettings />} />
         <Route path="/verify-email"    element={<EmailVerifyPage />} />
         <Route path="/reset-password"  element={<ResetPasswordPage />} />
         <Route path="/posts/:id"       element={<PostDetailPage onRequireAuth={() => setAuthOpen(true)} />} />
@@ -149,5 +153,6 @@ export default function App() {
       <MiniPlayer />
     </PlayerProvider>
     </PresenceProvider>
+    </ThemeProvider>
   );
 }

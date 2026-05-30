@@ -451,6 +451,16 @@ export default {
   actOnCounterNotice:       (id, decision, token) => request('PATCH', `/copyright/admin/claims/${id}/counter-notice`, { counter_notice_status: decision }, token),
   getCopyrightFlagged:      (token) => get('/copyright/admin/flagged', token),
 
+  getThemePreferences: (token) =>
+    fetch(`${BASE}/users/me/theme`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+
+  saveThemePreferences: (token, prefs) =>
+    fetch(`${BASE}/users/me/theme`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(prefs),
+    }).then(r => r.json()),
+
   uploadMakerWork: (formData, token, onProgress) => {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();

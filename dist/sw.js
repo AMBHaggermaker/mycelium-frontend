@@ -1,4 +1,4 @@
-const CACHE = 'mycelium-v1';
+const CACHE = 'mycelium-v3';
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.add('/')));
