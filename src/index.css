@@ -1171,31 +1171,14 @@ a { color: inherit; text-decoration: none; }
   outline: none;
 }
 .chat-gif-search:focus { border-color: var(--green); }
-.chat-gif-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4px;
-  padding: .5rem;
-  overflow-y: auto;
+.chat-gif-grid-wrap {
   flex: 1;
+  overflow-y: auto;
+  padding: .4rem;
+  /* Giphy Grid renders into this container — override link/anchor colours */
 }
-.chat-gif-item {
-  background: var(--surface);
-  border: none;
-  border-radius: 6px;
-  overflow: hidden;
-  cursor: pointer;
-  padding: 0;
-  aspect-ratio: 4/3;
-}
-.chat-gif-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.chat-gif-item:hover { opacity: .85; }
-.chat-gif-loading { color: var(--muted); font-size: .85rem; padding: 1rem; text-align: center; grid-column: 1/-1; }
+.chat-gif-grid-wrap a { text-decoration: none; }
+.chat-gif-loading { color: var(--muted); font-size: .85rem; padding: 1rem; text-align: center; }
 .chat-gif-powered { font-size: .7rem; color: var(--muted); text-align: center; padding: .3rem; margin: 0; }
 .chat-msg-gif {
   max-width: 240px;

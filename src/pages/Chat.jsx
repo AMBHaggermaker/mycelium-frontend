@@ -5,6 +5,10 @@ import api from '../api';
 import { usePresence } from '../contexts/PresenceContext';
 import PresenceDot from '../components/PresenceDot';
 import EmojiPicker from '../components/EmojiPicker';
+import { GiphyFetch } from '@giphy/js-fetch-api';
+import { Grid } from '@giphy/react-components';
+
+const gf = new GiphyFetch(import.meta.env.VITE_GIPHY_API_KEY || '');
 
 const SOCKET_URL = 'https://mycelium.unprecedentedtimes.org';
 const FIVE_MIN = 5 * 60 * 1000;
@@ -39,8 +43,7 @@ export default function Chat({ onRequireAuth }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [gifSearch, setGifSearch] = useState('');
-  const [gifs, setGifs] = useState([]);
-  const [gifsLoading, setGifsLoading] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const composerRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const gifPickerRef = useRef(null);
@@ -153,21 +156,16 @@ export default function Chat({ onRequireAuth }) {
     setShowEmojiPicker(false);
   }
 
-  async function searchGifs(query) {
-    setGifsLoading(true);
-    const BASE = 'https://mycelium.unprecedentedtimes.org/api';
-    try {
-      const res = await fetch(`${BASE}/chat/gifs?q=${encodeURIComponent(query || '')}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) setGifs(await res.json());
-    } catch { setGifs([]); }
-    finally { setGifsLoading(false); }
-  }
-
+  // Debounce gif search query
   useEffect(() => {
-    if (showGifPicker) searchGifs(gifSearch);
-  }, [showGifPicker]); // eslint-disable-line react-hooks/exhaustive-deps
+    const t = setTimeout(() => setDebouncedQuery(gifSearch), 400);
+    return () => clearTimeout(t);
+  }, [gifSearch]);
+
+  const fetchGifs = (offset) =>
+    debouncedQuery.trim()
+      ? gf.search(debouncedQuery, { offset, limit: 20, rating: 'pg-13' })
+      : gf.trending({ offset, limit: 20, rating: 'pg-13' });
 
   async function handleFileUpload(e) {
     const file = e.target.files?.[0];
@@ -211,6 +209,7 @@ export default function Chat({ onRequireAuth }) {
     });
     setShowGifPicker(false);
     setGifSearch('');
+    setDebouncedQuery('');
   }
 
   const activeRoom = rooms.find(r => r.slug === activeSlug);
@@ -426,27 +425,29 @@ export default function Chat({ onRequireAuth }) {
                   <div className="chat-gif-header">
                     <input
                       className="chat-gif-search"
-                      placeholder="Search GIFs…"
+                      placeholder="Search GIPHY…"
                       value={gifSearch}
-                      onChange={e => { setGifSearch(e.target.value); searchGifs(e.target.value); }}
+                      onChange={e => setGifSearch(e.target.value)}
                       autoFocus
                     />
-                    <button className="chat-picker-close" onClick={() => setShowGifPicker(false)}>✕</button>
+                    <button className="chat-picker-close" onClick={() => { setShowGifPicker(false); setGifSearch(''); setDebouncedQuery(''); }}>✕</button>
                   </div>
-                  <div className="chat-gif-grid">
-                    {gifsLoading ? (
-                      <div className="chat-gif-loading">Searching…</div>
-                    ) : gifs.length === 0 ? (
-                      <div className="chat-gif-loading">No GIFs found</div>
-                    ) : (
-                      gifs.map((g, i) => (
-                        <button key={i} className="chat-gif-item" onClick={() => sendGif(g.url, g.title)}>
-                          <img src={g.preview} alt={g.title} loading="lazy" />
-                        </button>
-                      ))
-                    )}
-                  </div>
-                  <p className="chat-gif-powered">Powered by Tenor</p>
+                  {!import.meta.env.VITE_GIPHY_API_KEY ? (
+                    <div className="chat-gif-loading">Set VITE_GIPHY_API_KEY to enable GIFs</div>
+                  ) : (
+                    <div className="chat-gif-grid-wrap">
+                      <Grid
+                        key={debouncedQuery}
+                        width={298}
+                        columns={3}
+                        gutter={4}
+                        fetchGifs={fetchGifs}
+                        onGifClick={(gif, e) => { e.preventDefault(); sendGif(gif.images.original.url, gif.title); }}
+                        hideAttribution
+                      />
+                    </div>
+                  )}
+                  <p className="chat-gif-powered">Powered by GIPHY</p>
                 </div>
               )}
               {user ? (
