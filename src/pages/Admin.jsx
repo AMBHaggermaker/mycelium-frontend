@@ -61,6 +61,25 @@ export default function Admin() {
             onClick={() => setTab('copyright')}>
             Copyright Claims
           </button>
+          {user.role === 'admin' && (
+            <button className={`tab-btn${tab === 'child-safety' ? ' active' : ''}`}
+              style={{ color: tab === 'child-safety' ? '#ff4060' : undefined }}
+              onClick={() => setTab('child-safety')}>
+              Child Safety
+            </button>
+          )}
+          {user.role === 'admin' && (
+            <button className={`tab-btn${tab === 'xrp-donations' ? ' active' : ''}`}
+              onClick={() => setTab('xrp-donations')}>
+              XRP Donations
+            </button>
+          )}
+          {user.username === 'AMBHaggermaker' && (
+            <button className={`tab-btn${tab === 'audit-log' ? ' active' : ''}`}
+              onClick={() => setTab('audit-log')}>
+              Audit Log
+            </button>
+          )}
         </div>
 
         {tab === 'moderation' && <ModerationQueue token={token} />}
@@ -70,6 +89,9 @@ export default function Admin() {
         {tab === 'businesses' && user.role === 'admin' && <BusinessesTab token={token} />}
         {tab === 'feedback' && user.role === 'admin' && <FeedbackTab token={token} />}
         {tab === 'copyright' && <CopyrightClaimsTab token={token} />}
+        {tab === 'child-safety' && user.role === 'admin' && <ChildSafetyTab token={token} />}
+        {tab === 'xrp-donations' && user.role === 'admin' && <XrpDonationsTab token={token} />}
+        {tab === 'audit-log' && user.username === 'AMBHaggermaker' && <AuditLogTab token={token} />}
       </div>
     </div>
   );
@@ -1576,5 +1598,472 @@ function MakerGrantBtn({ u, busy, onGrant }) {
       <button className="btn btn-sm btn-ghost" style={{ fontSize: '.72rem', padding: '.15rem .25rem' }}
         onClick={() => setOpen(false)}>✕</button>
     </span>
+  );
+}
+
+// ── Child Safety Tab ────────────────────────────────────────────────────────
+function ChildSafetyTab({ token }) {
+  const [activeTab, setActiveTab] = useState('flags');
+  const [flags,       setFlags]       = useState([]);
+  const [csam,        setCsam]        = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [ncmecReport, setNcmecReport] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      api.getChildSafetyFlags(token),
+      api.getCsamReports(token),
+    ]).then(([f, c]) => { setFlags(f); setCsam(c); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  async function reviewFlag(id, status, note) {
+    try {
+      const updated = await api.reviewSafetyFlag(id, { status, review_note: note }, token);
+      setFlags(prev => prev.map(f => f.id === id ? updated : f));
+    } catch (e) { alert(e.message); }
+  }
+
+  async function loadNcmecReport(id) {
+    try {
+      const r = await api.getNcmecReport(id, token);
+      setNcmecReport(r);
+    } catch (e) { alert(e.message); }
+  }
+
+  if (loading) return <div className="spinner" style={{ margin: '2rem auto' }} />;
+
+  return (
+    <div>
+      <div style={{ background: '#1a0a0a', border: '1px solid #ff4060', borderRadius: 8, padding: '1rem', marginBottom: '1.5rem' }}>
+        <strong style={{ color: '#ff4060' }}>⚠ Child Safety Queue</strong>
+        <p style={{ fontSize: '.85rem', color: '#a8b5a0', margin: '.5rem 0 0' }}>
+          AI-flagged content and CSAM hash matches requiring immediate review.
+          Confirmed CSAM reports must be submitted to NCMEC via the CyberTipline.
+        </p>
+      </div>
+
+      <div className="tabs" style={{ marginBottom: '1rem' }}>
+        <button className={`tab-btn${activeTab === 'flags' ? ' active' : ''}`} onClick={() => setActiveTab('flags')}>
+          AI Flags ({flags.filter(f => f.status === 'pending').length} pending)
+        </button>
+        <button className={`tab-btn${activeTab === 'csam' ? ' active' : ''}`} onClick={() => setActiveTab('csam')}>
+          CSAM Reports ({csam.length})
+        </button>
+      </div>
+
+      {activeTab === 'flags' && (
+        <div>
+          {flags.length === 0 && <p style={{ color: 'var(--muted)' }}>No flagged content.</p>}
+          {flags.map(f => (
+            <FlagCard key={f.id} flag={f} onReview={reviewFlag} />
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'csam' && (
+        <div>
+          {csam.length === 0 && <p style={{ color: 'var(--muted)' }}>No CSAM reports on record.</p>}
+          {csam.map(r => (
+            <div key={r.id} className="card" style={{ marginBottom: '.75rem', borderColor: '#ff4060' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                <div>
+                  <p style={{ fontWeight: 600, color: '#ff4060', marginBottom: '.25rem' }}>CSAM Hash Match</p>
+                  <p style={{ fontSize: '.8rem', color: 'var(--muted)', fontFamily: 'monospace' }}>Hash: {r.file_hash}</p>
+                  <p style={{ fontSize: '.8rem', color: 'var(--muted)' }}>
+                    User: {r.reporter_username || 'anonymous'} · IP: {r.ip_address || 'unknown'} · {new Date(r.created_at).toLocaleString()}
+                  </p>
+                  <p style={{ fontSize: '.8rem', color: 'var(--muted)' }}>Action: {r.action_taken}</p>
+                </div>
+                <button className="btn btn-sm btn-danger" onClick={() => loadNcmecReport(r.id)}>
+                  Submit to NCMEC
+                </button>
+              </div>
+            </div>
+          ))}
+          {ncmecReport && (
+            <div className="modal-overlay" onClick={() => setNcmecReport(null)}>
+              <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+                <div className="modal-header">
+                  <span className="modal-title">NCMEC CyberTipline Submission</span>
+                  <button className="modal-close" onClick={() => setNcmecReport(null)}>✕</button>
+                </div>
+                <div className="modal-body">
+                  <p style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
+                    {ncmecReport.note}
+                  </p>
+                  <a href={ncmecReport.ncmec_submission_url} target="_blank" rel="noopener noreferrer"
+                    className="btn btn-danger" style={{ marginBottom: '1rem', display: 'inline-block' }}>
+                    Open NCMEC CyberTipline →
+                  </a>
+                  <h4 style={{ marginBottom: '.5rem' }}>Fields for submission:</h4>
+                  <table style={{ fontSize: '.78rem', width: '100%', borderCollapse: 'collapse' }}>
+                    {Object.entries(ncmecReport.fields_for_submission).map(([k, v]) => (
+                      <tr key={k}>
+                        <td style={{ padding: '3px 10px 3px 0', color: 'var(--muted)', whiteSpace: 'nowrap', verticalAlign: 'top' }}>{k.replace(/_/g, ' ')}</td>
+                        <td style={{ padding: '3px 0', wordBreak: 'break-all' }}>{String(v)}</td>
+                      </tr>
+                    ))}
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FlagCard({ flag, onReview }) {
+  const [note, setNote] = useState('');
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="card" style={{ marginBottom: '.75rem', borderColor: flag.status === 'pending' ? '#f59e0b' : 'var(--border)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginBottom: '.3rem' }}>
+            <span className={`badge ${flag.status === 'pending' ? 'badge-event' : 'badge-gray'}`}>{flag.status}</span>
+            <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{flag.content_type} · {flag.flag_reason}</span>
+            <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>confidence: {flag.ai_confidence || 'unknown'}</span>
+          </div>
+          <p style={{ fontSize: '.82rem', marginBottom: '.2rem' }}>
+            <strong>User:</strong> {flag.flagged_username || 'unknown'}
+          </p>
+          {flag.flag_detail && (
+            <p style={{ fontSize: '.8rem', color: 'var(--muted)', marginBottom: '.2rem' }}>{flag.flag_detail}</p>
+          )}
+          <p style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{new Date(flag.created_at).toLocaleString()}</p>
+        </div>
+        {flag.status === 'pending' && (
+          <button className="btn btn-sm btn-outline" onClick={() => setOpen(o => !o)}>Review</button>
+        )}
+      </div>
+      {open && flag.status === 'pending' && (
+        <div style={{ marginTop: '.75rem', borderTop: '1px solid var(--border)', paddingTop: '.75rem' }}>
+          <textarea className="form-textarea" rows={2} placeholder="Review note (optional)"
+            value={note} onChange={e => setNote(e.target.value)}
+            style={{ marginBottom: '.5rem', fontSize: '.82rem' }} />
+          <div style={{ display: 'flex', gap: '.5rem' }}>
+            <button className="btn btn-sm btn-danger" onClick={() => onReview(flag.id, 'actioned', note)}>Take Action</button>
+            <button className="btn btn-sm btn-outline" onClick={() => onReview(flag.id, 'dismissed', note)}>Dismiss (False Positive)</button>
+            <button className="btn btn-sm btn-ghost" onClick={() => setOpen(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Audit Log Tab (founder only) ───────────────────────────────────────────
+function AuditLogTab({ token }) {
+  const [logs,    setLogs]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err,     setErr]     = useState(null);
+
+  useEffect(() => {
+    api.getAuditLog(token)
+      .then(setLogs)
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  if (loading) return <div className="spinner" style={{ margin: '2rem auto' }} />;
+  if (err)     return <p style={{ color: 'var(--red)' }}>{err}</p>;
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: '1rem', background: '#0a0a1a', borderColor: 'rgba(0,255,136,0.2)' }}>
+        <p style={{ fontSize: '.85rem', color: '#a8b5a0', margin: 0 }}>
+          All admin access to private content is logged here. Only the platform founder can view this log.
+          Logs are permanent and cannot be deleted.
+        </p>
+      </div>
+      {logs.length === 0 && <p style={{ color: 'var(--muted)' }}>No access log entries.</p>}
+      <table style={{ width: '100%', fontSize: '.8rem', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+            <th style={{ padding: '6px 10px 6px 0', color: 'var(--muted)' }}>Admin</th>
+            <th style={{ padding: '6px 10px', color: 'var(--muted)' }}>Type</th>
+            <th style={{ padding: '6px 10px', color: 'var(--muted)' }}>Content ID</th>
+            <th style={{ padding: '6px 10px', color: 'var(--muted)' }}>Reason</th>
+            <th style={{ padding: '6px 10px', color: 'var(--muted)' }}>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {logs.map(l => (
+            <tr key={l.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              <td style={{ padding: '6px 10px 6px 0' }}>{l.admin_username}</td>
+              <td style={{ padding: '6px 10px', color: 'var(--muted)' }}>{l.content_type}</td>
+              <td style={{ padding: '6px 10px', fontFamily: 'monospace', fontSize: '.72rem' }}>{l.content_id}</td>
+              <td style={{ padding: '6px 10px', maxWidth: 300 }}>{l.reason}</td>
+              <td style={{ padding: '6px 10px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{new Date(l.accessed_at).toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── XRP Donations Tab ─────────────────────────────────────────────────────────
+
+const XRP_STATUS_LABELS = {
+  pending:       { label: 'Pending',       color: '#f59e0b' },
+  confirmed:     { label: 'Confirmed',     color: '#00ff88' },
+  suspicious:    { label: 'Suspicious',    color: '#ef4444' },
+  ignored:       { label: 'Ignored',       color: '#6b7280' },
+  below_minimum: { label: 'Below Minimum', color: '#f97316' },
+};
+
+function XrpDonationsTab({ token }) {
+  const [data,        setData]        = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [err,         setErr]         = useState(null);
+  const [statusFilter,setStatusFilter]= useState('');
+  const [editNotes,   setEditNotes]   = useState({});  // id → notes string
+  const [editRef,     setEditRef]     = useState({});  // id → ledger ref string
+  const [copiedAddr,  setCopiedAddr]  = useState(null);
+  const [saving,      setSaving]      = useState({});
+
+  const load = useCallback(() => {
+    setLoading(true);
+    api.getAdminXrpDonations(statusFilter, token)
+      .then(setData)
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false));
+  }, [statusFilter, token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function copyAddr(addr, id) {
+    navigator.clipboard.writeText(addr).then(() => {
+      setCopiedAddr(id);
+      setTimeout(() => setCopiedAddr(null), 1500);
+    });
+  }
+
+  async function updateStatus(id, status) {
+    setSaving(s => ({ ...s, [id]: true }));
+    try {
+      const updated = await api.updateXrpDonation(id, {
+        status,
+        admin_notes:            editNotes[id] !== undefined ? editNotes[id] : undefined,
+        ledger_transaction_ref: editRef[id]   !== undefined ? editRef[id]   : undefined,
+      }, token);
+      setData(prev => ({
+        ...prev,
+        donations: prev.donations.map(d => d.id === id ? { ...d, ...updated } : d),
+      }));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSaving(s => ({ ...s, [id]: false }));
+    }
+  }
+
+  async function saveNotes(id) {
+    setSaving(s => ({ ...s, [id]: true }));
+    try {
+      const updated = await api.updateXrpDonation(id, {
+        admin_notes:            editNotes[id] ?? null,
+        ledger_transaction_ref: editRef[id]   ?? null,
+      }, token);
+      setData(prev => ({
+        ...prev,
+        donations: prev.donations.map(d => d.id === id ? { ...d, ...updated } : d),
+      }));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSaving(s => ({ ...s, [id]: false }));
+    }
+  }
+
+  function addrHighlight(addr) {
+    if (!addr || addr.length < 12) return <span>{addr}</span>;
+    return (
+      <>
+        <span style={{ color: '#00ff88', fontWeight: 700 }}>{addr.slice(0, 6)}</span>
+        <span style={{ color: 'var(--muted)' }}>{addr.slice(6, -6)}</span>
+        <span style={{ color: '#00ff88', fontWeight: 700 }}>{addr.slice(-6)}</span>
+      </>
+    );
+  }
+
+  if (loading) return <div className="spinner" style={{ marginTop: '2rem' }} />;
+  if (err)     return <p className="form-error">{err}</p>;
+  if (!data)   return null;
+
+  const { donations, totals } = data;
+
+  return (
+    <div>
+      {/* Warning banner */}
+      <div style={{
+        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)',
+        borderRadius: 8, padding: '12px 16px', marginBottom: '1.25rem',
+        fontSize: '.85rem', lineHeight: 1.6, color: '#fca5a5',
+      }}>
+        ⚠️ <strong style={{ color: '#f87171' }}>Only confirm transactions you have personally verified in Ledger Live.</strong>{' '}
+        Never confirm a transaction without a matching sender address.
+        Any transaction arriving without a matching declaration should not be touched.
+      </div>
+
+      {/* Summary */}
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+        {[
+          { label: 'Pending',        val: totals.pending_count,   color: '#f59e0b' },
+          { label: 'Confirmed',      val: totals.confirmed_count, color: '#00ff88' },
+          { label: 'Confirmed XRP',  val: `${parseFloat(totals.confirmed_xrp).toFixed(2)} XRP`, color: '#00ff88' },
+        ].map(s => (
+          <div key={s.label} style={{
+            background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8,
+            padding: '10px 18px', flex: '1 1 140px',
+          }}>
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: 2 }}>{s.label}</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 700, color: s.color }}>{s.val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filter */}
+      <div style={{ display: 'flex', gap: '.75rem', alignItems: 'center', marginBottom: '1rem' }}>
+        <label style={{ fontSize: '.85rem', color: 'var(--muted)' }}>Filter:</label>
+        <select className="form-select" style={{ width: 180 }}
+          value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <option value="">All statuses</option>
+          {Object.entries(XRP_STATUS_LABELS).map(([v, { label }]) => (
+            <option key={v} value={v}>{label}</option>
+          ))}
+        </select>
+        <button className="btn btn-outline btn-sm" onClick={load}>Refresh</button>
+      </div>
+
+      {donations.length === 0 ? (
+        <p className="empty">No declarations found.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {donations.map(d => {
+            const statusMeta = XRP_STATUS_LABELS[d.status] || { label: d.status, color: '#aaa' };
+            const isBelowMin = d.status === 'below_minimum';
+            return (
+              <div key={d.id} style={{
+                background: 'var(--card)', border: `1px solid ${isBelowMin ? 'rgba(249,115,22,0.35)' : 'var(--border)'}`,
+                borderRadius: 10, padding: '1rem 1.25rem',
+              }}>
+                {/* Header row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', marginBottom: '.75rem' }}>
+                  <div>
+                    <span style={{ fontWeight: 700, marginRight: 8 }}>{d.donor_name}</span>
+                    <span style={{ color: 'var(--muted)', fontSize: '.85rem' }}>{d.donor_email}</span>
+                    {d.mycelium_username && <span style={{ marginLeft: 8, color: 'var(--green)', fontSize: '.82rem' }}>@{d.mycelium_username}</span>}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                    <span style={{
+                      background: `${statusMeta.color}22`, color: statusMeta.color,
+                      border: `1px solid ${statusMeta.color}55`,
+                      borderRadius: 12, padding: '2px 10px', fontSize: '.78rem', fontWeight: 600,
+                    }}>{statusMeta.label}</span>
+                    <span style={{ color: 'var(--muted)', fontSize: '.78rem' }}>
+                      {new Date(d.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                {isBelowMin && (
+                  <div style={{
+                    background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.3)',
+                    borderRadius: 6, padding: '6px 10px', marginBottom: '.75rem',
+                    fontSize: '.8rem', color: '#fdba74',
+                  }}>
+                    ⚠️ Possible dust amount — do not confirm without manual verification.
+                  </div>
+                )}
+
+                {/* Amount + addresses */}
+                <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '.75rem' }}>
+                  <div>
+                    <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: 2 }}>Declared amount</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#00ff88' }}>{parseFloat(d.declared_amount_xrp)} XRP</div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 220 }}>
+                    <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: 4 }}>Sender address</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                      <code style={{ fontFamily: 'Courier New,monospace', fontSize: '.82rem', wordBreak: 'break-all' }}>
+                        {addrHighlight(d.sender_xrp_address)}
+                      </code>
+                      <button
+                        type="button"
+                        className="merch-donate-xrp-copy"
+                        style={{ flexShrink: 0 }}
+                        onClick={() => copyAddr(d.sender_xrp_address, d.id)}
+                      >
+                        {copiedAddr === d.id ? '✓' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {d.note && (
+                  <div style={{ fontSize: '.85rem', color: 'var(--muted)', fontStyle: 'italic', marginBottom: '.75rem' }}>
+                    "{d.note}"
+                  </div>
+                )}
+
+                {/* Admin notes + ledger ref */}
+                <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', marginBottom: '.75rem' }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <label style={{ fontSize: '.75rem', color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Admin notes</label>
+                    <input className="form-input" style={{ fontSize: '.82rem', padding: '.3rem .6rem' }}
+                      value={editNotes[d.id] !== undefined ? editNotes[d.id] : (d.admin_notes || '')}
+                      onChange={e => setEditNotes(n => ({ ...n, [d.id]: e.target.value }))}
+                      placeholder="Internal notes…" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <label style={{ fontSize: '.75rem', color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Ledger transaction ref</label>
+                    <input className="form-input" style={{ fontSize: '.82rem', padding: '.3rem .6rem' }}
+                      value={editRef[d.id] !== undefined ? editRef[d.id] : (d.ledger_transaction_ref || '')}
+                      onChange={e => setEditRef(r => ({ ...r, [d.id]: e.target.value }))}
+                      placeholder="Paste tx hash or reference…" />
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                  <button className="btn btn-sm btn-outline"
+                    style={{ borderColor: '#00ff88', color: '#00ff88', fontSize: '.8rem' }}
+                    disabled={saving[d.id] || d.status === 'confirmed'}
+                    onClick={() => updateStatus(d.id, 'confirmed')}>
+                    {saving[d.id] ? '…' : '✓ Confirm'}
+                  </button>
+                  <button className="btn btn-sm btn-outline"
+                    style={{ borderColor: '#ef4444', color: '#ef4444', fontSize: '.8rem' }}
+                    disabled={saving[d.id] || d.status === 'suspicious'}
+                    onClick={() => updateStatus(d.id, 'suspicious')}>
+                    ⚑ Suspicious
+                  </button>
+                  <button className="btn btn-sm btn-outline"
+                    style={{ fontSize: '.8rem' }}
+                    disabled={saving[d.id] || d.status === 'ignored'}
+                    onClick={() => updateStatus(d.id, 'ignored')}>
+                    Ignore
+                  </button>
+                  <button className="btn btn-sm btn-ghost"
+                    style={{ fontSize: '.8rem', marginLeft: 'auto' }}
+                    disabled={saving[d.id]}
+                    onClick={() => saveNotes(d.id)}>
+                    {saving[d.id] ? '…' : 'Save notes'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

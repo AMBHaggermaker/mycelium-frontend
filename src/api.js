@@ -445,6 +445,11 @@ export default {
 
   // Donations
   createDonationSession: (amount) => post('/donations/create-session', { amount }),
+  submitXrpDonation: (data)        => post('/donations/xrp', data),
+
+  // Admin — XRP donations
+  getAdminXrpDonations: (status, token) => get(`/admin/donations/xrp${status ? `?status=${status}` : ''}`, token),
+  updateXrpDonation:    (id, data, token) => patch(`/admin/donations/xrp/${id}`, data, token),
 
   // Professional Development Hub
   getProdevCourses:      (params)        => get(`/prodev/courses${qs(params)}`),
