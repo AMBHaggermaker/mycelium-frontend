@@ -1,4 +1,5 @@
 import DonateButton from '../components/DonateButton';
+import XrpDonate from '../components/XrpDonate';
 
 const MERCH_EMAIL = 'aliciambh82@protonmail.com';
 
@@ -96,6 +97,7 @@ export default function Merch() {
             </div>
             <DonateButton className="btn btn-primary merch-donate-btn" label="Donate via Stripe" />
           </div>
+          <XrpDonate />
         </div>
 
         <div className="merch-footer">

@@ -5475,6 +5475,10 @@ a { color: inherit; text-decoration: none; }
   padding: .85rem 1.25rem;
   border-top: 1px solid var(--border);
 }
+.donate-modal .merch-donate-xrp {
+  margin: 0; padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
 
 /* ── Donation Thanks Page ───────────────────────────────────── */
 .donation-thanks-page {
@@ -5547,6 +5551,19 @@ a { color: inherit; text-decoration: none; }
   transition: background .15s;
 }
 .merch-donate-xrp-copy:hover { background: var(--green-bg); }
+.xrp-donate-body {
+  display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap;
+}
+.xrp-qr-wrap {
+  background: var(--surface); border: 1px solid rgba(0,255,136,0.2);
+  border-radius: 8px; padding: .6rem; flex-shrink: 0;
+  line-height: 0;
+}
+.xrp-donate-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .5rem; }
+.xrp-donate-note {
+  font-size: .78rem; color: var(--muted); margin: 0; line-height: 1.5;
+  font-style: italic;
+}
 
 /* ── Post expiry badges ─────────────────────────────────────── */
 .badge-expiring-soon {

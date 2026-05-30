@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import api from '../api';
+import XrpDonate from './XrpDonate';
 
 const QUICK_AMOUNTS = [5, 10, 25, 50];
 
@@ -109,6 +110,8 @@ export default function DonateButton({ className = 'btn btn-primary', label = 'D
                   : `Donate${amount && amount >= 1 ? ` $${Number.isInteger(amount) ? amount : amount.toFixed(2)}` : ''}`}
               </button>
             </div>
+
+            <XrpDonate />
 
           </div>
         </div>
