@@ -5765,13 +5765,65 @@ a { color: inherit; text-decoration: none; }
 .maker-card-preview-icon { font-size: 1rem; color: var(--green); }
 .makers-empty { text-align: center; padding: 4rem 1.25rem; color: var(--muted); }
 
-.tier-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
-.tier-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; display: flex; flex-direction: column; gap: .6rem; }
-.tier-card-name { font-weight: 800; font-size: 1.05rem; text-transform: capitalize; }
-.tier-card-price { font-size: 1.3rem; font-weight: 700; color: var(--green); }
-.tier-card-features { list-style: none; font-size: .83rem; color: var(--muted); display: flex; flex-direction: column; gap: .3rem; }
-.tier-card-btn { margin-top: auto; }
-.modal-sub { color: var(--muted); font-size: .9rem; margin: .5rem 0 0; }
+/* ── Maker tier modal ───────────────────────────────────── */
+.modal--wide { max-width: 960px; }
+
+.tier-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+@media (max-width: 700px) {
+  .tier-cards { grid-template-columns: 1fr; }
+  .modal--wide { max-width: 100%; }
+}
+
+.tier-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  position: relative;
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+.tier-card--highlight {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(42,95,10,.10);
+}
+.tier-card-badge {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--green);
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: .2rem .75rem;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.tier-card-name { font-weight: 800; font-size: 1.1rem; text-transform: capitalize; }
+.tier-card-price { font-size: 1.45rem; font-weight: 700; color: var(--green); }
+.tier-card-storage { font-size: .82rem; color: var(--muted); font-weight: 600; }
+.tier-card-features {
+  list-style: none;
+  font-size: .84rem;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  margin: .25rem 0;
+}
+.tier-card-features li::before { content: '✓ '; color: var(--green); font-weight: 700; }
+.tier-card-btn { margin-top: auto; width: 100%; }
+.modal-sub { color: var(--muted); font-size: .9rem; margin: .25rem 0 .75rem; line-height: 1.5; }
 
 .maker-profile-page { padding-top: calc(var(--nav-h) + 1rem); padding-bottom: 7rem; max-width: 900px; margin: 0 auto; padding-left: 1.25rem; padding-right: 1.25rem; }
 .maker-profile-header { padding: 1.5rem 0; border-bottom: 1px solid var(--border); }

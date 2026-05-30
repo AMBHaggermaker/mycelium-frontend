@@ -10,9 +10,9 @@ const CATEGORIES = [
 ];
 
 const TIER_INFO = [
-  { tier: 'basic',    price: '$5/mo', storage: '1 GB',  audio: '50 MB/file',  video: 'No video',       desc: 'Audio and images' },
-  { tier: 'standard', price: '$10/mo', storage: '5 GB', audio: '200 MB/file', video: '500 MB/file',    desc: 'Audio and video' },
-  { tier: 'pro',      price: '$25/mo', storage: '20 GB', audio: '1 GB/file',  video: '1 GB/file',      desc: 'Full pro access' },
+  { tier: 'basic',    price: '$5/mo',  storage: '1 GB',  audio: '50 MB/file',  video: null,          image: '10 MB/file', popular: false, desc: 'Audio and images' },
+  { tier: 'standard', price: '$10/mo', storage: '5 GB',  audio: '200 MB/file', video: '500 MB/file', image: '25 MB/file', popular: true,  desc: 'Audio, video, and images' },
+  { tier: 'pro',      price: '$25/mo', storage: '20 GB', audio: '1 GB/file',   video: '2 GB/file',   image: '50 MB/file', popular: false, desc: 'Full pro access' },
 ];
 
 export default function Makers({ onRequireAuth }) {
@@ -121,31 +121,45 @@ export default function Makers({ onRequireAuth }) {
       {/* Tier selection modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
-            <h2>Choose Your Maker Tier</h2>
-            <p className="modal-sub">Upload your original work to the sovereign content market. Files are stored on platform infrastructure — no corporate intermediaries.</p>
-            {subError && <p className="error-text">{subError}</p>}
-            <div className="tier-cards">
-              {TIER_INFO.map(t => (
-                <div key={t.tier} className="tier-card">
-                  <div className="tier-card-name">{t.tier[0].toUpperCase() + t.tier.slice(1)}</div>
-                  <div className="tier-card-price">{t.price}</div>
-                  <ul className="tier-card-features">
-                    <li>{t.storage} storage</li>
-                    <li>Audio: {t.audio}</li>
-                    <li>Video: {t.video}</li>
-                    <li>{t.desc}</li>
-                  </ul>
-                  <button
-                    className="btn btn-primary tier-card-btn"
-                    disabled={subscribing === t.tier}
-                    onClick={() => handleSubscribe(t.tier)}
-                  >
-                    {subscribing === t.tier ? 'Redirecting…' : `Choose ${t.tier[0].toUpperCase() + t.tier.slice(1)}`}
-                  </button>
-                </div>
-              ))}
+          <div className="modal modal--wide" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">Choose Your Maker Tier</span>
+              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p className="modal-sub">
+                Upload your original work to the sovereign content market. Files are stored on
+                platform infrastructure — no corporate intermediaries, no content ID strikes.
+              </p>
+              {subError && <p className="error-text">{subError}</p>}
+              <div className="tier-cards">
+                {TIER_INFO.map(t => {
+                  const name = t.tier[0].toUpperCase() + t.tier.slice(1);
+                  return (
+                    <div key={t.tier} className={'tier-card' + (t.popular ? ' tier-card--highlight' : '')}>
+                      {t.popular && <div className="tier-card-badge">Most Popular</div>}
+                      <div className="tier-card-name">{name}</div>
+                      <div className="tier-card-price">{t.price}</div>
+                      <div className="tier-card-storage">{t.storage} total storage</div>
+                      <ul className="tier-card-features">
+                        <li>Audio: {t.audio}</li>
+                        <li>Video: {t.video ?? 'Not available'}</li>
+                        <li>Images: {t.image}</li>
+                      </ul>
+                      <button
+                        className={'btn tier-card-btn' + (t.popular ? ' btn-primary' : ' btn-outline')}
+                        disabled={subscribing === t.tier}
+                        onClick={() => handleSubscribe(t.tier)}
+                      >
+                        {subscribing === t.tier ? 'Redirecting…' : `Subscribe — ${name}`}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <p style={{ fontSize: '.8rem', color: 'var(--muted)', textAlign: 'center', marginTop: '.25rem' }}>
+                Already a subscriber? Make sure you are logged in and your subscription is active.
+              </p>
             </div>
           </div>
         </div>
