@@ -5503,20 +5503,50 @@ a { color: inherit; text-decoration: none; }
 /* ── Merch Donate Section ──────────────────────────────────── */
 .merch-donate-section {
   margin: 2.5rem 0 1.5rem;
-  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
-  border: 1px solid #6ee7b7;
+  background: #1a1a2e;
+  border: 1px solid rgba(0,255,136,0.25);
   border-radius: var(--radius);
   padding: 1.75rem 2rem;
+  box-shadow: 0 0 8px rgba(0,255,136,0.15);
 }
 .merch-donate-inner {
   display: flex; align-items: center; justify-content: space-between;
   gap: 1.5rem; flex-wrap: wrap;
 }
-.merch-donate-title { font-size: 1.15rem; font-weight: 700; margin: 0 0 .35rem; }
+.merch-donate-title {
+  font-size: 1.15rem; font-weight: 700; margin: 0 0 .35rem;
+  color: var(--text);
+}
 .merch-donate-desc {
   font-size: .875rem; color: var(--muted); max-width: 480px; margin: 0; line-height: 1.6;
 }
 .merch-donate-btn { flex-shrink: 0; }
+/* XRP option (when added) */
+.merch-donate-xrp {
+  margin-top: 1.25rem; padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+.merch-donate-xrp-label {
+  font-size: .78rem; color: var(--muted); margin: 0 0 .45rem;
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.merch-donate-xrp-row {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+}
+.merch-donate-xrp-addr {
+  font-family: 'Courier New', monospace; font-size: .8rem;
+  color: var(--green); background: var(--surface);
+  padding: .3rem .65rem; border-radius: 5px;
+  border: 1px solid rgba(0,255,136,0.2);
+  word-break: break-all; flex: 1;
+}
+.merch-donate-xrp-copy {
+  background: none; border: 1px solid rgba(0,255,136,0.25);
+  color: var(--green); font-size: .8rem; padding: .3rem .65rem;
+  border-radius: 5px; cursor: pointer; white-space: nowrap;
+  transition: background .15s;
+}
+.merch-donate-xrp-copy:hover { background: var(--green-bg); }
 
 /* ── Post expiry badges ─────────────────────────────────────── */
 .badge-expiring-soon {
