@@ -41,52 +41,23 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--bg);
+  background: #050510; /* fallback — canvas SpaceBackground covers this once loaded */
   color: var(--text);
   line-height: 1.55;
   min-height: 100vh;
   position: relative;
 }
 
-/* ── Cosmic star field ─────────────────────────────────── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background-image:
-    radial-gradient(circle, rgba(255,255,255,0.32) 1px, transparent 1px),
-    radial-gradient(circle, rgba(255,255,255,0.18) 1px, transparent 1px),
-    radial-gradient(circle, rgba(0,255,136,0.12) 1px, transparent 1px);
-  background-size: 230px 230px, 110px 110px, 400px 400px;
-  background-position: 0 0, 55px 70px, 120px 190px;
-  animation: starDrift 60s linear infinite;
-  pointer-events: none;
+/* ── Ember fire particle animations (SpaceBackground) ─── */
+@keyframes emberRiseL {
+  0%   { transform: translateY(0) translateX(0);     opacity: 0; }
+  8%   { opacity: 0.7; }
+  100% { transform: translateY(-42vh) translateX(-12px); opacity: 0; }
 }
-
-@keyframes starDrift {
-  0%   { transform: translate(0, 0); }
-  100% { transform: translate(-115px, -115px); }
-}
-
-/* Subtle nebula glow on large background areas */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(ellipse 60% 40% at 20% 20%, rgba(157,78,221,0.06) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 35% at 80% 70%, rgba(0,255,136,0.05) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 30% at 60% 10%, rgba(255,110,180,0.04) 0%, transparent 50%);
-  pointer-events: none;
-  animation: nebulaDrift 90s ease-in-out infinite alternate;
-}
-
-@keyframes nebulaDrift {
-  0%   { opacity: 1; }
-  50%  { opacity: 0.7; }
-  100% { opacity: 1; }
+@keyframes emberRiseR {
+  0%   { transform: translateY(0) translateX(0);    opacity: 0; }
+  8%   { opacity: 0.7; }
+  100% { transform: translateY(-42vh) translateX(12px); opacity: 0; }
 }
 
 a { color: inherit; text-decoration: none; }
@@ -6314,9 +6285,8 @@ html { scroll-padding-top: var(--nav-h); }
    COSMIC MYCELIUM — GLOBAL THEME ADDITIONS
    ══════════════════════════════════════════════════════════ */
 
-/* ── Starfield off state ─────────────────────────────── */
-body.no-starfield::before,
-body.no-starfield::after { display: none; }
+/* ── Space background off state — canvas controlled by React ─ */
+/* body.no-starfield class still set by ThemeContext; SpaceBackground reads prefs.starfield */
 
 /* ── Reduced / no motion ────────────────────────────── */
 body.reduce-motion *,

@@ -37,6 +37,7 @@ import InviteModal from './components/InviteModal';
 import FeedbackButton from './components/FeedbackButton';
 import DidYouKnow from './components/DidYouKnow';
 import MiniPlayer from './components/MiniPlayer';
+import SpaceBackground from './components/SpaceBackground';
 import { PlayerProvider } from './contexts/PlayerContext';
 import { PresenceProvider } from './contexts/PresenceContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -106,6 +107,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+    <SpaceBackground />
     <PresenceProvider>
     <PlayerProvider>
       <CriticalAnomalyBanner />

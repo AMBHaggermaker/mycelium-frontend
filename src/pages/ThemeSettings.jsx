@@ -104,16 +104,16 @@ export default function ThemeSettings() {
           </div>
         </div>
 
-        {/* Starfield */}
+        {/* Space Background */}
         <div className="theme-settings-group">
-          <span className="theme-settings-label">Star Field</span>
+          <span className="theme-settings-label">Space Background</span>
           <label className="starfield-toggle">
             <input
               type="checkbox"
-              checked={!!prefs.starfield}
+              checked={prefs.starfield !== false}
               onChange={e => savePrefs({ starfield: e.target.checked })}
             />
-            Show animated star field background
+            Show animated deep space background
           </label>
         </div>
 
