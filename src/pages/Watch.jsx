@@ -29,16 +29,29 @@ const DASHBOARD_HOW_IT_WORKS = {
     what: 'The Atmospheric Observations dashboard tracks unusual aerial phenomena including persistent contrails, grid patterns, low-altitude spray events, and unidentified aerial observations. Every submission is automatically cross-referenced with live flight data from the OpenSky Network and NOAA weather conditions.',
     submit: 'Click "Submit Observation" and provide as much detail as possible. GPS coordinates are required for the flight cross-reference to work. Use the "Use My Location" button or enter coordinates manually.',
     after: 'After submission, the system queries the OpenSky Network for flights within a 50-mile radius at the time of observation. Weather data (humidity, wind speed) is pulled from NOAA. The AI then classifies the observation.',
-    classify: 'EXPLAINED = a matching flight was found and atmospheric conditions support the pattern. UNEXPLAINED = atmospheric conditions are abnormal or no flight matches. UNIDENTIFIED = no flight data available and conditions are unusual. PARTIAL = some data available but not conclusive. Soil and rainwater samples within 5 miles of drift zones are automatically linked to observations.',
+    classify: 'EXPLAINED = matching flight confirmed by OpenSky (real-time) and/or Fli (scheduled routes) with supporting conditions. PARTIAL = scheduled commercial route exists (Fli) but no real-time tracking confirmation (OpenSky), or flight found but altitude/conditions don\'t fully match. UNIDENTIFIED = neither OpenSky nor Fli found any matching flights — dual-source confirmation increases confidence. UNEXPLAINED = flight found but atmospheric conditions are abnormal. Sources shown as colored pills on each badge.',
     severity: 'Critical = immediate chemical exposure risk. Serious = confirmed unusual pattern with no flight match. Moderate = unusual but not immediately dangerous. Minor = minor deviation from normal. Monitoring = routine documentation.',
     tips: ['GPS coordinates are essential — without them the flight cross-reference cannot run.', 'Note the exact time as precisely as possible — the OpenSky query searches ±30 minutes around your observation time.', 'Photograph the sky and any residue on surfaces, vehicles, or plants.', 'If you collect soil or rainwater samples, submit them through the Soil/Rainwater Testing section and they will be automatically linked to nearby observations.', 'The flight data comes from the OpenSky Network which has ~85% coverage — some military and private aircraft may not appear.'],
   },
 };
 
+const BranchIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <circle cx="8" cy="8" r="1.8" fill="currentColor"/>
+    <path d="M8 8L8 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    <path d="M8 8L3 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    <path d="M8 8L13 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    <path d="M8 4L5 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+    <path d="M8 4L11 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+    <path d="M5.5 10.5L3.5 9.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+    <path d="M10.5 10.5L12.5 9.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+  </svg>
+);
+
 function HowThisWorks({ dashboardId }) {
   const storageKey = `watch-htw-${dashboardId}`;
   const [expanded, setExpanded] = useState(() => {
-    try { return localStorage.getItem(storageKey) === null; } catch { return true; }
+    try { return localStorage.getItem(storageKey) === 'open'; } catch { return false; }
   });
 
   function toggle() {
@@ -51,8 +64,8 @@ function HowThisWorks({ dashboardId }) {
 
   return (
     <div className="htw-panel">
-      <button className="htw-toggle" onClick={toggle} type="button">
-        <span className="htw-toggle-icon">ℹ</span>
+      <button className="htw-toggle" onClick={toggle} type="button" aria-expanded={expanded}>
+        <span className="htw-toggle-icon"><BranchIcon /></span>
         <span className="htw-toggle-label">How This Works</span>
         <span className="htw-arrow" style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}>▼</span>
       </button>
@@ -81,7 +94,7 @@ function HowThisWorks({ dashboardId }) {
             <p>{info.severity}</p>
           </div>
           <div className="htw-tips">
-            <strong>💡 Tips for best results</strong>
+            <strong>✦ Tips for best results</strong>
             <ul>
               {info.tips.map((tip, i) => <li key={i}>{tip}</li>)}
             </ul>
@@ -1852,18 +1865,37 @@ const CLASSIFICATION_STYLES = {
   pending:      { color: '#6b7280', bg: '#f3f4f6', border: '#9ca3af44', label: 'PENDING' },
 };
 
-function ClassificationBadge({ classification }) {
+function ClassificationBadge({ classification, sources }) {
   const s = CLASSIFICATION_STYLES[classification] || CLASSIFICATION_STYLES.pending;
+  const src = sources ? (typeof sources === 'string' ? JSON.parse(sources) : sources) : null;
+  const showOpenSky = src?.opensky_queried === true;
+  const showFli     = src?.fli_queried === true;
   return (
-    <span
-      className={classification === 'unidentified' ? 'atmos-badge-unidentified' : undefined}
-      style={{
-        fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
-        padding: '.12rem .5rem', borderRadius: 99, background: s.bg, color: s.color,
-        border: `1px solid ${s.border}`, whiteSpace: 'nowrap',
-      }}
-    >
-      {s.label}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', flexWrap: 'wrap' }}>
+      <span
+        className={classification === 'unidentified' ? 'atmos-badge-unidentified' : undefined}
+        style={{
+          fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
+          padding: '.12rem .5rem', borderRadius: 99, background: s.bg, color: s.color,
+          border: `1px solid ${s.border}`, whiteSpace: 'nowrap',
+        }}
+      >
+        {s.label}
+      </span>
+      {showOpenSky && (
+        <span style={{
+          fontSize: '.6rem', fontWeight: 600, padding: '.08rem .38rem', borderRadius: 99,
+          background: 'rgba(0,180,255,0.10)', color: '#38bdf8',
+          border: '1px solid rgba(0,180,255,0.25)', whiteSpace: 'nowrap', letterSpacing: '.04em',
+        }}>OpenSky</span>
+      )}
+      {showFli && (
+        <span style={{
+          fontSize: '.6rem', fontWeight: 600, padding: '.08rem .38rem', borderRadius: 99,
+          background: 'rgba(168,85,247,0.10)', color: '#c084fc',
+          border: '1px solid rgba(168,85,247,0.25)', whiteSpace: 'nowrap', letterSpacing: '.04em',
+        }}>Fli</span>
+      )}
     </span>
   );
 }
@@ -1901,14 +1933,15 @@ function AtmosphericObsCard({ obs, highlighted, isAdmin, token, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const date = new Date(obs.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const typeLabel  = ATMOS_TYPE_LABELS[obs.report_type] || obs.report_type;
-  const driftZones = obs.drift_zones     ? (typeof obs.drift_zones     === 'string' ? JSON.parse(obs.drift_zones)     : obs.drift_zones)     : null;
-  const weather    = obs.weather_data    ? (typeof obs.weather_data    === 'string' ? JSON.parse(obs.weather_data)    : obs.weather_data)    : null;
-  const flights    = obs.matched_flights ? (typeof obs.matched_flights === 'string' ? JSON.parse(obs.matched_flights) : obs.matched_flights) : null;
+  const driftZones = obs.drift_zones            ? (typeof obs.drift_zones            === 'string' ? JSON.parse(obs.drift_zones)            : obs.drift_zones)            : null;
+  const weather    = obs.weather_data           ? (typeof obs.weather_data           === 'string' ? JSON.parse(obs.weather_data)           : obs.weather_data)           : null;
+  const flights    = obs.matched_flights        ? (typeof obs.matched_flights        === 'string' ? JSON.parse(obs.matched_flights)        : obs.matched_flights)        : null;
+  const sources    = obs.classification_sources ? (typeof obs.classification_sources === 'string' ? JSON.parse(obs.classification_sources) : obs.classification_sources) : null;
 
   return (
     <div id={`atmos-${obs.id}`} className={`watch-report-card${highlighted ? ' watch-report-highlighted' : ''}`}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.35rem' }}>
-        <ClassificationBadge classification={obs.classification} />
+        <ClassificationBadge classification={obs.classification} sources={sources} />
         <SeverityBadge severity={obs.severity} />
         <span style={{ fontSize: '.72rem', padding: '.12rem .45rem', borderRadius: 99, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}>{typeLabel}</span>
         <span style={{ fontSize: '.72rem', color: 'var(--muted)', marginLeft: 'auto' }}>{date}</span>
@@ -1937,27 +1970,57 @@ function AtmosphericObsCard({ obs, highlighted, isAdmin, token, onDeleted }) {
       {expanded && (
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: '.65rem', marginTop: '.25rem', display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
           <div className="atmos-crossref">
-            <div className="atmos-crossref-label">Flight Cross-Reference (OpenSky Network)</div>
+            <div className="atmos-crossref-label">Flight Cross-Reference</div>
             {obs.classification === 'pending' && <p style={{ fontSize: '.8rem', color: 'var(--muted)', margin: 0 }}>Classification pending — query runs immediately on submission. GPS coordinates required for flight matching.</p>}
             {obs.classification !== 'pending' && (
               <>
-                {flights && flights.length > 0 ? (
-                  <div style={{ fontSize: '.8rem', color: 'var(--text)' }}>
-                    <p style={{ margin: '0 0 .35rem' }}>{flights.length} flight{flights.length !== 1?'s':''} found in area at time of report:</p>
-                    {flights.slice(0,4).map((f,i) => (
-                      <div key={i} style={{ padding: '.2rem .5rem', background: 'var(--surface)', borderRadius: 4, marginBottom: '.2rem', display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 600 }}>{f.callsign || f.icao24}</span>
-                        <span style={{ color: 'var(--muted)' }}>{f.origin}</span>
-                        {f.altitude_m && <span>{Math.round(f.altitude_m * 3.281)} ft</span>}
-                        {f.heading && <span>Hdg {Math.round(f.heading)}°</span>}
-                      </div>
-                    ))}
+                {/* OpenSky real-time block */}
+                <div style={{ marginBottom: '.5rem' }}>
+                  <span style={{ fontSize: '.68rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '.05em' }}>OpenSky Network — Real-time</span>
+                  {flights && flights.length > 0 ? (
+                    <div style={{ fontSize: '.8rem', color: 'var(--text)', marginTop: '.25rem' }}>
+                      <p style={{ margin: '0 0 .3rem' }}>{flights.length} flight{flights.length !== 1?'s':''} detected in area (50 mi radius):</p>
+                      {flights.slice(0,4).map((f,i) => (
+                        <div key={i} style={{ padding: '.2rem .5rem', background: 'var(--surface)', borderRadius: 4, marginBottom: '.2rem', display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 600 }}>{f.callsign || f.icao24}</span>
+                          <span style={{ color: 'var(--muted)' }}>{f.origin}</span>
+                          {f.altitude_m && <span>{Math.round(f.altitude_m * 3.281)} ft</span>}
+                          {f.heading && <span>Hdg {Math.round(f.heading)}°</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '.8rem', color: 'var(--muted)', margin: '.2rem 0 0' }}>
+                      {sources?.opensky_queried === false ? 'OpenSky unavailable at time of classification.' : 'No registered flights found in area (50-mile radius).'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Fli scheduled routes block */}
+                {sources?.fli_queried && (
+                  <div style={{ marginBottom: '.35rem' }}>
+                    <span style={{ fontSize: '.68rem', fontWeight: 700, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                      Fli (Google Flights) — Scheduled Routes
+                    </span>
+                    {sources.fli_routes_found ? (
+                      <p style={{ fontSize: '.8rem', color: 'var(--text)', margin: '.2rem 0 0' }}>
+                        {sources.fli_route_count} scheduled commercial route{sources.fli_route_count !== 1 ? 's' : ''} found between{' '}
+                        <strong>{sources.fli_airports_checked?.[0]}</strong> and{' '}
+                        <strong>{sources.fli_airports_checked?.[1]}</strong> today
+                        {sources.fli_note && <span style={{ color: 'var(--muted)' }}> — {sources.fli_note}</span>}
+                      </p>
+                    ) : sources.fli_routes_found === false ? (
+                      <p style={{ fontSize: '.8rem', color: 'var(--muted)', margin: '.2rem 0 0' }}>
+                        No scheduled commercial routes found between{' '}
+                        {sources.fli_airports_checked?.[0]} and {sources.fli_airports_checked?.[1]}.
+                        {sources.fli_note && ` ${sources.fli_note}`}
+                      </p>
+                    ) : (
+                      <p style={{ fontSize: '.8rem', color: 'var(--muted)', margin: '.2rem 0 0' }}>Fli query unavailable.</p>
+                    )}
                   </div>
-                ) : (
-                  <p style={{ fontSize: '.8rem', color: 'var(--muted)', margin: 0 }}>
-                    {obs.classification === 'unidentified' ? 'No registered flights found in area (50-mile radius).' : 'No altitude-matching flight found for this observation.'}
-                  </p>
                 )}
+
                 {weather && (
                   <p style={{ fontSize: '.78rem', color: 'var(--muted)', margin: '.35rem 0 0', lineHeight: 1.45 }}>
                     NOAA — {weather.station}: Humidity {weather.humidity_pct !== null ? `${Math.round(weather.humidity_pct)}%` : 'unavailable'}{weather.temp_c !== null ? `, ${Math.round(weather.temp_c)}°C` : ''}
