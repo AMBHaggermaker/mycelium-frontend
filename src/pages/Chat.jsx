@@ -384,9 +384,14 @@ export default function Chat({ onRequireAuth }) {
                 <p className="empty">No messages yet — say hello!</p>
               ) : (
                 messages.map(msg => (
-                  <div key={msg.id} className="chat-msg">
+                  <div key={msg.id} className={`chat-msg${msg.is_mesh || msg.username === 'mesh' ? ' chat-msg-mesh' : ''}`}>
                     <div className="chat-msg-header">
-                      <span className="chat-msg-author">{msg.username}</span>
+                      <span className="chat-msg-author">
+                        {(msg.is_mesh || msg.username === 'mesh') && (
+                          <span className="chat-mesh-badge">📡 Mesh</span>
+                        )}
+                        {msg.username}
+                      </span>
                       <span className="chat-msg-time">{fmt(msg.created_at)}</span>
                     </div>
                     {(msg.media_type === 'gif' || msg.media_type === 'image') && msg.media_url ? (
