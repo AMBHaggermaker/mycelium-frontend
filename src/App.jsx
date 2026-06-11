@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Component } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import Nav from './components/Nav';
 import Feed from './pages/Feed';
@@ -8,6 +8,10 @@ import Profile from './pages/Profile';
 import Chat from './pages/Chat';
 import Admin from './pages/Admin';
 import Watch from './pages/Watch';
+import WatchWater  from './pages/WatchWater';
+import WatchAir    from './pages/WatchAir';
+import WatchSoil   from './pages/WatchSoil';
+import WatchEnergy from './pages/WatchEnergy';
 import Merch from './pages/Merch';
 import InvitePage from './pages/InvitePage';
 import Settings from './pages/Settings';
@@ -43,6 +47,26 @@ import { PresenceProvider } from './contexts/PresenceContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useAuth } from './auth';
 import api from './api';
+
+class PageErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="page">
+          <div className="container" style={{ maxWidth: 700, paddingTop: '3rem' }}>
+            <p className="error-msg">Something went wrong loading this page. Please try refreshing.</p>
+            <p style={{ fontSize: '.8rem', color: 'var(--muted)', marginTop: '.5rem', fontFamily: 'monospace' }}>
+              {this.state.error.message}
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function CriticalAnomalyBanner() {
   const { user } = useAuth();
@@ -121,14 +145,18 @@ export default function App() {
         <Route path="/profile/:username" element={<Profile />} />
         <Route path="/chat"        element={<Chat onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/admin"       element={<Admin />} />
-        <Route path="/watch"       element={<Watch onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/watch"        element={<Watch onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/watch/water"  element={<WatchWater  onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/watch/air"    element={<WatchAir    onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/watch/soil"   element={<WatchSoil   onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/watch/energy" element={<WatchEnergy onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/merch"       element={<Merch />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="/settings"        element={<Settings />} />
         <Route path="/theme"           element={<ThemeSettings />} />
         <Route path="/verify-email"    element={<EmailVerifyPage />} />
         <Route path="/reset-password"  element={<ResetPasswordPage />} />
-        <Route path="/posts/:id"       element={<PostDetailPage onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/posts/:id"       element={<PageErrorBoundary><PostDetailPage onRequireAuth={() => setAuthOpen(true)} /></PageErrorBoundary>} />
         <Route path="/advocate"        element={<Advocate onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/messages"        element={<Messages onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/covenant"        element={<Covenant />} />

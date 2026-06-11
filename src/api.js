@@ -338,6 +338,15 @@ export default {
   getWatchReports:    (dashboard, params) => get(`/watch/${dashboard}/reports${qs(params)}`),
   getAllWatchReports:  (params)           => get(`/watch/all-reports${qs(params)}`),
   getWatchAnomalies: (params)            => get(`/watch/anomalies${qs(params)}`),
+
+  // Environmental dashboards
+  getWaterData:     (params)        => get(`/watch-env/water${qs(params)}`),
+  getAirData:       (params)        => get(`/watch-env/air${qs(params)}`),
+  getSoilData:      (params)        => get(`/watch-env/soil${qs(params)}`),
+  getEnergyData:    ()              => get('/watch-env/energy'),
+  geocodeLocation:  (q)             => get(`/watch-env/geocode?q=${encodeURIComponent(q)}`),
+  submitEnergyBill: (data, token)   => post('/watch-env/energy-bills', data, token),
+  getEnergyBillsAggregate: ()       => get('/watch-env/energy-bills/aggregate'),
   // Homeschool
   getHomeschoolGroups: ()               => get('/circles?circle_type=homeschool_circle&limit=60'),
   getHomeschoolChats:  ()               => get('/chat/rooms'),

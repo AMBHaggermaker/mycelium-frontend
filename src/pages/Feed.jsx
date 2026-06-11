@@ -59,6 +59,7 @@ export default function Feed({ onRequireAuth }) {
   const [donateDismissed, setDonateDismissed] = useState(
     () => typeof localStorage !== 'undefined' && localStorage.getItem('donate_banner_dismissed') === '1'
   );
+  const [ghostToast, setGhostToast] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
@@ -96,6 +97,18 @@ export default function Feed({ onRequireAuth }) {
     return () => clearTimeout(t);
   }, [load, search]);
 
+  useEffect(() => {
+    if (!token) return;
+    const socket = getSocket(token);
+    function onGhostArticle(data) {
+      load();
+      setGhostToast(data);
+      setTimeout(() => setGhostToast(null), 8000);
+    }
+    socket.on('ghost_article', onGhostArticle);
+    return () => socket.off('ghost_article', onGhostArticle);
+  }, [token, load]);
+
   function handleCategoryChange(val) {
     setCategory(val);
     setSubcategory('');
@@ -116,6 +129,23 @@ export default function Feed({ onRequireAuth }) {
 
   return (
     <div className="page feed-page-layout">
+      {ghostToast && (
+        <div className="ghost-toast" role="alert">
+          <span className="ghost-toast-icon">📰</span>
+          <div className="ghost-toast-body">
+            <strong>New article published</strong>
+            <span className="ghost-toast-title">{ghostToast.title}</span>
+          </div>
+          {ghostToast.ghost_url && (
+            <a href={ghostToast.ghost_url} target="_blank" rel="noopener noreferrer"
+               className="btn btn-sm btn-primary ghost-toast-btn">
+              Read Now
+            </a>
+          )}
+          <button className="ghost-toast-close" onClick={() => setGhostToast(null)}>✕</button>
+        </div>
+      )}
+
       {/* Mobile Live button */}
       <MobileLiveDrawer token={token} />
 
@@ -345,13 +375,14 @@ export default function Feed({ onRequireAuth }) {
 // ── Live Network Panel ────────────────────────────────────────────────────────
 
 const ACTIVITY_LABELS = {
-  new_post:     (d) => `New ${d.type}: ${d.title?.slice(0, 40)}`,
-  rsvp:         (d) => `Someone marked Going: ${d.event_title?.slice(0, 35)}`,
-  watch_report: (d) => `Watch report: ${d.dashboard || 'submitted'}`,
-  chat_message: (d) => `Chat activity: ${d.room_name || 'room'}`,
-  new_member:   (d) => `New member joined${d.location ? ` · ${d.location}` : ''}`,
-  pattern_report:(d)=> `Pattern flagged: ${d.institution?.slice(0, 35)}`,
-  anomaly:      (d) => `Anomaly detected: ${d.description?.slice(0, 40)}`,
+  new_post:      (d) => `New ${d.type}: ${d.title?.slice(0, 40)}`,
+  rsvp:          (d) => `Someone marked Going: ${d.event_title?.slice(0, 35)}`,
+  watch_report:  (d) => `Watch report: ${d.dashboard || 'submitted'}`,
+  chat_message:  (d) => `Chat activity: ${d.room_name || 'room'}`,
+  new_member:    (d) => `New member joined${d.location ? ` · ${d.location}` : ''}`,
+  pattern_report:(d) => `Pattern flagged: ${d.institution?.slice(0, 35)}`,
+  anomaly:       (d) => `Anomaly detected: ${d.description?.slice(0, 40)}`,
+  ghost_article: (d) => `New article: ${d.title?.slice(0, 50)}`,
 };
 
 const SEVERITY_STYLES = {

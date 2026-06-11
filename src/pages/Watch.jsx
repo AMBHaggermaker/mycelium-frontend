@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 import WatchMap, { AnomalyMap } from '../components/WatchMap';
@@ -246,6 +246,18 @@ export default function Watch({ onRequireAuth }) {
             <span className="watch-tab-icon">⚠</span>
             <span className="watch-tab-label">Anomalies</span>
           </button>
+          <span className="watch-tab-divider" aria-hidden="true" />
+          {[
+            { path: '/watch/water',  icon: '💧', label: 'Water Quality' },
+            { path: '/watch/air',    icon: '🌬️', label: 'Air Quality' },
+            { path: '/watch/soil',   icon: '🌱', label: 'Soil Quality' },
+            { path: '/watch/energy', icon: '⚡', label: 'Energy' },
+          ].map(t => (
+            <Link key={t.path} to={t.path} className="watch-tab-btn watch-tab-btn--env">
+              <span className="watch-tab-icon">{t.icon}</span>
+              <span className="watch-tab-label">{t.label}</span>
+            </Link>
+          ))}
         </div>
 
         {active === 'overview' ? (

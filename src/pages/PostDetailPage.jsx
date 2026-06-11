@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
+import EventLocationMap from '../components/EventLocationMap';
 
 const BASE_URL = 'https://mycelium.unprecedentedtimes.org';
 
@@ -151,6 +152,8 @@ export default function PostDetailPage({ onRequireAuth }) {
   const [submitting,      setSubmitting]      = useState(false);
   const [commentErr,      setCommentErr]      = useState(null);
 
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     setLoading(true);
     api.getPost(id)
@@ -262,12 +265,19 @@ export default function PostDetailPage({ onRequireAuth }) {
   const isExpired = expiresAt && expiresAt < now;
   const isExpiringSoon = expiresAt && !isExpired && (expiresAt - now) < 24 * 60 * 60 * 1000;
 
-  const [deleting, setDeleting] = useState(false);
   async function handleDelete() {
-    if (!confirm('This will permanently remove this post and all reservations. This cannot be undone. Confirm delete?')) return;
+    const isMod = !isOwn && (user?.role === 'admin' || user?.role === 'moderator');
+    const msg = isMod
+      ? 'You are removing this post as a moderator. This action is logged. Confirm removal.'
+      : 'Are you sure you want to delete this post? This cannot be undone.';
+    if (!confirm(msg)) return;
     setDeleting(true);
     try {
       await api.deletePost(post.id, token);
+      if (isMod) {
+        api.logModerationAction({ action: 'delete_post', target_type: 'post', target_id: post.id }, token)
+          .catch(() => {});
+      }
       navigate(-1);
     } catch (e) {
       alert(e.message);
@@ -362,6 +372,16 @@ export default function PostDetailPage({ onRequireAuth }) {
             )}
           </div>
 
+          {/* Event location map */}
+          {post.type === 'event' && post.location_lat && post.location_lng && (
+            <EventLocationMap
+              lat={post.location_lat}
+              lng={post.location_lng}
+              address={post.location}
+              title={post.title}
+            />
+          )}
+
           {/* Tags */}
           {post.tags?.length > 0 && (
             <div className="tags" style={{ marginTop: '.5rem' }}>
@@ -369,15 +389,19 @@ export default function PostDetailPage({ onRequireAuth }) {
             </div>
           )}
 
-          {/* Capacity */}
-          {cap !== null && (
+          {/* Capacity / headcount */}
+          {cap !== null ? (
             <div className="capacity-section" style={{ marginTop: '1rem' }}>
               <div className="capacity-bar">
                 <div className={`capacity-fill${isFull ? ' full' : ''}`} style={{ width: `${pct}%` }} />
               </div>
               <span className="capacity-label">{filled} / {cap} spots filled</span>
             </div>
-          )}
+          ) : filled > 0 ? (
+            <div className="capacity-section" style={{ marginTop: '1rem' }}>
+              <span className="capacity-label">{filled} {filled === 1 ? 'person' : 'people'} going</span>
+            </div>
+          ) : null}
 
           {/* RSVP (events) */}
           {post.type === 'event' && (

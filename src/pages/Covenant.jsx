@@ -115,6 +115,18 @@ export default function Covenant() {
             principles — not just by agreeing to them.</p>
           </section>
 
+          <section className="covenant-section">
+            <h2 className="covenant-heading">Child Safety Exception</h2>
+            <p>
+              The only absolute exception to our law enforcement partnership policy is child sexual abuse material.
+              Any confirmed child sexual abuse material discovered on this platform will be reported to the
+              National Center for Missing and Exploited Children and relevant law enforcement immediately
+              and without exception. This is not a compromise of our sovereignty principles. It is a moral
+              line that admits no ambiguity. Documenting child exploitation to stop it is legitimate.
+              Sharing exploitative material under any framing is not.
+            </p>
+          </section>
+
           <section className="covenant-section covenant-closing">
             <p>
               By joining Mycelium, you agree to uphold this Covenant — not because you are required to,

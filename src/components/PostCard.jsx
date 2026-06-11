@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import api from '../api';
 
-const TYPE_BADGE = { need: 'badge-need', offer: 'badge-offer', event: 'badge-event', story_card: 'badge-story' };
+const TYPE_BADGE = { need: 'badge-need', offer: 'badge-offer', event: 'badge-event', story_card: 'badge-story', ghost_article: 'badge-ghost' };
 const BASE_URL = 'https://mycelium.unprecedentedtimes.org';
 
 const CATEGORY_LABELS = {
@@ -147,6 +147,49 @@ export default function PostCard({ post, onRequireAuth, onReserved, onDeleted })
       ? <span className="urgency-dot dot-self" title="Poster marked as urgent" />
       : null;
 
+  if (post.type === 'ghost_article') {
+    return (
+      <div className="card post-card post-card--ghost-article">
+        {post.feature_image_url && (
+          <div className="ghost-article-image">
+            <img src={post.feature_image_url} alt="" loading="lazy" />
+          </div>
+        )}
+        <div className="ghost-article-body">
+          <div className="ghost-article-header">
+            <span className="badge badge-ghost">Unprecedented Times</span>
+            <span className="post-meta">
+              <Link to={`/profile/${post.username}`} className="username-link" onClick={e => e.stopPropagation()}>
+                {post.username}
+              </Link>
+            </span>
+          </div>
+          <h3 className="ghost-article-title">{post.title}</h3>
+          {post.description && (
+            <p className="ghost-article-excerpt">{post.description}</p>
+          )}
+          <div className="ghost-article-actions" onClick={e => e.stopPropagation()}>
+            {post.ghost_url && (
+              <a
+                href={post.ghost_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-sm btn-primary ghost-read-btn"
+              >
+                Read Now →
+              </a>
+            )}
+            {canDelete && (
+              <button className="btn btn-sm btn-danger" onClick={handleDelete} disabled={deleting}>
+                {deleting ? '…' : 'Delete'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={[
@@ -260,14 +303,18 @@ export default function PostCard({ post, onRequireAuth, onReserved, onDeleted })
         </div>
       )}
 
-      {cap !== null && (
+      {cap !== null ? (
         <div className="capacity-section">
           <div className="capacity-bar">
             <div className={`capacity-fill${isFull ? ' full' : ''}`} style={{ width: `${pct}%` }} />
           </div>
           <span className="capacity-label">{filled} / {cap} spots</span>
         </div>
-      )}
+      ) : filled > 0 ? (
+        <div className="capacity-section">
+          <span className="capacity-label">{filled} {filled === 1 ? 'person' : 'people'} going</span>
+        </div>
+      ) : null}
 
       {err && <p className="card-error">{err}</p>}
 

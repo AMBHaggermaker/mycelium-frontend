@@ -38,7 +38,8 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
   const { user, token } = useAuth();
   const [form, setForm] = useState({
     type: 'offer', title: '', description: '', circle_id: defaultCircleId || '',
-    capacity: '', location: '', location_lat: null, location_lng: null,
+    limit_attendance: false, capacity: '',
+    location: '', location_lat: null, location_lng: null,
     starts_at: '', ends_at: '', tags: '',
     category: '', subcategory: '', is_urgent: false, expires_at: '',
     commerce_type: '', price: '', business_id: '',
@@ -100,7 +101,9 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
         title:         form.title.trim(),
         description:   isStory ? (form.rich_content.trim() || undefined) : (form.description.trim() || undefined),
         circle_id:     form.circle_id || undefined,
-        capacity:      form.capacity ? parseInt(form.capacity) : undefined,
+        capacity:      (form.type === 'event')
+                         ? (form.limit_attendance && form.capacity ? parseInt(form.capacity) : undefined)
+                         : (form.capacity ? parseInt(form.capacity) : undefined),
         location:      form.location.trim() || undefined,
         location_lat:  form.location_lat ?? undefined,
         location_lng:  form.location_lng ?? undefined,
@@ -308,9 +311,16 @@ export default function NewPostModal({ onClose, onCreated, defaultCircleId }) {
 
           {form.type === 'event' && (
             <div className="form-group">
-              <label className="form-label">Capacity</label>
-              <input className="form-input" type="number" min="1" value={form.capacity}
-                onChange={e => set('capacity', e.target.value)} placeholder="Unlimited" />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer', fontSize: '.88rem', marginBottom: form.limit_attendance ? '.5rem' : 0 }}>
+                <input type="checkbox" checked={form.limit_attendance}
+                  onChange={e => set('limit_attendance', e.target.checked)}
+                  style={{ width: 16, height: 16 }} />
+                Limit attendance?
+              </label>
+              {form.limit_attendance && (
+                <input className="form-input" type="number" min="1" value={form.capacity}
+                  onChange={e => set('capacity', e.target.value)} placeholder="Max spots" />
+              )}
             </div>
           )}
 

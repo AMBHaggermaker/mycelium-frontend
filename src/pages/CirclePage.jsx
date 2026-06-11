@@ -22,11 +22,35 @@ export default function CirclePage({ onRequireAuth }) {
   const [showNew, setShowNew] = useState(false);
   const [newThread, setNewThread] = useState(false);
   const [threadTitle, setThreadTitle] = useState('');
+  const [auditReason, setAuditReason] = useState('');
+  const [auditSubmitted, setAuditSubmitted] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
 
   const isMember = !!membership;
   const isAdmin  = membership?.role === 'admin';
 
   useEffect(() => { loadAll(); }, [id]);
+
+  // Admin accessing a private circle must log their reason
+  const isGlobalAdmin = user?.role === 'admin' || user?.role === 'moderator';
+  useEffect(() => {
+    if (circle && circle.is_private && isGlobalAdmin && !isMember && !auditSubmitted) {
+      setShowAuditModal(true);
+    }
+  }, [circle, isGlobalAdmin, isMember, auditSubmitted]);
+
+  async function submitAuditLog() {
+    if (!auditReason.trim()) return;
+    try {
+      await api.logAuditAccess({
+        content_type: 'circle',
+        content_id: id,
+        reason: auditReason.trim(),
+      }, token);
+      setAuditSubmitted(true);
+      setShowAuditModal(false);
+    } catch (e) { alert(e.message); }
+  }
 
   async function loadAll() {
     setLoading(true); setErr(null);
@@ -85,6 +109,45 @@ export default function CirclePage({ onRequireAuth }) {
   if (loading) return <div className="page"><div className="container"><div className="spinner" /></div></div>;
   if (err)     return <div className="page"><div className="container"><p className="error-msg">{err}</p></div></div>;
 
+  // Block admin from seeing private circle content until they log a reason
+  if (showAuditModal && isGlobalAdmin && !isMember) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal" style={{ maxWidth: 480 }}>
+          <div className="modal-header">
+            <span className="modal-title">Private Circle — Access Logging Required</span>
+          </div>
+          <div className="modal-body">
+            <p style={{ fontSize: '.9rem', color: 'var(--muted)', marginBottom: '1rem' }}>
+              <strong>{circle?.name}</strong> is a private circle. As a platform administrator,
+              you may access it only when investigating a documented report of abuse or harassment.
+              All admin access to private circles is logged and reviewed by the platform founder.
+            </p>
+            <div className="form-group">
+              <label className="form-label">Reason for accessing this private circle <span style={{ color: 'var(--red)' }}>*</span></label>
+              <textarea
+                className="form-textarea"
+                rows={3}
+                placeholder="Describe the report or reason for access…"
+                value={auditReason}
+                onChange={e => setAuditReason(e.target.value)}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem' }}>
+              <button
+                className="btn btn-primary"
+                disabled={!auditReason.trim()}
+                onClick={submitAuditLog}>
+                Log Access &amp; Continue
+              </button>
+              <button className="btn btn-ghost" onClick={() => window.history.back()}>Go Back</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <div className="container">
@@ -97,6 +160,11 @@ export default function CirclePage({ onRequireAuth }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
               <h1 className="circle-header-title">{circle.name}</h1>
               {circle.is_private && <span className="badge badge-gray">Private</span>}
+            {circle.is_private && isMember && (
+              <span style={{ fontSize: '.72rem', color: 'var(--muted)', marginLeft: '.5rem' }}>
+                This circle is private. Content is visible only to members. Platform administrators may access private circles only when investigating documented reports of abuse or harassment. All admin access is logged and reviewed by the platform founder.
+              </span>
+            )}
             </div>
             {circle.description && <p className="circle-header-desc">{circle.description}</p>}
             <p style={{ fontSize: '.8rem', color: 'var(--muted)', marginTop: '.4rem' }}>
