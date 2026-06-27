@@ -6,7 +6,7 @@ import WatchMap, { AnomalyMap } from '../components/WatchMap';
 import ImageCropUploader from '../components/ImageCropUploader';
 import WhyThisWorks from '../components/WhyThisWorks';
 
-const VALID_TABS = ['overview','infrastructure','environment','housing','health','watershed','food','surveillance','civic','land_development','atmospheric_observations','anomalies'];
+const VALID_TABS = ['overview','infrastructure','environment','housing','health','watershed','food','surveillance','civic','land_development','atmospheric_observations','anomalies','commerce_anomalies'];
 
 // ── Dashboard instructions ─────────────────────────────────────────────────────
 
@@ -246,6 +246,13 @@ export default function Watch({ onRequireAuth }) {
             <span className="watch-tab-icon">⚠</span>
             <span className="watch-tab-label">Anomalies</span>
           </button>
+          <button
+            className={`watch-tab-btn${active === 'commerce_anomalies' ? ' active' : ''}`}
+            onClick={() => setActive('commerce_anomalies')}
+          >
+            <span className="watch-tab-icon">🏪</span>
+            <span className="watch-tab-label">Commerce Anomalies</span>
+          </button>
           <span className="watch-tab-divider" aria-hidden="true" />
           {[
             { path: '/watch/water',  icon: '💧', label: 'Water Quality' },
@@ -269,6 +276,8 @@ export default function Watch({ onRequireAuth }) {
           />
         ) : active === 'anomalies' ? (
           <AnomaliesView />
+        ) : active === 'commerce_anomalies' ? (
+          <CommerceAnomaliesTab onRequireAuth={onRequireAuth} />
         ) : active === 'land_development' ? (
           <LandDevelopmentDashboard
             dashboard={DASHBOARDS.find(d => d.id === 'land_development')}
@@ -325,6 +334,206 @@ function WatchOverviewMap({ reports, anomalies, loading, isMobile }) {
       <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: '.65rem', textAlign: 'center' }}>
         {reports.filter(r => r.location_lat).length} of {reports.length} reports have location data · Select a dashboard tab to submit new reports
       </p>
+    </div>
+  );
+}
+
+const MKT_PLATFORMS = ['wayfair','vinted','ebay','facebook','etsy','amazon','other'];
+const MKT_ANOMALY_TYPES = [
+  { value: 'irrational_pricing', label: 'Irrational pricing' },
+  { value: 'suspicious_pattern', label: 'Suspicious pattern' },
+  { value: 'logistics_anomaly',  label: 'Logistics anomaly' },
+  { value: 'other',              label: 'Other' },
+];
+
+function CommerceAnomaliesTab({ onRequireAuth }) {
+  const { user, token } = useAuth();
+  const isVerified = !!(user && (user.verified || user.founding_member || user.role === 'admin' || user.role === 'moderator'));
+
+  const [feed, setFeed]       = useState([]);
+  const [clusters, setClusters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+
+  // form state
+  const [platform, setPlatform] = useState('wayfair');
+  const [url, setUrl]           = useState('');
+  const [title, setTitle]       = useState('');
+  const [desc, setDesc]         = useState('');
+  const [listed, setListed]     = useState('');
+  const [fair, setFair]         = useState('');
+  const [category, setCategory] = useState('');
+  const [anomalyType, setAnomalyType] = useState('irrational_pricing');
+  const [notes, setNotes]       = useState('');
+  const [busy, setBusy]         = useState(false);
+  const [err, setErr]           = useState(null);
+
+  function load() {
+    if (!token) { setLoading(false); return; }
+    setLoading(true);
+    Promise.all([
+      api.getMarketplaceAnomalies({}, token).catch(() => []),
+      api.getMarketplaceClusters(token).catch(() => []),
+    ]).then(([f, c]) => { setFeed(f); setClusters(c); }).finally(() => setLoading(false));
+  }
+  useEffect(() => { load(); }, [token]);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!title.trim()) { setErr('Listing title is required'); return; }
+    setBusy(true); setErr(null);
+    try {
+      await api.submitMarketplaceAnomaly({
+        platform, listing_url: url, listing_title: title, item_description: desc,
+        listed_price: listed, estimated_fair_value: fair, item_category: category,
+        anomaly_type: anomalyType, notes,
+      }, token);
+      setShowForm(false);
+      setTitle(''); setUrl(''); setDesc(''); setListed(''); setFair(''); setCategory(''); setNotes('');
+      load();
+    } catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div>
+      <div className="watch-dashboard-header">
+        <div className="watch-dashboard-title-row">
+          <span className="watch-dashboard-icon">🏪</span>
+          <h2 className="watch-dashboard-title">Commerce Anomalies</h2>
+        </div>
+      </div>
+
+      {/* Framing statement */}
+      <div className="card" style={{ marginBottom: '1rem', borderColor: 'var(--border)' }}>
+        <p style={{ fontSize: '.85rem', lineHeight: 1.6, color: 'var(--muted)' }}>
+          This section documents community observations of potentially anomalous marketplace listings.
+          Submissions are community reports, not verified findings. We document patterns. We do not make
+          accusations. All submissions require a Mycelium account. False reporting violates the Covenant.
+        </p>
+      </div>
+
+      {/* Cluster pattern alerts */}
+      {clusters.map((c, i) => (
+        <div key={i} className="card" style={{ marginBottom: '.75rem',
+          background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)' }}>
+          <p style={{ fontSize: '.84rem', color: 'var(--amber)', lineHeight: 1.5 }}>
+            ⚠ {c.count} anomalies reported on <strong>{c.platform}</strong>
+            {c.item_category ? ` in “${c.item_category}”` : ''} within 30 days.
+            This pattern has been flagged for community awareness. This is a documented community
+            observation, not a verified finding.
+          </p>
+        </div>
+      ))}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+        {isVerified ? (
+          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(v => !v)}>
+            {showForm ? 'Cancel' : '+ Report an anomaly'}
+          </button>
+        ) : (
+          <button className="btn btn-outline btn-sm" onClick={() => (user ? null : onRequireAuth?.())}>
+            {user ? 'Verified members only' : 'Sign in to report'}
+          </button>
+        )}
+      </div>
+
+      {showForm && isVerified && (
+        <form className="card" onSubmit={submit} style={{ marginBottom: '1rem' }}>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Platform</label>
+              <select className="form-select" value={platform} onChange={e => setPlatform(e.target.value)}>
+                {MKT_PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Anomaly type</label>
+              <select className="form-select" value={anomalyType} onChange={e => setAnomalyType(e.target.value)}>
+                {MKT_ANOMALY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Listing URL</label>
+            <input className="form-input" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Item title <span className="form-required">*</span></label>
+            <input className="form-input" value={title} onChange={e => setTitle(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Item description</label>
+            <textarea className="form-textarea" value={desc} onChange={e => setDesc(e.target.value)} rows={3} />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Listed price</label>
+              <input className="form-input" type="number" step="0.01" value={listed} onChange={e => setListed(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Estimated fair value</label>
+              <input className="form-input" type="number" step="0.01" value={fair} onChange={e => setFair(e.target.value)} />
+              <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: '.3rem' }}>
+                The AI will assess fair value independently.
+              </p>
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Item category</label>
+            <input className="form-input" value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. furniture, electronics" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Additional notes</label>
+            <textarea className="form-textarea" value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
+          </div>
+          {err && <p className="form-error">{err}</p>}
+          <button className="btn btn-primary btn-full" disabled={busy}>{busy ? 'Submitting…' : 'Submit observation'}</button>
+        </form>
+      )}
+
+      {/* Feed */}
+      {!token ? (
+        <p className="empty">Sign in to view community anomaly reports.</p>
+      ) : loading ? <div className="spinner" /> :
+       feed.length === 0 ? <p className="empty">No anomalies reported yet.</p> :
+       <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+         {feed.map(a => (
+           <div key={a.id} className="card">
+             <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '.3rem' }}>
+               <span className="tag">{a.platform}</span>
+               {a.item_category && <span className="tag">{a.item_category}</span>}
+               <span style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{a.anomaly_type.replace('_', ' ')}</span>
+               {a.price_ratio && (
+                 <span style={{ fontSize: '.75rem', color: a.price_ratio >= 10 ? 'var(--red)' : 'var(--muted)', fontWeight: 700 }}>
+                   {a.price_ratio}× fair value
+                 </span>
+               )}
+               <span style={{ fontSize: '.72rem', color: 'var(--muted)', marginLeft: 'auto' }}>
+                 {new Date(a.created_at).toLocaleDateString()}
+               </span>
+             </div>
+             <p style={{ fontWeight: 600 }}>{a.listing_title}</p>
+             {a.listing_url && (
+               <a href={a.listing_url} target="_blank" rel="noreferrer" style={{ fontSize: '.78rem', color: 'var(--blue)', wordBreak: 'break-all' }}>
+                 {a.listing_url}
+               </a>
+             )}
+             {(a.listed_price || a.estimated_fair_value) && (
+               <p style={{ fontSize: '.8rem', color: 'var(--muted)', marginTop: '.2rem' }}>
+                 Listed {a.listed_price ?? '—'} · est. fair {a.estimated_fair_value ?? '—'}
+               </p>
+             )}
+             {a.ai_analysis && (
+               <details style={{ marginTop: '.4rem' }}>
+                 <summary style={{ cursor: 'pointer', fontSize: '.78rem', color: 'var(--muted)' }}>AI pattern analysis</summary>
+                 <p style={{ fontSize: '.84rem', color: 'var(--muted)', marginTop: '.3rem', lineHeight: 1.55 }}>{a.ai_analysis}</p>
+               </details>
+             )}
+             <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: '.4rem' }}>Reported by {a.reporter_username}</p>
+           </div>
+         ))}
+       </div>}
     </div>
   );
 }

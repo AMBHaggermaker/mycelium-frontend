@@ -17,6 +17,8 @@ const MORE_LINKS = [
   { to: '/learn',      label: 'Learn',      icon: '📚' },
   { to: '/makers',     label: 'Makers',     icon: '⚒' },
   { to: '/advocate',   label: 'Advocate',   icon: '⚖' },
+  { to: '/whistleblower', label: 'Whistleblower', icon: '🕊' },
+  { to: '/accountability', label: 'Accountability Forum', icon: '📣' },
   { to: '/legislature', label: 'Legislature', icon: '🏛️' },
   { href: 'https://unprecedentedtimes.org/the-mycelium-covenant', label: 'Covenant', icon: '⬡', external: true, covenant: true },
   { to: '/merch',      label: 'Merch',      icon: '🛍' },
@@ -91,7 +93,10 @@ export default function Nav({ onAuthOpen, onInviteOpen }) {
               <circle cx="22" cy="12" r="1.5" fill="currentColor" opacity=".6" />
               <circle cx="2" cy="12" r="1.5" fill="currentColor" opacity=".6" />
             </svg>
-            Mycelium
+            <span className="nav-logo-text">
+              Mycelium
+              <span className="nav-logo-tagline">Not revolution. Ascension.</span>
+            </span>
           </Link>
 
           {/* Primary nav links */}

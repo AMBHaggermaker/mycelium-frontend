@@ -535,4 +535,30 @@ export default {
       xhr.send(formData);
     });
   },
+
+  // Whistleblower forum
+  submitWhistleblower: (formData, token) =>
+    fetch(`${BASE}/whistleblower`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    }).then(async res => {
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      if (!res.ok) throw new Error(data.error || 'Submit failed');
+      return data;
+    }),
+  getWhistleblowerStatus:  (tokenStr)            => get(`/whistleblower/status/${tokenStr}`),
+  postWhistleblowerReply:  (tokenStr, content)   => post(`/whistleblower/status/${tokenStr}/messages`, { content }),
+  getPublishedWhistleblower: ()                  => get('/whistleblower/published'),
+  // admin
+  getWhistleblowerQueue:   (status, token)       => get(`/whistleblower/admin${status ? `?status=${status}` : ''}`, token),
+  getWhistleblowerDetail:  (id, token)           => get(`/whistleblower/admin/${id}`, token),
+  postWhistleblowerAdminReply: (id, content, sender_type, token) =>
+    post(`/whistleblower/admin/${id}/messages`, { content, sender_type }, token),
+  setWhistleblowerStatus:  (id, data, token)     => patch(`/whistleblower/admin/${id}/status`, data, token),
+
+  // Marketplace anomaly pattern mapping (Commerce Anomalies)
+  submitMarketplaceAnomaly: (data, token)         => post('/marketplace/anomalies', data, token),
+  getMarketplaceAnomalies:  (params, token)       => get(`/marketplace/anomalies${qs(params)}`, token),
+  getMarketplaceClusters:   (token)               => get('/marketplace/clusters', token),
 };

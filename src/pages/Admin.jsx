@@ -61,6 +61,10 @@ export default function Admin() {
             onClick={() => setTab('copyright')}>
             Copyright Claims
           </button>
+          <button className={`tab-btn${tab === 'whistleblower' ? ' active' : ''}`}
+            onClick={() => setTab('whistleblower')}>
+            Whistleblower
+          </button>
           {user.role === 'admin' && (
             <button className={`tab-btn${tab === 'child-safety' ? ' active' : ''}`}
               style={{ color: tab === 'child-safety' ? '#ff4060' : undefined }}
@@ -89,9 +93,178 @@ export default function Admin() {
         {tab === 'businesses' && user.role === 'admin' && <BusinessesTab token={token} />}
         {tab === 'feedback' && user.role === 'admin' && <FeedbackTab token={token} />}
         {tab === 'copyright' && <CopyrightClaimsTab token={token} />}
+        {tab === 'whistleblower' && <WhistleblowerTab token={token} userRole={user.role} />}
         {tab === 'child-safety' && user.role === 'admin' && <ChildSafetyTab token={token} />}
         {tab === 'xrp-donations' && user.role === 'admin' && <XrpDonationsTab token={token} />}
         {tab === 'audit-log' && user.username === 'AMBHaggermaker' && <AuditLogTab token={token} />}
+      </div>
+    </div>
+  );
+}
+
+const WB_STATUSES = ['pending', 'under_review', 'published', 'rejected', 'referred'];
+const WB_API_HOST = 'https://mycelium.unprecedentedtimes.org';
+
+function WhistleblowerTab({ token, userRole }) {
+  const [items, setItems]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr]       = useState(null);
+  const [filter, setFilter] = useState('');
+  const [openId, setOpenId] = useState(null);
+
+  const isAdmin = userRole === 'admin';
+
+  function load() {
+    setLoading(true);
+    api.getWhistleblowerQueue(filter, token)
+      .then(setItems).catch(e => setErr(e.message)).finally(() => setLoading(false));
+  }
+  useEffect(() => { load(); }, [token, filter]);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <label style={{ fontSize: '.8rem', color: 'var(--muted)' }}>Status</label>
+        <select className="form-select" style={{ width: 'auto' }} value={filter} onChange={e => setFilter(e.target.value)}>
+          <option value="">All</option>
+          {WB_STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+        </select>
+        <span style={{ fontSize: '.8rem', color: 'var(--muted)' }}>{items.length} submissions</span>
+      </div>
+
+      {loading ? <div className="spinner" /> :
+       err ? <p className="error-msg">{err}</p> :
+       items.length === 0 ? <p className="empty">No submissions.</p> :
+       <div className="table-scroll-wrap">
+         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+           <thead><tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
+             <th style={{ padding: '.5rem' }}>Title</th>
+             <th style={{ padding: '.5rem' }}>Tier</th>
+             <th style={{ padding: '.5rem' }}>Category</th>
+             <th style={{ padding: '.5rem' }}>Status</th>
+             <th style={{ padding: '.5rem' }}>Docs</th>
+             <th style={{ padding: '.5rem' }}>Filed</th>
+             <th></th>
+           </tr></thead>
+           <tbody>
+             {items.map(it => (
+               <tr key={it.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                 <td style={{ padding: '.5rem' }}>{it.title}</td>
+                 <td style={{ padding: '.5rem' }}>{it.tier}</td>
+                 <td style={{ padding: '.5rem' }}>{it.category}</td>
+                 <td style={{ padding: '.5rem' }}>{it.status.replace('_', ' ')}</td>
+                 <td style={{ padding: '.5rem' }}>{it.document_count}</td>
+                 <td style={{ padding: '.5rem', fontSize: '.78rem', color: 'var(--muted)' }}>
+                   {new Date(it.created_at).toLocaleDateString()}
+                 </td>
+                 <td style={{ padding: '.5rem' }}>
+                   <button className="btn btn-outline btn-sm" onClick={() => setOpenId(it.id)}>Review</button>
+                 </td>
+               </tr>
+             ))}
+           </tbody>
+         </table>
+       </div>}
+
+      {openId && (
+        <WhistleblowerDetail id={openId} token={token} isAdmin={isAdmin}
+          onClose={() => setOpenId(null)} onChanged={load} />
+      )}
+    </div>
+  );
+}
+
+function WhistleblowerDetail({ id, token, isAdmin, onClose, onChanged }) {
+  const [data, setData] = useState(null);
+  const [err, setErr]   = useState(null);
+  const [reply, setReply] = useState('');
+  const [reason, setReason] = useState('');
+
+  function load() {
+    api.getWhistleblowerDetail(id, token).then(setData).catch(e => setErr(e.message));
+  }
+  useEffect(() => { load(); }, [id]);
+
+  async function setStatus(status) {
+    const body = { status };
+    if (status === 'rejected') body.reject_reason = reason || 'No reason provided';
+    if (status === 'referred') body.referred_to = reason || 'Referred';
+    try { await api.setWhistleblowerStatus(id, body, token); load(); onChanged?.(); }
+    catch (e) { alert(e.message); }
+  }
+
+  async function sendReply() {
+    if (!reply.trim()) return;
+    try {
+      await api.postWhistleblowerAdminReply(id, reply.trim(), 'investigator', token);
+      setReply(''); load();
+    } catch (e) { alert(e.message); }
+  }
+
+  const s = data?.submission;
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 640 }}>
+        <div className="modal-header">
+          <span className="modal-title">Whistleblower submission</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          {err && <p className="error-msg">{err}</p>}
+          {!data ? <div className="spinner" /> : (
+            <>
+              <h3 style={{ fontWeight: 700, marginBottom: '.3rem' }}>{s.title}</h3>
+              <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: '.5rem' }}>
+                {s.tier} · {s.category} · status: <strong>{s.status.replace('_', ' ')}</strong>
+                {s.submitter_username && ` · ${s.submitter_username}`}
+                {s.submitter_contact && ` · contact: ${s.submitter_contact}`}
+              </p>
+              <p style={{ fontSize: '.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: '.6rem' }}>{s.summary}</p>
+
+              {s.documents?.length > 0 || data.documents?.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem', marginBottom: '.6rem' }}>
+                  {data.documents.map(d => (
+                    <a key={d.id} href={`${WB_API_HOST}${d.url}`} target="_blank" rel="noreferrer"
+                      className="btn btn-outline btn-sm">📄 {d.original_filename || 'Document'}</a>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* Message thread */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '.6rem', marginBottom: '.6rem' }}>
+                <p style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: '.4rem' }}>Follow-up thread</p>
+                {(data.messages || []).map(m => (
+                  <div key={m.id} style={{ marginBottom: '.5rem' }}>
+                    <p style={{ fontSize: '.7rem', color: 'var(--muted)' }}>
+                      {m.is_from_submitter ? 'Submitter' : m.sender_type}
+                      {m.ai_summarized && ' · This response has been AI-summarized to protect submitter identity. Factual content is preserved.'}
+                    </p>
+                    <p style={{ fontSize: '.85rem' }}>{m.content}</p>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: '.5rem', marginTop: '.4rem' }}>
+                  <input className="form-input" value={reply} onChange={e => setReply(e.target.value)}
+                    placeholder="Ask the submitter a question…" style={{ flex: 1 }} />
+                  <button className="btn btn-primary btn-sm" onClick={sendReply}>Send</button>
+                </div>
+              </div>
+
+              {isAdmin && (
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '.6rem' }}>
+                  <input className="form-input" value={reason} onChange={e => setReason(e.target.value)}
+                    placeholder="Reason (for reject) or organization (for referral)" style={{ marginBottom: '.5rem' }} />
+                  <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                    <button className="btn btn-outline btn-sm" onClick={() => setStatus('under_review')}>Under Review</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => setStatus('published')}>Publish</button>
+                    <button className="btn btn-outline btn-sm" onClick={() => setStatus('referred')}>Refer</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => setStatus('rejected')}>Reject</button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

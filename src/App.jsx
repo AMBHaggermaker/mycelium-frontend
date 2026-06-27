@@ -36,6 +36,8 @@ import WorkDetail from './pages/WorkDetail';
 import MakerUpload from './pages/MakerUpload';
 import GuildThanks from './pages/GuildThanks';
 import CopyrightPolicy from './pages/CopyrightPolicy';
+import Whistleblower from './pages/Whistleblower';
+import AccountabilityForum from './pages/AccountabilityForum';
 import AuthModal from './components/AuthModal';
 import InviteModal from './components/InviteModal';
 import FeedbackButton from './components/FeedbackButton';
@@ -146,10 +148,10 @@ export default function App() {
         <Route path="/chat"        element={<Chat onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/admin"       element={<Admin />} />
         <Route path="/watch"        element={<Watch onRequireAuth={() => setAuthOpen(true)} />} />
-        <Route path="/watch/water"  element={<WatchWater  onRequireAuth={() => setAuthOpen(true)} />} />
-        <Route path="/watch/air"    element={<WatchAir    onRequireAuth={() => setAuthOpen(true)} />} />
-        <Route path="/watch/soil"   element={<WatchSoil   onRequireAuth={() => setAuthOpen(true)} />} />
-        <Route path="/watch/energy" element={<WatchEnergy onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/watch/water"  element={<PageErrorBoundary><WatchWater  onRequireAuth={() => setAuthOpen(true)} /></PageErrorBoundary>} />
+        <Route path="/watch/air"    element={<PageErrorBoundary><WatchAir    onRequireAuth={() => setAuthOpen(true)} /></PageErrorBoundary>} />
+        <Route path="/watch/soil"   element={<PageErrorBoundary><WatchSoil   onRequireAuth={() => setAuthOpen(true)} /></PageErrorBoundary>} />
+        <Route path="/watch/energy" element={<PageErrorBoundary><WatchEnergy onRequireAuth={() => setAuthOpen(true)} /></PageErrorBoundary>} />
         <Route path="/merch"       element={<Merch />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="/settings"        element={<Settings />} />
@@ -160,6 +162,8 @@ export default function App() {
         <Route path="/advocate"        element={<Advocate onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/messages"        element={<Messages onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/covenant"        element={<Covenant />} />
+        <Route path="/whistleblower"   element={<Whistleblower onRequireAuth={() => setAuthOpen(true)} />} />
+        <Route path="/accountability"  element={<AccountabilityForum />} />
         <Route path="/my-posts"        element={<MyPosts />} />
         <Route path="/businesses"      element={<Businesses onRequireAuth={() => setAuthOpen(true)} />} />
         <Route path="/businesses/:id"  element={<BusinessProfile />} />

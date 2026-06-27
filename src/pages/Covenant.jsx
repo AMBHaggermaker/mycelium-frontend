@@ -54,6 +54,28 @@ export default function Covenant() {
             </p>
           </section>
 
+          <section className="covenant-section" style={{ textAlign: 'center', margin: '2rem 0' }}>
+            <p style={{
+              fontFamily: "'Cinzel Decorative', serif",
+              fontSize: '1.35rem',
+              fontWeight: 700,
+              color: '#00ff88',
+              textShadow: '0 0 8px rgba(0,255,136,0.55), 0 0 18px rgba(0,255,136,0.25)',
+              letterSpacing: '.04em',
+              marginBottom: '1.1rem',
+            }}>
+              Not revolution. Ascension.
+            </p>
+            <p style={{ fontSize: '.95rem', lineHeight: 1.8, color: 'var(--text)', maxWidth: 620, margin: '0 auto', textAlign: 'left' }}>
+              This platform is not built for revolution. Revolution is cyclical — it turns the wheel and
+              arrives back where it started, with different people holding the same power over the same
+              systems. We are building for those who want to ascend. Not to seize what exists but to build
+              what doesn't yet. Not to oppose the old system but to outgrow it. The mycelium doesn't fight
+              the soil. It moves through it, builds within it, and eventually what grows above the surface
+              is something the soil alone could never have produced.
+            </p>
+          </section>
+
           <section className="covenant-section">
             <h2 className="covenant-heading">I. We show up honestly.</h2>
             <p>We use our real names or consistent identities. We do not create fake accounts, impersonate

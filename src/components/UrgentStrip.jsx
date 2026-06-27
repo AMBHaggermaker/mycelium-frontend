@@ -53,9 +53,15 @@ export default function UrgentStrip() {
           </a>
         ))}
       </div>
-      <a href={LF_BASE} target="_blank" rel="noopener noreferrer" className="urgent-all-link">
-        View all →
-      </a>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '.15rem', alignItems: 'flex-end' }}>
+        <a href={LF_BASE} target="_blank" rel="noopener noreferrer" className="urgent-all-link">
+          View all →
+        </a>
+        <a href={`${LF_BASE}/map`} target="_blank" rel="noopener noreferrer" className="urgent-all-link"
+          style={{ fontSize: '.8rem', opacity: .85 }}>
+          🗺 Map view →
+        </a>
+      </div>
     </div>
   );
 }
